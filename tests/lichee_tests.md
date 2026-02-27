@@ -1,6 +1,6 @@
 # Тестирование Lichee RV Dock 
 
-![alt text](/pictures/stend.jpg)
+![Стенд](/pictures/stend.jpg)
 
 ## Схема стенда
 
@@ -9,9 +9,8 @@
 - Arduino Mega 2560 - инструмент тестирования;
 - ПК - место сбора данных и их визуализации.
 
-[Визуализации результатов](/results/lichee_results/rt_stress_50_99.png)
+[Визуализации результатов](https://altlinux.space/besogon1238/rt-tester/src/branch/main/results)
 
-[JSON со статистикой](/results/lichee_results/latency_jitter_session_674070_20260205_121017.json)
 
 Схема подключения:
 
@@ -20,11 +19,11 @@
 
  Между устройствами стоит логический преобразователь уровней.
 
-![alt text](/pictures/pinout.png)
+![Распиновка](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/pinout.png)
 
 ## Код для ПК
 
-[Код для ПК](/examples/pc-data-receiver/)
+[Код для ПК](https://altlinux.space/besogon1238/rt-tester/src/branch/main/examples/pc-data-receiver)
 
 Код на Python управляет измерениями задержек между Arduino Mega и Lichee RV Dock. Он подключается к Arduino через последовательный порт, отправляет команды управления и принимает обработанные данные в формате JSON. Программа работает в интерактивном режиме с консольным управлением.
 
@@ -34,7 +33,7 @@
 
 ## Код для Arduino
 
-[Код для Arduino](/examples/arduino-measure/)
+[Код для Arduino](https://altlinux.space/besogon1238/rt-tester/src/branch/main/examples/arduino-measure)
 
 Код на Arduino C измеряет задержки в системе связи с Lichee RV Dock. Он отправляет импульсы через пин 7 и принимает ответные сигналы через пин 19. Для каждого импульса измеряется **время отклика системы**(разница между отправкой сигналом на Lichee и получением ответного) и **период между ответными сигналами**.
 
@@ -48,7 +47,7 @@
 
 ## Код для Lichee
 
-[Код для Lichee](/examples/lichee-example.c)
+[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/examples/lichee-example.c)
 
 Собрать код для Lichee:
 
