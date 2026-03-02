@@ -3,8 +3,8 @@
 
 #include "globals.h"
 
-void initPins();                     // настройка пинов и прерывания
-void onResponse();                    // обработчик прерывания (ISR)
-void processGroupStatistics();        // расчёт статистики по завершённой группе
+void initPins();
+void onResponse();           // обработчик прерывания
+void sendGroupStatistics();   // отправка статистики группы на ПК
 
 #endif

@@ -1,6 +1,6 @@
 # Тестирование Lichee RV Dock 
 
-![Стенд](/pictures/stend.jpg)
+![Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend.jpg)
 
 ## Схема стенда
 

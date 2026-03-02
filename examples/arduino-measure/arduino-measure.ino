@@ -1,28 +1,23 @@
-// Основной файл arduino-example.ino
+#include <ArduinoJson.h>
 #include "config.h"
 #include "globals.h"
 #include "measurement.h"
-#include "statistics.h"
-#include <ArduinoJson.h>
 
 void setup() {
   Serial.begin(115200);
-  initPins();                     // из measurement.h
+  initPins();
   interrupts();
   randomSeed(analogRead(0));
   sessionId = random(100000, 999999);
+  
+  Serial.println(F("{\"status\":\"ready\",\"message\":\"Continuous measurement mode\"}"));
 }
 
 void loop() {
-  checkSerialCommands();          // обработка команд (определена ниже)
+  // Обработка команд из Serial (оставлена в основном файле)
+  checkSerialCommands();
 
-  if (sendDataFlag && (groupIndex == NUM_GROUPS)) {
-    sendAveragedJsonData();       // из statistics.h
-    sendDataFlag = false;
-    collectingData = false;
-  }
-
-  if (collectingData && (groupIndex < NUM_GROUPS)) {
+  if (collectingData) {
     // Отправка импульса на Lichee
     t_start = micros();
     active = !active;
@@ -33,46 +28,55 @@ void loop() {
     }
     delayMicroseconds(DELAY_MICROSECONDS);
 
-    // Если группа завершена – обработать статистику
+    // Если группа завершена – отправляем статистику
     if (measurementInGroup >= GROUP_SIZE) {
-      processGroupStatistics();   // из measurement.h
+      sendGroupStatistics();
       groupIndex++;
       measurementInGroup = 0;
-
-      if (groupIndex == NUM_GROUPS) {
-        Serial.println(F("{\"status\":\"data_ready\",\"message\":\"All groups collected\"}"));
-        collectingData = false;
+      
+      // Не останавливаемся, продолжаем бесконечно
+      if (groupIndex % 10 == 0) {
+        // Можно выводить прогресс раз в 10 групп
+        Serial.print(F("{\"progress\":\""));
+        Serial.print(groupIndex);
+        Serial.println(F("\"}"));
       }
     }
   }
 }
 
-// Обработка команд из Serial (оставлена в основном файле)
+// Обработка команд из Serial
 void checkSerialCommands() {
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
     command.trim();
-
+    
     if (command == "START") {
       groupIndex = 0;
       measurementInGroup = 0;
-      sendDataFlag = false;
       collectingData = true;
-      Serial.println(F("{\"status\":\"started\",\"message\":\"Measurement started\"}"));
+      
+      StaticJsonDocument<128> doc;
+      doc["status"] = "started";
+      doc["session_id"] = sessionId;
+      serializeJson(doc, Serial);
+      Serial.println();
     }
-    else if (command == "SEND") {
-      if (groupIndex == NUM_GROUPS) {
-        Serial.println(F("{\"status\":\"sending\",\"message\":\"Preparing to send averaged data\"}"));
-        sendDataFlag = true;
-      } else {
-        Serial.println(F("{\"status\":\"error\",\"message\":\"Data not ready yet\"}"));
-      }
+    else if (command == "STOP") {
+      collectingData = false;
+      
+      StaticJsonDocument<64> doc;
+      doc["status"] = "stopped";
+      doc["groups_collected"] = groupIndex;
+      serializeJson(doc, Serial);
+      Serial.println();
     }
     else if (command == "STATUS") {
-      StaticJsonDocument<200> doc;
-      doc["status"] = "status_report";
-      doc["groups_collected"] = groupIndex;
-      doc["measurements_in_current_group"] = measurementInGroup;
+      StaticJsonDocument<128> doc;
+      doc["status"] = "status";
+      doc["collecting"] = collectingData;
+      doc["groups"] = groupIndex;
+      doc["measurements"] = measurementInGroup;
       doc["session_id"] = sessionId;
       serializeJson(doc, Serial);
       Serial.println();
@@ -80,14 +84,9 @@ void checkSerialCommands() {
     else if (command == "RESET") {
       groupIndex = 0;
       measurementInGroup = 0;
-      sendDataFlag = false;
       collectingData = false;
-      Serial.println(F("{\"status\":\"reset\",\"message\":\"Measurements reset\"}"));
-    }
-    else {
-      Serial.print(F("{\"status\":\"error\",\"message\":\"Unknown command: "));
-      Serial.print(command);
-      Serial.println(F("\"}"));
+      
+      Serial.println(F("{\"status\":\"reset\"}"));
     }
   }
 }

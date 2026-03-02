@@ -1,6 +1,6 @@
 # Тестирование Radxa rk3588 5b
 
-![Стенд](/pictures/stend_radxa.jpg)
+![Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend_radxa.jpg)
 
 ## Схема стенда
 
