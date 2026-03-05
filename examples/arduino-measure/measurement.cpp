@@ -1,5 +1,6 @@
 #include "measurement.h"
 #include <ArduinoJson.h>
+#include <math.h>
 
 // Определения глобальных переменных
 volatile bool active = false;
@@ -15,7 +16,7 @@ volatile uint8_t* portInputRegisterPin20;
 uint8_t pin20Mask;
 
 volatile unsigned long currentGroupLatency[GROUP_SIZE];
-volatile unsigned long currentGroupJitter[GROUP_SIZE];
+volatile unsigned long currentGroupJitter[GROUP_SIZE];  // больше не используется для расчёта, но оставим для совместимости
 
 void initPins() {
   pinMode(PIN_OUT, OUTPUT);
@@ -34,78 +35,102 @@ void onResponse() {
     unsigned long currentTime = micros();
     unsigned long latency = currentTime - t_start;
 
-    unsigned long jitter = 0;
-    if (measurementInGroup > 0) {
-      jitter = abs((long)(latency - currentGroupLatency[measurementInGroup-1]));
-    }
-
+    // Сохраняем задержку
     currentGroupLatency[measurementInGroup] = latency;
-    currentGroupJitter[measurementInGroup] = jitter;
+    
+    // Для обратной совместимости можно не заполнять jitter массив
+    // или заполнять чем-то, но он больше не используется в расчётах
+    
     measurementInGroup++;
   }
 }
 
-void sendGroupStatistics() {
-    if (GROUP_SIZE == 0) return;
+// Функция для поиска N наибольших значений
+void findNLargest(unsigned long* source, int sourceSize, 
+                  unsigned long* dest, int destSize) {
+  // Инициализируем массив назначения нулями
+  for (int i = 0; i < destSize; i++) {
+    dest[i] = 0;
+  }
+  
+  // Проходим по всем исходным значениям
+  for (int i = 0; i < sourceSize; i++) {
+    unsigned long currentValue = source[i];
+    //Serial.print("\nЗадержка №");Serial.print(i);Serial.print(" равна ");Serial.print(currentValue);
+
     
-    const int WORST_COUNT = 5;  // Количество худших значений для анализа latency
-    
-    // Массив для хранения WORST_COUNT самых больших значений latency
-    unsigned long worstLatency[WORST_COUNT] = {0};
-    
-    // Проходим по всем измерениям и находим WORST_COUNT самых больших задержек
-    for (int i = 0; i < GROUP_SIZE; i++) {
-        unsigned long currentLatency = currentGroupLatency[i];
-        
-        // Вставляем в массив worstLatency, если значение больше минимального в нём
-        for (int j = 0; j < WORST_COUNT; j++) {
-            if (currentLatency > worstLatency[j]) {
-                // Сдвигаем меньшие значения вправо
-                for (int k = WORST_COUNT - 1; k > j; k--) {
-                    worstLatency[k] = worstLatency[k-1];
-                }
-                worstLatency[j] = currentLatency;
-                break;
-            }
+    // Вставляем в dest, если значение больше минимального в нём
+    for (int j = 0; j < destSize; j++) {
+      if (currentValue > dest[j]) {
+        // Сдвигаем меньшие значения вправо
+        for (int k = destSize - 1; k > j; k--) {
+          dest[k] = dest[k-1];
         }
+        dest[j] = currentValue;
+        break;
+      }
     }
+  }
+}
+
+// Функция для вычисления стандартного отклонения (джеттер)
+float calculateJitter() {
+  if (GROUP_SIZE <= 1) return 0.0;
+  
+  // 1. Вычисляем среднее арифметическое всех задержек в группе
+  unsigned long sumLatency = 0;
+  for (int i = 0; i < GROUP_SIZE; i++) {
+    sumLatency += currentGroupLatency[i];
+  }
+  float meanLatency = (float)sumLatency / GROUP_SIZE;
+  
+  // 2. Вычисляем сумму квадратов отклонений от среднего
+  double sumSquaredDiff = 0;  // используем double для большей точности
+  for (int i = 0; i < GROUP_SIZE; i++) {
+    double diff = (double)currentGroupLatency[i] - meanLatency;
+    sumSquaredDiff += diff * diff;
+  }
+  
+  // 3. Стандартное отклонение (джеттер)
+  // Для генеральной совокупности делим на GROUP_SIZE
+  // Для выборки обычно делят на GROUP_SIZE-1, но здесь вся группа - это и есть наша совокупность
+  float variance = sumSquaredDiff / GROUP_SIZE;
+  float jitter = sqrt(variance);
+  
+  return jitter;
+}
+
+void sendGroupData() {
+    if (GROUP_SIZE == 0) return;
+        
+    // Массив для хранения WORST_COUNT самых больших значений latency
+    unsigned long worstLatency[WORST_COUNT];
     
-    // Вычисляем статистику latency по худшим значениям
-    unsigned long minLatency = worstLatency[WORST_COUNT-1];
-    unsigned long maxLatency = worstLatency[0];
-    unsigned long sumLatency = 0;
+    // Находим 25 худших задержек
+    findNLargest((unsigned long*)currentGroupLatency, GROUP_SIZE, 
+                 worstLatency, WORST_COUNT);
     
-    for (int i = 0; i < WORST_COUNT; i++) {
-        sumLatency += worstLatency[i];
-        // Обновляем min/max (хотя они уже отсортированы, но для надёжности)
-        if (worstLatency[i] < minLatency) minLatency = worstLatency[i];
-        if (worstLatency[i] > maxLatency) maxLatency = worstLatency[i];
-    }
-    
-    float avgLatency = (float)sumLatency / WORST_COUNT;
-    
-    // Вычисляем джиттер по ВСЕМ измерениям (как в оригинале)
-    unsigned long sumJitter = 0;
-    for (int i = 1; i < GROUP_SIZE; i++) {
-        sumJitter += currentGroupJitter[i];
-    }
-    float avgJitter = (float)sumJitter / (GROUP_SIZE - 1);
+    // Вычисляем джиттер по стандартной формуле (стандартное отклонение)
+    float jitter = calculateJitter();
+
+    //Serial.print("\n Джиттер группы: ");Serial.print(jitter);
     
     // Отправляем JSON
-    StaticJsonDocument<384> doc;
+    StaticJsonDocument<1024> doc;
+    
     doc["session_id"] = sessionId;
     doc["group_index"] = groupIndex;
     doc["timestamp"] = millis();
-    doc["avg_latency_us"] = avgLatency;
-    doc["min_latency_us"] = minLatency;
-    doc["max_latency_us"] = maxLatency;
-    doc["avg_jitter_us"] = avgJitter;
-    
-    // Добавляем информацию о том, что статистика latency только по худшим
-    doc["latency_stats_type"] = "worst_25";
-    doc["jitter_stats_type"] = "all_measurements";
+    doc["jitter_us"] = jitter; 
     doc["total_measurements"] = GROUP_SIZE;
     doc["worst_count"] = WORST_COUNT;
+    
+    // Добавляем массив худших задержек
+    JsonArray worstLatencies = doc.createNestedArray("worst_latencies_us");
+    for (int i = 0; i < WORST_COUNT; i++) {
+        worstLatencies.add(worstLatency[i]);
+        //Serial.print("\nХудшая задержка ранга ");Serial.print(i);Serial.print(" равна ");Serial.print(worstLatency[i]);
+    }
     
     JsonObject params = doc.createNestedObject("parameters");
     params["delay_us"] = DELAY_MICROSECONDS;

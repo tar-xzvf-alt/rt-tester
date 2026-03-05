@@ -1,0 +1,15 @@
+2026-03-05 16:18:55,083 - INFO - Group 0 received, jitter: 10.85 µs
+2026-03-05 16:18:55,453 - INFO - Group 1 received, jitter: 12.52 µs
+2026-03-05 16:18:55,827 - INFO - Group 2 received, jitter: 10.90 µs
+2026-03-05 16:18:56,203 - INFO - Group 3 received, jitter: 10.72 µs
+2026-03-05 16:18:56,581 - INFO - Group 4 received, jitter: 6.19 µs
+2026-03-05 16:18:56,955 - INFO - Group 5 received, jitter: 8.84 µs
+2026-03-05 16:18:57,335 - INFO - Group 6 received, jitter: 8.16 µs
+2026-03-05 16:18:57,703 - INFO - Group 7 received, jitter: 13.93 µs
+2026-03-05 16:18:58,079 - INFO - Group 8 received, jitter: 9.28 µs
+2026-03-05 16:18:58,454 - INFO - Group 9 received, jitter: 13.72 µs
+2026-03-05 16:18:58,829 - INFO - Group 10 received, jitter: 11.10 µs
+2026-03-05 16:18:59,206 - INFO - Group 11 received, jitter: 14.51 µs
+2026-03-05 16:18:59,359 - INFO - Auto-stop triggered after 12 groups
+2026-03-05 16:18:59,360 - INFO - Session ended. Total groups: 12
+2026-03-05 16:18:59,360 - INFO - Session duration: 4.693 sec

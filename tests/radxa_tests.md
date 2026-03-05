@@ -47,12 +47,12 @@
 
 ## Код для Radxa
 
-[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/examples/radxa-example.c)
+[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivstigation/radxa.c)
 
 Собрать код для Radxa:
 
 ```
-gcc radxa-example.c -lgpiod -o radxa-example
+gcc radxa.c -lgpiod -o radxa
 ```
 
 Код на C работает на Radxa и реализует ответную логику в системе измерений. Программа настраивает два GPIO-пина: один как вход для приема импульсов от Arduino, второй как выход для отправки ответных сигналов.

@@ -7,8 +7,6 @@ void setup() {
   Serial.begin(115200);
   initPins();
   interrupts();
-  randomSeed(analogRead(0));
-  sessionId = random(100000, 999999);
   
   Serial.println(F("{\"status\":\"ready\",\"message\":\"Continuous measurement mode\"}"));
 }
@@ -30,7 +28,7 @@ void loop() {
 
     // Если группа завершена – отправляем статистику
     if (measurementInGroup >= GROUP_SIZE) {
-      sendGroupStatistics();
+      sendGroupData();
       groupIndex++;
       measurementInGroup = 0;
       
@@ -52,6 +50,8 @@ void checkSerialCommands() {
     command.trim();
     
     if (command == "START") {
+      randomSeed(analogRead(0));
+      sessionId = random(100000, 999999);
       groupIndex = 0;
       measurementInGroup = 0;
       collectingData = true;

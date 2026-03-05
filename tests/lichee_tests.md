@@ -47,12 +47,12 @@
 
 ## Код для Lichee
 
-[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/examples/lichee-example.c)
+[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivstigation/lichee.c)
 
 Собрать код для Lichee:
 
 ```
-gcc lichee-example.c -lgpiod -o lichee-example
+gcc lichee.c -lgpiod -o lichee
 ```
 
 Код на C работает на Lichee RV Dock и реализует ответную логику в системе измерений. Программа настраивает два GPIO-пина: один как вход для приема импульсов от Arduino, второй как выход для отправки ответных сигналов.

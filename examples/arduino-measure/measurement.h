@@ -3,8 +3,8 @@
 
 #include "globals.h"
 
-void initPins();
-void onResponse();           // обработчик прерывания
-void sendGroupStatistics();   // отправка статистики группы на ПК
+void initPins();        // инициализация пинов
+void onResponse();      // обработчик прерывания
+void sendGroupData();   // отправка джиттера группы и худших задержек ПК
 
 #endif

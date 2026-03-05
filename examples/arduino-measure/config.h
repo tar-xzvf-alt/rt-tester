@@ -6,5 +6,6 @@ const int PIN_IN = 20;
 const int GROUP_SIZE = 500;      
 const int NUM_GROUPS = 10;
 const unsigned int DELAY_MICROSECONDS = 300;
+const int WORST_COUNT = 25;  // Количество худших задержек для отправки
 
 #endif
