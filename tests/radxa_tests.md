@@ -1,6 +1,6 @@
 # Тестирование Radxa rk3588 5b
 
-![Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend_radxa.jpg)
+[Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend_radxa.jpg)
 
 ## Схема стенда
 
@@ -19,11 +19,11 @@
 
  Между устройствами стоит логический преобразователь уровней.
 
-![Распиновка](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/rock5bp_40pin_power_3.png)
+[Распиновка](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/rock5bp_40pin_power_3.png)
 
 ## Код для ПК
 
-[Код для ПК](https://altlinux.space/besogon1238/rt-tester/src/branch/main/examples/pc-data-receiver)
+[Код для ПК](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver)
 
 Код на Python управляет измерениями задержек между Arduino Mega и Radxa. Он подключается к Arduino через последовательный порт, отправляет команды управления и принимает обработанные данные в формате JSON. Программа работает в интерактивном режиме с консольным управлением.
 
@@ -33,7 +33,7 @@
 
 ## Код для Arduino
 
-[Код для Arduino](https://altlinux.space/besogon1238/rt-tester/src/branch/main/examples/arduino-measure)
+[Код для Arduino](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/arduino-meter)
 
 Код на Arduino C измеряет задержки в системе связи с Radxa. Он отправляет импульсы через пин 7 и принимает ответные сигналы через пин 19. Для каждого импульса измеряется **время отклика системы**(разница между отправкой сигналом на Radxa и получением ответного) и **период между ответными сигналами**.
 
@@ -47,7 +47,7 @@
 
 ## Код для Radxa
 
-[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivstigation/radxa.c)
+[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivestigation/radxa.c)
 
 Собрать код для Radxa:
 
