@@ -33,14 +33,13 @@ void onResponse() {
     unsigned long currentTime = micros();
     unsigned long latency = currentTime - t_start;
 
-    // Сохраняем задержку
     currentGroupLatency[measurementInGroup] = latency;
     
     measurementInGroup++;
   }
 }
 
-// Функция для поиска N наибольших значений
+// Find N largest values in source
 void findNLargest(unsigned long* source, int sourceSize, unsigned long* dest, int destSize) 
 {
   for (int i = 0; i < destSize; i++) {
@@ -49,13 +48,13 @@ void findNLargest(unsigned long* source, int sourceSize, unsigned long* dest, in
 
   for (int i = 0; i < sourceSize; i++) {
     unsigned long currentValue = source[i];
-    //Serial.print("\nЗадержка №");Serial.print(i);Serial.print(" равна ");Serial.print(currentValue);
+    //Serial.print("\nLatency №");Serial.print(i);Serial.print(" = ");Serial.print(currentValue);
 
     
-    // Вставляем в dest, если значение больше минимального в нём
+    // Insert into dest, if value more then min
     for (int j = 0; j < destSize; j++) {
       if (currentValue > dest[j]) {
-        // Сдвигаем меньшие значения вправо
+        // Move dest[] less then currentValue to "right"
         for (int k = destSize - 1; k > j; k--) {
           dest[k] = dest[k-1];
         }
@@ -66,7 +65,7 @@ void findNLargest(unsigned long* source, int sourceSize, unsigned long* dest, in
   }
 }
 
-// Функция для вычисления стандартного отклонения (джеттер)
+// Calculate Jitter for group
 float calculateJitter() {
   if (GROUP_SIZE <= 1) return 0.0;
   
@@ -76,7 +75,7 @@ float calculateJitter() {
   }
   float meanLatency = (float)sumLatency / GROUP_SIZE;
   
-  double sumSquaredDiff = 0;  // используем double для большей точности
+  double sumSquaredDiff = 0;
   for (int i = 0; i < GROUP_SIZE; i++) {
     double diff = (double)currentGroupLatency[i] - meanLatency;
     sumSquaredDiff += diff * diff;
@@ -99,7 +98,7 @@ void sendGroupData() {
     
     float jitter = calculateJitter();
 
-    //Serial.print("\n Джиттер группы: ");Serial.print(jitter);
+    //Serial.print("\n Group jitter: ");Serial.print(jitter);
     
     StaticJsonDocument<1024> doc;
     
@@ -110,7 +109,7 @@ void sendGroupData() {
     doc["total_measurements"] = GROUP_SIZE;
     doc["worst_count"] = WORST_COUNT;
     
-    // Добавляем массив худших задержек
+    // Create array withs worst latencies
     JsonArray worstLatencies = doc.createNestedArray("worst_latencies_us");
     for (int i = 0; i < WORST_COUNT; i++) {
         worstLatencies.add(worstLatency[i]);

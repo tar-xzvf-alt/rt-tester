@@ -3,8 +3,8 @@
 
 #include "globals.h"
 
-void initPins();        // инициализация пинов
-void onResponse();      // обработчик прерывания
-void sendGroupData();   // отправка джиттера группы и худших задержек ПК
+void initPins();        // pin initialization
+void onResponse();      // intrerrupt handler
+void sendGroupData();   // sending data into pc
 
 #endif

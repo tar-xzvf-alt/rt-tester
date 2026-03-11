@@ -241,16 +241,13 @@ def plot_jitter(db_path: str, session_id: int = None, output: str = None) -> Non
     else:
         plt.show()
 
-def show_fall_details(db_path: str, session_id: int = None, 
-                     limit: int = 20, log_to_file: bool = True) -> None:
+def show_fall_details(db_path: str, session_id: int = None) -> None:
     """
     Display detailed information about falls and recoveries.
     
     Args:
         db_path: Path to SQLite database
         session_id: Optional session ID to filter data
-        limit: Maximum number of events to display
-        log_to_file: Whether to save output to session log file
     """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
@@ -273,8 +270,6 @@ def show_fall_details(db_path: str, session_id: int = None,
         query += ' WHERE session_id = ?'
         params.append(session_id)
     
-    query += ' ORDER BY id DESC LIMIT ?'
-    params.append(limit)
     
     cursor.execute(query, params)
     events = cursor.fetchall()
@@ -319,8 +314,8 @@ def show_fall_details(db_path: str, session_id: int = None,
     for line in output_lines:
         print(line)
     
-    # Log to file if requested and session_id is specified
-    if log_to_file and session_id:
+    # Log to file if session_id is specified
+    if session_id:
         logger = setup_session_logging(session_id)
         for line in output_lines:
             logger.info(line)
@@ -484,10 +479,6 @@ def main():
     parser.add_argument('--output', '-o', help='Save plot to file instead of displaying')
     parser.add_argument('--top', type=int, default=25, 
                        help='Number of worst latencies to analyze (1-25, default: 25)')
-    parser.add_argument('--limit', type=int, default=20,
-                       help='Limit entries for events list (default: 20)')
-    parser.add_argument('--no-log', action='store_true',
-                       help='Disable logging to file (console only)')
     
     subparsers = parser.add_subparsers(dest='command', help='Command to execute')
     
@@ -520,7 +511,7 @@ def main():
             show_session_stats(args.db, args.session)
         
         elif args.command == 'falls':
-            show_fall_details(args.db, args.session, args.limit, not args.no_log)
+            show_fall_details(args.db, args.session)
         
         elif args.command == 'latency':
             plot_latency_over_time(args.db, args.session, args.output, args.top)

@@ -89,12 +89,9 @@ int main(void)
     offsets[0] = (GPIO_LINE * 32) + GPIO_IN_LINE;   // Input
     offsets[1] = (GPIO_LINE * 32) + GPIO_OUT_LINE;  // Output
 
-    //offsets[0] = 34;   // Input
-    //offsets[1] = 35;  // Output
-
     //set_irq_thread_priority(132);
 
-    setup_rt(0);
+    //setup_rt(0);
 
     signal(SIGINT, sig_handler);
 
@@ -139,7 +136,7 @@ int main(void)
         return 1;
     }
 
-    gpiod_request_config_set_consumer(req_cfg, "licheeeee");
+    gpiod_request_config_set_consumer(req_cfg, "lichee-int");
 
     req = gpiod_chip_request_lines(chip, req_cfg, line_cfg);
     if (!req) {
