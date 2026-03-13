@@ -4,10 +4,12 @@
 
 volatile bool active = false;
 volatile unsigned long t_start = 0;
-volatile uint8_t groupIndex = 0;
+volatile int groupIndex = 0;
 volatile int measurementInGroup = 0;
+volatile int measurementoverall = 0;
 volatile bool collectingData = false;
 volatile unsigned long sessionId = 0;
+
 
 volatile uint8_t* portOutputRegisterPin7;
 uint8_t pin7Mask;
@@ -36,6 +38,7 @@ void onResponse() {
     currentGroupLatency[measurementInGroup] = latency;
     
     measurementInGroup++;
+    measurementoverall++;
   }
 }
 

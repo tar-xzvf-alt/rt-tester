@@ -3,6 +3,8 @@
 #include "globals.h"
 #include "measurement.h"
 
+int GROUPS_COUNT = 1000; 
+
 void setup() {
   Serial.begin(115200);
   initPins();
@@ -14,29 +16,32 @@ void setup() {
 void loop() {
   checkSerialCommands();
 
-  if (collectingData) {
-    // Send pulse to Lichee
-    t_start = micros();
-    active = !active;
-    if (active) {
-      *portOutputRegisterPin7 |= pin7Mask;
-    } else {
-      *portOutputRegisterPin7 &= ~pin7Mask;
-    }
-    delayMicroseconds(DELAY_MICROSECONDS);
-
-    // If group is complete - send statistics
-    if (measurementInGroup >= GROUP_SIZE) {
-      sendGroupData();
-      groupIndex++;
-      measurementInGroup = 0;
-      
-      // Continue indefinitely, don't stop
-      if (groupIndex % 10 == 0) {
-        // Optional progress output every 10 groups
-        Serial.print(F("{\"progress\":\""));
-        Serial.print(groupIndex);
-        Serial.println(F("\"}"));
+  if(groupIndex < GROUPS_COUNT)
+  {
+    if (collectingData) {
+      // Send pulse to SoC
+      t_start = micros();
+      active = !active;
+      if (active) {
+        *portOutputRegisterPin7 |= pin7Mask;
+      } else {
+        *portOutputRegisterPin7 &= ~pin7Mask;
+      }
+      delayMicroseconds(DELAY_MICROSECONDS);
+  
+      // If group is complete - send statistics
+      if (measurementInGroup >= GROUP_SIZE) {
+        sendGroupData();
+        groupIndex++;
+        measurementInGroup = 0;
+        
+        // Continue indefinitely, don't stop
+        if (groupIndex % 10 == 0) {
+          // Optional progress output every 10 groups
+          Serial.print(F("{\"progress\":\""));
+          Serial.print(groupIndex);
+          Serial.println(F("\"}"));
+        }
       }
     }
   }
@@ -48,7 +53,24 @@ void checkSerialCommands() {
     String command = Serial.readStringUntil('\n');
     command.trim();
     
-    if (command == "START") {
+    if (command.startsWith("START")) {
+      // Parse groups count if provided
+      int spaceIndex = command.indexOf(' ');
+      if (spaceIndex > 0) {
+        // Extract the number after START
+        String groupsStr = command.substring(spaceIndex + 1);
+        groupsStr.trim();
+        int newGroupsCount = groupsStr.toInt();
+        
+        // Update GROUPS_COUNT if valid number provided
+        if (newGroupsCount > 0) {
+          GROUPS_COUNT = newGroupsCount;
+        }
+      } else {
+        // Если число не передано, используем значение по умолчанию (1000)
+        GROUPS_COUNT = 1000;
+      }
+      
       // Generate new session ID
       randomSeed(analogRead(0));
       sessionId = random(100000, 999999);

@@ -6,7 +6,7 @@
 
 extern volatile bool active;
 extern volatile unsigned long t_start;
-extern volatile uint8_t groupIndex;
+extern volatile int groupIndex;
 extern volatile int measurementInGroup;
 extern volatile bool collectingData;
 extern volatile unsigned long sessionId;

@@ -3,16 +3,17 @@ Configuration constants for Arduino collector.
 """
 
 # Database defaults
-DEFAULT_DB_PATH = "arduino_data.db"
+DEFAULT_DB_PATH = "./arduino_data.db"
 
 # Serial communication
 DEFAULT_BAUDRATE = 115200
-SERIAL_TIMEOUT = 1  # seconds
-READ_SLEEP = 0.001  # seconds
+READ_SLEEP = 0.0001  # 1ms sleep in read loop
 
-# Fall monitoring defaults
-DEFAULT_TIMEOUT_US = 10_000_000  # 10 seconds
-DEFAULT_CHECK_INTERVAL_US = 2_000_000  # 2 seconds
+# Fall monitoring
+DEFAULT_TIMEOUT_US = 1000000         # 1000 microseconds
+DEFAULT_CHECK_INTERVAL_US = 1000000  # 1000 microseconds
+
+AUTO_STOP = 10
 
 # Logging
 LOG_DIR = "logs"

@@ -16,8 +16,8 @@ import config
 import database as db
 import serial_comm
 from logging_utils import setup_session_logging
-from monitor import FallMonitor
-
+from arduino_monitor import FallMonitor
+from config_loader import load_config
 
 class ArduinoCollector:
     """
@@ -26,39 +26,33 @@ class ArduinoCollector:
     Handles serial communication, data storage, and system monitoring.
     """
     
-    def __init__(self, db_path=config.DEFAULT_DB_PATH, port=None, 
-                 baudrate=config.DEFAULT_BAUDRATE,
-                 timeout_us=config.DEFAULT_TIMEOUT_US, 
-                 check_interval_us=config.DEFAULT_CHECK_INTERVAL_US,
-                 auto_stop_groups=None):
+    def __init__(self, config_dict, port=None, baudrate=config.DEFAULT_BAUDRATE):
         """
-        Initialize Arduino collector.
+        Initialize Arduino collector with configuration.
         
         Args:
-            db_path: Path to SQLite database file
-            port: Serial port for Arduino (auto-detect if None)
+            config_dict: Complete configuration dictionary from load_config()
+            port: Serial port for Arduino (overrides config)
             baudrate: Serial communication speed
-            timeout_us: Fall detection timeout in microseconds
-            check_interval_us: Fall check interval in microseconds
-            auto_stop_groups: Number of groups after which to auto-stop (None = disabled)
         """
-        self.db_path = db_path
+        self.config = config_dict
+        self.db_path = config_dict['db']
         self.port = port
         self.baudrate = baudrate
         self.ser = None
         self.running = False
         self.groups_received = 0
+        self.groups_try_received = 0
         self.start_time = None
         self.current_session_id = None
-        
-        # Auto-stop configuration
-        self.auto_stop_groups = auto_stop_groups
-        self.auto_stop_triggered = False
-        
-        # Collection state
-        self.last_group_index = -1
+        self.last_group_index = 0
         self.start_command_time_us = 0
         self.is_collecting = False
+        
+        # Auto-stop configuration
+        self.auto_stop_groups = config_dict.get('auto-stop-groups')
+        self.auto_stop_triggered = False
+        
         
         # Logger for session logging
         self.session_logger = None
@@ -68,23 +62,31 @@ class ArduinoCollector:
         
         # Setup fall monitor
         self.fall_monitor = FallMonitor(
-            timeout_us=timeout_us,
+            timeout_us=config_dict['timeout-us'],
             on_fall=self._on_fall_detected,
             on_recovery=self._on_recovery_detected
         )
         
-        self.check_interval_us = check_interval_us
+        self.check_interval_us = config_dict['check-interval-us']
         
-        self._print_init_info(timeout_us, check_interval_us)
+        self._print_init_info()
     
-    def _print_init_info(self, timeout_us: int, check_interval_us: int) -> None:
+    def _print_init_info(self):
         """Print initialization information."""
+        timeout_us = self.config['timeout-us']
+        check_us = self.config['check-interval-us']
         timeout_sec = timeout_us / 1_000_000
-        check_sec = check_interval_us / 1_000_000
+        check_sec = check_us / 1_000_000
+        
         print(f"✓ Database initialized: {self.db_path}")
         print(f"  Fall monitoring: timeout {timeout_us:,} µs ({timeout_sec:.1f} sec)")
+        print(f"  Check interval: {check_us:,} µs ({check_sec:.1f} sec)")
+        
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
+        else:
+            print(f"  Auto-stop: disabled")
+        
     
     def _on_fall_detected(self, time_since_last_data_us: int) -> None:
         """Callback when fall is detected."""
@@ -129,28 +131,39 @@ class ArduinoCollector:
     def connect(self) -> bool:
         """Connect to Arduino."""
         self.ser = serial_comm.connect_to_arduino(self.port, self.baudrate)
+        
+        # Guarantee what measeurement is stopped
+        self.send_command("STOP")
+
         return self.ser is not None
-    
+
+
     def send_command(self, command: str) -> None:
         """Send command to Arduino."""
         serial_comm.send_command(self.ser, command)
-    
+
+
     def _handle_group_data(self, msg: dict) -> None:
-        """Handle incoming group data."""
         current_time_us = time.time_ns() // 1000
-        group_id = db.save_group_data(self.db_path, msg, current_time_us)
+        group_index = msg['group_index']
         
-        if group_id:
-            self.groups_received += 1
-            self.last_group_index = msg['group_index']
-            
-            # Log to session file
-            if self.session_logger:
-                self.session_logger.info(
-                    f"Group {msg['group_index']} received, "
-                    f"jitter: {msg.get('jitter_us', 0):.2f} µs"
-                )
-    
+        if self.is_collecting:
+
+            # Save group data
+            group_id = db.save_group_data(self.db_path, msg, current_time_us)
+        
+            if group_id:
+                self.groups_received += 1
+                self.last_group_index = group_index
+                
+                if self.session_logger:
+                    self.session_logger.info(
+                        f"Group {group_index} received, "
+                    )
+        else:
+            self.session_logger.info(f"BAD GROUP!!!")
+        
+
     def _check_auto_stop(self) -> None:
         """Check if auto-stop condition is met."""
         if (self.auto_stop_groups and 
@@ -171,6 +184,7 @@ class ArduinoCollector:
                 self.session_logger.info(f"Session ended. Total groups: {self.groups_received}")
                 self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
     
+
     def run(self):
         """Main execution loop."""
         self.running = True
@@ -236,15 +250,22 @@ class ArduinoCollector:
     
     def _cmd_start(self) -> None:
         """Handle start command."""
-        self.send_command("START")
+        if self.auto_stop_groups:
+            start_cmd = f"START {self.auto_stop_groups}"
+        else:
+            start_cmd = "START"
+        
+        self.send_command(start_cmd)
         self.start_command_time_us = time.time_ns() // 1000
         self.is_collecting = True
         self.groups_received = 0
-        self.last_group_index = -1
+        self.groups_try_received = 0
+        self.last_group_index = 0
         self.auto_stop_triggered = False
         self.fall_monitor.reset()
-        print("✓ Measurement started, fall monitoring active")
-    
+        print(f"✓ Measurement started, fall monitoring active" + 
+            (f" (will stop after {self.auto_stop_groups} groups)" if self.auto_stop_groups else ""))
+        
     def _cmd_stop(self) -> None:
         """Handle stop command."""
         self.send_command("STOP")
@@ -287,7 +308,6 @@ class ArduinoCollector:
         """Data reading thread."""
         while self.running:
             msg = serial_comm.read_json_message(self.ser)
-            
             if msg:
                 # Update last data time
                 self.fall_monitor.update_last_data_time()
@@ -302,6 +322,8 @@ class ArduinoCollector:
                             self.session_logger.info(f"=== Session {self.current_session_id} started ===")
                             self.session_logger.info(f"Auto-stop groups: {self.auto_stop_groups}")
                     
+                    self.groups_try_received+=1
+
                     self._handle_group_data(msg)
                 
                 elif "status" in msg:
@@ -316,10 +338,17 @@ class ArduinoCollector:
             self.current_session_id = msg.get('session_id')
             self.session_logger = setup_session_logging(self.current_session_id)
             print(f"\n✓ New session ID: {self.current_session_id}")
+            
+        
         elif status == 'stopped':
             print(f"\n✓ Measurement stopped by Arduino")
             self.is_collecting = False
-    
+            
+            if self.session_logger:
+                duration_us = (time.time_ns() // 1000) - self.start_command_time_us
+                self.session_logger.info(f"Session ended. Total groups: {self.groups_received}")
+                self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
+        
     def _show_status(self) -> None:
         """Show extended status with fall information."""
         elapsed = time.time() - self.start_time
@@ -404,50 +433,23 @@ class ArduinoCollector:
 
 
 def main():
-    """Main entry point with command line argument parsing."""
+    """Main entry point."""
     parser = argparse.ArgumentParser(
-        description='Arduino Data Collection Daemon',
-        epilog='For more information, see README.md'
+        description='Arduino Data Collection Daemon'
     )
-    parser.add_argument('--db', default=config.DEFAULT_DB_PATH, help='Path to SQLite database')
-    parser.add_argument('--port', help='Arduino COM port')
+    parser.add_argument('--params', help='Path to configuration file')
+    parser.add_argument('--port', help='Arduino COM port (overrides config)')
     parser.add_argument('--baud', type=int, default=config.DEFAULT_BAUDRATE, 
                        help=f'Baud rate (default: {config.DEFAULT_BAUDRATE})')
     
-    # Timeout parameters
-    parser.add_argument('--timeout-us', type=int, default=config.DEFAULT_TIMEOUT_US,
-                       help=f'Fall timeout in microseconds (default: {config.DEFAULT_TIMEOUT_US:,} = 10 sec)')
-    parser.add_argument('--check-interval-us', type=int, default=config.DEFAULT_CHECK_INTERVAL_US,
-                       help=f'Check interval in microseconds (default: {config.DEFAULT_CHECK_INTERVAL_US:,} = 2 sec)')
-    
-    # Convenience parameters (seconds)
-    parser.add_argument('--timeout', type=float, 
-                       help='Fall timeout in seconds (alternative to --timeout-us)')
-    parser.add_argument('--check-interval', type=float,
-                       help='Check interval in seconds (alternative to --check-interval-us)')
-    
-    # Auto-stop parameter
-    parser.add_argument('--auto-stop', type=int, metavar='GROUPS',
-                       help='Automatically stop after specified number of groups')
-    
     args = parser.parse_args()
     
-    # Convert seconds to microseconds if specified
-    timeout_us = args.timeout_us
-    if args.timeout is not None:
-        timeout_us = int(args.timeout * 1_000_000)
-    
-    check_interval_us = args.check_interval_us
-    if args.check_interval is not None:
-        check_interval_us = int(args.check_interval * 1_000_000)
+    config_dict = load_config(args.params)
     
     collector = ArduinoCollector(
-        db_path=args.db,
+        config_dict=config_dict,
         port=args.port,
-        baudrate=args.baud,
-        timeout_us=timeout_us,
-        check_interval_us=check_interval_us,
-        auto_stop_groups=args.auto_stop
+        baudrate=args.baud
     )
     
     if not collector.connect():

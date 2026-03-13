@@ -9,19 +9,15 @@ from typing import Optional, List, Tuple, Any
 from config import DEFAULT_DB_PATH
 
 
-def init_database(db_path: str = DEFAULT_DB_PATH) -> None:
-    """
-    Initialize SQLite database with required tables.
-    
-    Args:
-        db_path: Path to SQLite database file
-    """
+def init_database(db_path):
+    """Initialize database with all tables."""
+
     os.makedirs(os.path.dirname(os.path.abspath(db_path)), exist_ok=True)
-    
+
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
-    
-    # Groups information table
+
+   # Groups information table
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS groups (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,7 +61,38 @@ def init_database(db_path: str = DEFAULT_DB_PATH) -> None:
         )
     ''')
     
-    # Indexes for better performance
+    
+    # SoC metrics table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS soc_metrics (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER,
+            group_index INTEGER,
+            pc_timestamp TEXT,
+            soc_timestamp REAL,
+            cpu_percent REAL,
+            memory_total INTEGER,
+            memory_used INTEGER,
+            memory_free INTEGER,
+            memory_percent REAL,
+            load_1min REAL
+        )
+    ''')
+    
+    # Events table
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id INTEGER,
+            event_type TEXT,
+            pc_timestamp TEXT,
+            time_since_start_us INTEGER,
+            group_index INTEGER,
+            details TEXT
+        )
+    ''')
+    
+    # Indexes
     cursor.execute('''
         CREATE INDEX IF NOT EXISTS idx_groups_session 
         ON groups(session_id, group_index)
@@ -76,10 +103,7 @@ def init_database(db_path: str = DEFAULT_DB_PATH) -> None:
         ON latencies(group_id)
     ''')
     
-    cursor.execute('''
-        CREATE INDEX IF NOT EXISTS idx_events_session 
-        ON system_events(session_id)
-    ''')
+    cursor.execute('CREATE INDEX IF NOT EXISTS idx_events_session ON events(session_id)')
     
     conn.commit()
     conn.close()
@@ -271,3 +295,31 @@ def get_recent_events(db_path: str, session_id: Optional[int], limit: int = 10) 
     conn.close()
     
     return events
+
+
+def save_soc_metrics(db_path, metrics):
+    """Save SoC metrics to database."""
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    
+    cursor.execute('''
+        INSERT INTO soc_metrics 
+        (session_id, group_index, pc_timestamp, soc_timestamp,
+         cpu_percent, memory_total, memory_used, memory_free, 
+         memory_percent, load_1min)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        metrics.get('session_id'),
+        metrics.get('group_index', -1),
+        datetime.now().isoformat(),
+        metrics.get('timestamp', 0),
+        metrics.get('cpu_percent', 0),
+        metrics.get('memory_total', 0),
+        metrics.get('memory_used', 0),
+        metrics.get('memory_free', 0),
+        metrics.get('memory_percent', 0),
+        metrics.get('load_1min', 0)
+    ))
+    
+    conn.commit()
+    conn.close()
