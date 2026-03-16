@@ -3,8 +3,6 @@
 #include "globals.h"
 #include "measurement.h"
 
-int GROUPS_COUNT = 1000; 
-
 void setup() {
   Serial.begin(115200);
   initPins();
@@ -16,105 +14,136 @@ void setup() {
 void loop() {
   checkSerialCommands();
 
-  if(groupIndex < GROUPS_COUNT)
-  {
-    if (collectingData) {
-      // Send pulse to SoC
-      t_start = micros();
-      active = !active;
-      if (active) {
-        *portOutputRegisterPin7 |= pin7Mask;
-      } else {
-        *portOutputRegisterPin7 &= ~pin7Mask;
-      }
-      delayMicroseconds(DELAY_MICROSECONDS);
-  
-      // If group is complete - send statistics
-      if (measurementInGroup >= GROUP_SIZE) {
-        sendGroupData();
-        groupIndex++;
-        measurementInGroup = 0;
-        
-        // Continue indefinitely, don't stop
-        if (groupIndex % 10 == 0) {
-          // Optional progress output every 10 groups
-          Serial.print(F("{\"progress\":\""));
-          Serial.print(groupIndex);
-          Serial.println(F("\"}"));
+  if (collectingData) {
+    // Проверяем, не достигли ли лимита групп
+    if (maxGroups > 0 && groupIndex >= maxGroups) {
+      // Достигли лимита - автоматически останавливаемся
+      collectingData = false;
+      
+      // Отправляем уведомление об остановке
+      StaticJsonDocument<64> doc;
+      doc["status"] = "auto_stopped";
+      doc["session_id"] = sessionId;
+      doc["groups_collected"] = groupIndex;
+      serializeJson(doc, Serial);
+      Serial.println();
+      
+      return;
+    }
+    
+    // Send pulse
+    t_start = micros();
+    active = !active;
+    if (active) {
+      *portOutputRegisterPin7 |= pin7Mask;
+    } else {
+      *portOutputRegisterPin7 &= ~pin7Mask;
+    }
+    delayMicroseconds(DELAY_MICROSECONDS);
+
+    // If group is complete - send statistics
+    if (measurementInGroup >= GROUP_SIZE) {
+      sendGroupData();
+      groupIndex++;
+      measurementInGroup = 0;
+      
+      // Optional progress output
+      if (groupIndex % 10 == 0) {
+        Serial.print(F("{\"progress\":\""));
+        Serial.print(groupIndex);
+        if (maxGroups > 0) {
+          Serial.print(F("/"));
+          Serial.print(maxGroups);
         }
+        Serial.println(F("\"}"));
       }
     }
   }
 }
-
 
 void checkSerialCommands() {
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
     command.trim();
     
-    if (command.startsWith("START")) {
-      // Parse groups count if provided
-      int spaceIndex = command.indexOf(' ');
-      if (spaceIndex > 0) {
-        // Extract the number after START
-        String groupsStr = command.substring(spaceIndex + 1);
-        groupsStr.trim();
-        int newGroupsCount = groupsStr.toInt();
+    if (command == "START") {
+      // Старый формат без параметров - для обратной совместимости
+      // Генерируем свой session_id
+      randomSeed(analogRead(0));
+      startMeasurement(random(100000, 999999), 0);
+    }
+    else if (command.startsWith("START ")) {
+      String params = command.substring(6);
+      
+      StaticJsonDocument<128> doc;
+      DeserializationError error = deserializeJson(doc, params);
+      
+      if (!error) {
+        unsigned long new_session_id = doc["session_id"].as<unsigned long>();
+        int groups = doc["groups"] | 0;
+
+        Serial.print("Session id is ");Serial.println(new_session_id);
         
-        // Update GROUPS_COUNT if valid number provided
-        if (newGroupsCount > 0) {
-          GROUPS_COUNT = newGroupsCount;
+        if (new_session_id != 0) {
+          startMeasurement(new_session_id, groups);
+        } else {
+          // Если session_id не передан, генерируем свой
+          randomSeed(analogRead(0));
+          startMeasurement(random(100000, 999999), groups);
         }
       } else {
-        // Если число не передано, используем значение по умолчанию (1000)
-        GROUPS_COUNT = 1000;
+        Serial.print(F("{\"error\":\"Invalid parameters: "));
+        Serial.print(params);
+        Serial.println(F("\"}"));
       }
-      
-      // Generate new session ID
-      randomSeed(analogRead(0));
-      sessionId = random(100000, 999999);
-      
-      // Reset counters
-      groupIndex = 0;
-      measurementInGroup = 0;
-      collectingData = true;
-      
-      // Send confirmation
-      StaticJsonDocument<128> doc;
-      doc["status"] = "started";
-      doc["session_id"] = sessionId;
-      serializeJson(doc, Serial);
-      Serial.println();
     }
     else if (command == "STOP") {
       collectingData = false;
       
-      // Send confirmation with collected groups count
       StaticJsonDocument<64> doc;
       doc["status"] = "stopped";
+      doc["session_id"] = sessionId;
       doc["groups_collected"] = groupIndex;
       serializeJson(doc, Serial);
       Serial.println();
     }
     else if (command == "STATUS") {
-      // Report current status
       StaticJsonDocument<128> doc;
       doc["status"] = "status";
+      doc["session_id"] = sessionId;
       doc["collecting"] = collectingData;
       doc["groups"] = groupIndex;
+      doc["max_groups"] = maxGroups;
       doc["measurements"] = measurementInGroup;
-      doc["session_id"] = sessionId;
       serializeJson(doc, Serial);
       Serial.println();
     }
     else if (command == "RESET") {
-      // Reset to initial state
       groupIndex = 0;
       measurementInGroup = 0;
       collectingData = false;
+      maxGroups = 0;
+      sessionId = 0;
       
       Serial.println(F("{\"status\":\"reset\"}"));
     }
   }
+}
+
+void startMeasurement(unsigned long new_session_id, int groups) {
+  sessionId = new_session_id;
+  groupIndex = 0;
+  measurementInGroup = 0;
+  collectingData = true;
+  maxGroups = groups;
+  
+  StaticJsonDocument<128> doc;
+  doc["status"] = "started";
+  doc["session_id"] = sessionId;
+  doc["max_groups"] = maxGroups;
+  if (maxGroups > 0) {
+    doc["auto_stop"] = true;
+  }
+  serializeJson(doc, Serial);
+  Serial.println();
 }

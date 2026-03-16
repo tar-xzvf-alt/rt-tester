@@ -1,22 +1,22 @@
 #include "measurement.h"
 #include <ArduinoJson.h>
-#include <math.h>
 
+// Определения глобальных переменных
 volatile bool active = false;
 volatile unsigned long t_start = 0;
 volatile int groupIndex = 0;
 volatile int measurementInGroup = 0;
-volatile int measurementoverall = 0;
 volatile bool collectingData = false;
 volatile unsigned long sessionId = 0;
-
+volatile int maxGroups = 0;
 
 volatile uint8_t* portOutputRegisterPin7;
 uint8_t pin7Mask;
 volatile uint8_t* portInputRegisterPin20;
 uint8_t pin20Mask;
 
-volatile unsigned long currentGroupLatency[GROUP_SIZE];
+volatile int currentGroupLatency[GROUP_SIZE];
+volatile int currentGroupJitter[GROUP_SIZE];
 
 void initPins() {
   pinMode(PIN_OUT, OUTPUT);
@@ -35,94 +35,89 @@ void onResponse() {
     unsigned long currentTime = micros();
     unsigned long latency = currentTime - t_start;
 
+    unsigned long jitter = 0;
+    if (measurementInGroup > 0) {
+      if (latency > currentGroupLatency[measurementInGroup-1]) {
+        jitter = latency - currentGroupLatency[measurementInGroup-1];
+      } else {
+        jitter = currentGroupLatency[measurementInGroup-1] - latency;
+      }
+    }
+
     currentGroupLatency[measurementInGroup] = latency;
-    
+    currentGroupJitter[measurementInGroup] = jitter;
     measurementInGroup++;
-    measurementoverall++;
   }
 }
 
-// Find N largest values in source
-void findNLargest(unsigned long* source, int sourceSize, unsigned long* dest, int destSize) 
-{
-  for (int i = 0; i < destSize; i++) {
-    dest[i] = 0;
-  }
+void sendGroupData() {
+  if (GROUP_SIZE == 0) return;
 
-  for (int i = 0; i < sourceSize; i++) {
-    unsigned long currentValue = source[i];
-    //Serial.print("\nLatency №");Serial.print(i);Serial.print(" = ");Serial.print(currentValue);
-
+  const int WORST_COUNT = 25;
+  unsigned long worstLatencies[WORST_COUNT] = {0};
+  int worstIndices[WORST_COUNT] = {-1};
+  
+  // Находим 25 худших значений latency
+  for (int i = 0; i < GROUP_SIZE; i++) {
+    unsigned long currentLatency = currentGroupLatency[i];
     
-    // Insert into dest, if value more then min
-    for (int j = 0; j < destSize; j++) {
-      if (currentValue > dest[j]) {
-        // Move dest[] less then currentValue to "right"
-        for (int k = destSize - 1; k > j; k--) {
-          dest[k] = dest[k-1];
+    for (int j = 0; j < WORST_COUNT; j++) {
+      if (currentLatency > worstLatencies[j]) {
+        // Сдвигаем меньшие значения вправо
+        for (int k = WORST_COUNT - 1; k > j; k--) {
+          worstLatencies[k] = worstLatencies[k-1];
+          worstIndices[k] = worstIndices[k-1];
         }
-        dest[j] = currentValue;
+        worstLatencies[j] = currentLatency;
+        worstIndices[j] = i;
         break;
       }
     }
   }
-}
-
-// Calculate Jitter for group
-float calculateJitter() {
-  if (GROUP_SIZE <= 1) return 0.0;
   
+  // Вычисляем статистику для худших значений latency
   unsigned long sumLatency = 0;
-  for (int i = 0; i < GROUP_SIZE; i++) {
-    sumLatency += currentGroupLatency[i];
-  }
-  float meanLatency = (float)sumLatency / GROUP_SIZE;
+  unsigned long minLatency = worstLatencies[WORST_COUNT-1];
+  unsigned long maxLatency = worstLatencies[0];
   
-  double sumSquaredDiff = 0;
-  for (int i = 0; i < GROUP_SIZE; i++) {
-    double diff = (double)currentGroupLatency[i] - meanLatency;
-    sumSquaredDiff += diff * diff;
+  for (int i = 0; i < WORST_COUNT; i++) {
+    sumLatency += worstLatencies[i];
   }
   
-
-  float variance = sumSquaredDiff / GROUP_SIZE;
-  float jitter = sqrt(variance);
+  float avgLatency = (float)sumLatency / WORST_COUNT;
   
-  return jitter;
-}
-
-void sendGroupData() {
-    if (GROUP_SIZE == 0) return;
-        
-    unsigned long worstLatency[WORST_COUNT];
-    
-    findNLargest((unsigned long*)currentGroupLatency, GROUP_SIZE, 
-                 worstLatency, WORST_COUNT);
-    
-    float jitter = calculateJitter();
-
-    //Serial.print("\n Group jitter: ");Serial.print(jitter);
-    
-    StaticJsonDocument<1024> doc;
-    
-    doc["session_id"] = sessionId;
-    doc["group_index"] = groupIndex;
-    doc["timestamp"] = millis();
-    doc["jitter_us"] = jitter; 
-    doc["total_measurements"] = GROUP_SIZE;
-    doc["worst_count"] = WORST_COUNT;
-    
-    // Create array withs worst latencies
-    JsonArray worstLatencies = doc.createNestedArray("worst_latencies_us");
-    for (int i = 0; i < WORST_COUNT; i++) {
-        worstLatencies.add(worstLatency[i]);
-        //Serial.print("\nХудшая задержка ранга ");Serial.print(i);Serial.print(" равна ");Serial.print(worstLatency[i]);
-    }
-    
-    JsonObject params = doc.createNestedObject("parameters");
-    params["delay_us"] = DELAY_MICROSECONDS;
-    params["measurements_per_group"] = GROUP_SIZE;
-    
-    serializeJson(doc, Serial);
-    Serial.println();
+  // Джиттер считаем по всем измерениям (не только по худшим)
+  unsigned long sumJitter = 0;
+  for (int i = 1; i < GROUP_SIZE; i++) {
+    sumJitter += currentGroupJitter[i];
+  }
+  float avgJitter = (float)sumJitter / (GROUP_SIZE - 1);
+  
+  // Формируем JSON
+  StaticJsonDocument<512> doc;
+  
+  // Используем session_id, полученный с ПК
+  doc["session_id"] = sessionId;
+  doc["group_index"] = groupIndex;
+  doc["timestamp"] = millis();
+  doc["avg_latency_us"] = avgLatency;
+  doc["min_latency_us"] = minLatency;
+  doc["max_latency_us"] = maxLatency;
+  doc["jitter_us"] = avgJitter;
+  doc["worst_count"] = WORST_COUNT;
+  
+  // Добавляем массив худших значений
+  JsonArray worstArray = doc.createNestedArray("worst_latencies_us");
+  for (int i = 0; i < WORST_COUNT; i++) {
+    worstArray.add(worstLatencies[i]);
+  }
+  
+  // Параметры измерений
+  JsonObject params = doc.createNestedObject("parameters");
+  params["delay_us"] = DELAY_MICROSECONDS;
+  params["measurements_per_group"] = GROUP_SIZE;
+  params["max_groups"] = maxGroups;
+  
+  serializeJson(doc, Serial);
+  Serial.println();
 }

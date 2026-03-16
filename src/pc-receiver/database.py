@@ -69,13 +69,15 @@ def init_database(db_path):
             session_id INTEGER,
             group_index INTEGER,
             pc_timestamp TEXT,
-            soc_timestamp REAL,
             cpu_percent REAL,
-            memory_total INTEGER,
-            memory_used INTEGER,
-            memory_free INTEGER,
             memory_percent REAL,
-            load_1min REAL
+            cpu_max REAL,
+            mem_max REAL,
+            cpu_avg REAL,
+            mem_avg REAL,
+            samples_in_group INTEGER,
+            duration_ms REAL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
     
@@ -297,28 +299,34 @@ def get_recent_events(db_path: str, session_id: Optional[int], limit: int = 10) 
     return events
 
 
-def save_soc_metrics(db_path, metrics):
-    """Save SoC metrics to database."""
+def save_soc_metrics_from_log(db_path, metrics):
+    """
+    Save SoC metrics parsed from log file to database.
+    
+    Args:
+        db_path: Path to SQLite database
+        metrics: Dictionary with parsed metrics
+    """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
     cursor.execute('''
         INSERT INTO soc_metrics 
-        (session_id, group_index, pc_timestamp, soc_timestamp,
-         cpu_percent, memory_total, memory_used, memory_free, 
-         memory_percent, load_1min)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (session_id, group_index, pc_timestamp, cpu_percent, memory_percent,
+         cpu_max, mem_max, cpu_avg, mem_avg, samples_in_group, duration_ms)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         metrics.get('session_id'),
-        metrics.get('group_index', -1),
+        metrics.get('group_index'),
         datetime.now().isoformat(),
-        metrics.get('timestamp', 0),
-        metrics.get('cpu_percent', 0),
-        metrics.get('memory_total', 0),
-        metrics.get('memory_used', 0),
-        metrics.get('memory_free', 0),
-        metrics.get('memory_percent', 0),
-        metrics.get('load_1min', 0)
+        metrics.get('cpu_avg'),  # используем среднее как основное значение
+        metrics.get('mem_avg'),
+        metrics.get('cpu_max'),
+        metrics.get('mem_max'),
+        metrics.get('cpu_avg'),
+        metrics.get('mem_avg'),
+        metrics.get('samples'),
+        metrics.get('duration_ms')
     ))
     
     conn.commit()
