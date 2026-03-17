@@ -98,8 +98,7 @@ def get_soc_metrics(db_path: str, session_id: int = None) -> pd.DataFrame:
             session_id,
             group_index,
             cpu_percent,
-            memory_percent,
-            load_1min
+            memory_percent
         FROM soc_metrics
     '''
     params = []
@@ -188,13 +187,6 @@ def plot_comprehensive_analysis(db_path: str, session_id: int = None,
         ax3.plot(merged['group_index'], merged['memory_percent'], 'orange', 
                 linewidth=2, label='Memory Usage %', marker='s', markersize=3)
         
-        # Add load average as text annotations for peaks
-        load_peaks = merged.nlargest(5, 'load_1min')[['group_index', 'load_1min']]
-        for _, row in load_peaks.iterrows():
-            ax3.annotate(f'load={row["load_1min"]:.2f}', 
-                        (row['group_index'], 95),
-                        fontsize=8, rotation=45, ha='center')
-        
         # Add zero line for reference
         ax3.axhline(y=0, color='gray', linestyle='-', linewidth=0.5, alpha=0.5)
         
@@ -209,7 +201,6 @@ def plot_comprehensive_analysis(db_path: str, session_id: int = None,
             f"max={merged['cpu_percent'].max():.1f}%\n"
             f"MEM: avg={merged['memory_percent'].mean():.1f}%, "
             f"max={merged['memory_percent'].max():.1f}%\n"
-            f"Load: avg={merged['load_1min'].mean():.2f}"
         )
         ax3.text(0.02, 0.02, stats_text, transform=ax3.transAxes,
                 fontsize=9, verticalalignment='bottom',
@@ -306,12 +297,6 @@ def plot_latency_with_soc(db_path: str, session_id: int = None,
         ax2.set_ylabel('SoC Usage %', color=color)
         ax2.tick_params(axis='y', labelcolor=color)
         
-        # Add load peaks as annotations
-        load_peaks = merged.nlargest(3, 'load_1min')[['group_index', 'load_1min']]
-        for _, row in load_peaks.iterrows():
-            ax2.annotate(f'load={row["load_1min"]:.2f}', 
-                        (row['group_index'], 90),
-                        fontsize=8, ha='center')
         
         # Combine legends
         lines = [line1, line2, line3]
