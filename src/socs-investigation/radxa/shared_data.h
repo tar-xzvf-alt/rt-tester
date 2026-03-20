@@ -8,42 +8,42 @@
 #define PULSES_PER_GROUP 1500
 #define LOG_PATH "/var/log/soc_metrics.log"
 
-// Структура для пиковых значений за группу
+// Structure for peak values per group
 typedef struct {
-    float max_cpu;           // Максимальный CPU за одно измерение в группе
-    float max_mem;           // Максимальная память за одно измерение в группе
-    float total_cpu;         // Сумма CPU для вычисления среднего
-    float total_mem;         // Сумма памяти для вычисления среднего
-    int samples;             // Количество измерений в группе
-    int group_number;        // Номер текущей группы
-    struct timeval group_start; // Время начала группы
+    float max_cpu;           // Maximum CPU per measurement in group
+    float max_mem;           // Maximum memory per measurement in group
+    float total_cpu;         // Sum of CPU for calculating average
+    float total_mem;         // Sum of memory for calculating average
+    int samples;             // Number of measurements in group
+    int group_number;        // Current group number
+    struct timeval group_start; // Group start time
 } GroupStats;
 
-// Разделяемые данные между потоками
+// Shared data between threads
 typedef struct {
-    // Управление
+    // Control
     volatile int running;
-    volatile int pulse_counter;     // Счетчик импульсов в текущей группе
-    volatile int group_counter;      // Счетчик групп
+    volatile int pulse_counter;     // Pulse counter in current group
+    volatile int group_counter;      // Group counter
     
-    // Синхронизация
+    // Synchronization
     pthread_mutex_t stats_mutex;
     pthread_cond_t measurement_cond;
     
-    // Статистика текущей группы
+    // Current group statistics
     GroupStats current_stats;
     
-    // Для измерения CPU (предыдущие значения)
+    // For CPU measurement (previous values)
     unsigned long long prev_user;
     unsigned long long prev_system;
     unsigned long long prev_idle;
     unsigned long long prev_iowait;
     unsigned long long prev_total;
     
-    // Лог-файл
+    // Log file
     FILE *log_file;
     
-    // Идентификаторы потоков для принудительного завершения
+    // Thread IDs for forceful termination
     pthread_t gpio_thread;
     pthread_t metrics_thread;
 } SharedData;

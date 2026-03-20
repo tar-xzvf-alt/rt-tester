@@ -3,8 +3,8 @@
 
 #include "globals.h"
 
-void initPins();        // pin initialization
-void onResponse();      // intrerrupt handler
-void sendGroupData();   // sending data into pc
+void initPins();        // Pin initialization
+void onResponse();      // Interrupt handler
+void sendGroupData();   // Send data to PC
 
 #endif

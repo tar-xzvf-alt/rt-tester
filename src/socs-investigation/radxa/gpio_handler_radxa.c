@@ -13,23 +13,15 @@
 #define GPIO_IN_LINE   2
 #define GPIO_OUT_LINE  3
 
-// Обработчик очистки при отмене потока
-void gpio_cleanup_handler(void *arg)
-{
-    printf("🔌 GPIO handler cleaning up\n");
-}
 
 void* gpio_handler_thread(void* arg)
 {
     SharedData *shared = (SharedData*)arg;
     
-    // Устанавливаем обработчик очистки
-    pthread_cleanup_push(gpio_cleanup_handler, shared);
-    
-    printf("🔌 GPIO handler thread started\n");
+    printf("GPIO handler thread started\n");
     set_current_thread_rt("gpio_handler");
     
-    // Разрешаем отмену потока
+    // Enable thread cancellation
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
     
@@ -85,15 +77,15 @@ void* gpio_handler_thread(void* arg)
     printf("   (will be canceled on shutdown)\n");
 
     while (shared->running) {
-        // БЛОКИРУЮЩИЙ ВЫЗОВ - он же точка отмены
+        // BLOCKING CALL - also a cancellation point
         int num_events = gpiod_line_request_read_edge_events(req, evbuf, 16);
         
-        // Если поток отменят во время этого вызова,
-        // он завершится здесь и выполнится обработчик очистки
+        // If thread is cancelled during this call,
+        // it will terminate here and execute cleanup handler
         
         if (num_events < 0) {
             if (errno == EINTR) {
-                // Прервано сигналом, проверяем флаг running
+                // Interrupted by signal, check running flag
                 continue;
             }
             perror("read_edge_events");
@@ -102,7 +94,7 @@ void* gpio_handler_thread(void* arg)
         
         if (num_events == 0) continue;
         
-        // Обрабатываем события
+        // Process events
         for (int i = 0; i < num_events; i++) {
             struct gpiod_edge_event *ev = 
                 gpiod_edge_event_buffer_get_event(evbuf, i);
@@ -122,13 +114,13 @@ void* gpio_handler_thread(void* arg)
             }
         }
         
-        // Проверка точки отмены
+        // Check cancellation point
         pthread_testcancel();
     }
 
-    printf("\n🔌 GPIO handler stopping...\n");
+    printf("\nGPIO handler stopping...\n");
     
-    // Очистка ресурсов GPIO
+    // Cleanup GPIO resources
     if (evbuf) gpiod_edge_event_buffer_free(evbuf);
     if (req) gpiod_line_request_release(req);
     if (chip) gpiod_chip_close(chip);
@@ -139,6 +131,6 @@ void* gpio_handler_thread(void* arg)
     if (req_cfg) gpiod_request_config_free(req_cfg);
     
     pthread_cleanup_pop(1);
-    printf("🔌 GPIO handler thread stopped\n");
+    printf("GPIO handler thread stopped\n");
     return NULL;
 }

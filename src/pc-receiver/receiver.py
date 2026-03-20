@@ -46,7 +46,6 @@ class ArduinoCollector:
         self.ser = None
         self.running = False
         self.groups_received = 0
-        self.groups_try_received = 0
         self.start_time = None
         self.current_session_id = None
         self.last_group_index = 0
@@ -59,7 +58,7 @@ class ArduinoCollector:
 
         self.ssh_client = None
         if config_dict['soc']['enabled']:
-            self.log_path = "/var/log/soc_metrics.log"  # путь к логу на одноплатнике
+            self.log_path = "/var/log/soc_metrics.log"  # path to log on target device
             self._connect_ssh()
         
         # Logger for session logging
@@ -86,7 +85,7 @@ class ArduinoCollector:
         timeout_sec = timeout_us / 1_000_000
         check_sec = check_us / 1_000_000
         
-        print(f"✓ Database initialized: {self.db_path}")
+        print(f"Database initialized: {self.db_path}")
         print(f"  Fall monitoring: timeout {timeout_us:,} µs ({timeout_sec:.1f} sec)")
         print(f"  Check interval: {check_us:,} µs ({check_sec:.1f} sec)")
         
@@ -101,7 +100,7 @@ class ArduinoCollector:
         elapsed_since_start_us = (time.time_ns() // 1000) - self.start_command_time_us
         elapsed_sec = elapsed_since_start_us / 1_000_000
         
-        print(f"\n⚠️ SYSTEM FALL DETECTED!")
+        print(f"\nSYSTEM FALL DETECTED!")
         print(f"   Time: {datetime.now().strftime('%H:%M:%S')}")
         print(f"   Time since start: {elapsed_sec:.3f} sec ({elapsed_since_start_us:,} µs)")
         print(f"   Last group received: {self.last_group_index}")
@@ -120,7 +119,7 @@ class ArduinoCollector:
     
     def _on_recovery_detected(self, fall_duration_us: int) -> None:
         """Callback when recovery is detected."""
-        print(f"\n✅ SYSTEM RECOVERED!")
+        print(f"\nSYSTEM RECOVERED!")
         print(f"   Time: {datetime.now().strftime('%H:%M:%S')}")
         print(f"   Fall duration: {fall_duration_us / 1_000_000:.3f} sec ({fall_duration_us:,} µs)")
         print(f"   Last group before fall: {self.last_group_index}")
@@ -140,7 +139,7 @@ class ArduinoCollector:
         """Connect to Arduino."""
         self.ser = serial_comm.connect_to_arduino(self.port, self.baudrate)
         
-        # Guarantee what measeurement is stopped
+        # Guarantee that measurement is stopped
         self.send_command("STOP")
 
         return self.ser is not None
@@ -158,7 +157,7 @@ class ArduinoCollector:
         
         # Check session_id
         if msg_session_id != self.current_session_id:
-            print(f"⚠️ Session ID mismatch in group {group_index}: "
+            print(f"Warning: Session ID mismatch in group {group_index}: "
                 f"expected {self.current_session_id}, got {msg_session_id}")
             self.current_session_id = msg_session_id
             self.session_logger = setup_session_logging(self.current_session_id)
@@ -174,7 +173,7 @@ class ArduinoCollector:
                     self.session_logger.info(f"Group {group_index} received")
         else:
             if self.session_logger:
-                self.session_logger.info(f"⚠️ Received group {group_index} while not collecting")
+                self.session_logger.info(f"Received group {group_index} while not collecting")
             
 
     def _check_auto_stop(self) -> None:
@@ -184,7 +183,7 @@ class ArduinoCollector:
             not self.auto_stop_triggered):
             
             self.auto_stop_triggered = True
-            print(f"\n🛑 Auto-stop triggered after {self.groups_received} groups")
+            print(f"\nAuto-stop triggered after {self.groups_received} groups")
             
             if self.session_logger:
                 self.session_logger.info(f"Auto-stop triggered after {self.groups_received} groups")
@@ -225,8 +224,8 @@ class ArduinoCollector:
             self.running = False
             if self.ser:
                 self.ser.close()
-            print("✓ Connection closed")
-            print(f"✓ Data saved to {self.db_path}")
+            print("Connection closed")
+            print(f"Data saved to {self.db_path}")
     
     def _print_welcome(self) -> None:
         """Print welcome message."""
@@ -266,19 +265,19 @@ class ArduinoCollector:
         import random
         session_id = random.randint(100000, 999999)
         
-        # Очищаем лог и сбрасываем счетчик на одноплатнике
+        # Clear log and reset counter on target device
         if self.ssh_client:
             print("  Preparing target device for new session...")
             self._clear_log_and_reset_counter()
         else:
-            print("  ⚠️ No SSH connection, target device metrics may be out of sync")
+            print("  No SSH connection, target device metrics may be out of sync")
         
-        # Формируем команду для Arduino
+        # Form command for Arduino
         params = f'{{"session_id":{session_id},"groups":{self.auto_stop_groups if self.auto_stop_groups else 0}}}'
         cmd = f"START {params}"
         self.send_command(cmd)
         
-        # Сохраняем информацию о сессии
+        # Save session information
         self.current_session_id = session_id
         self.start_command_time_us = time.time_ns() // 1000
         self.is_collecting = True
@@ -287,11 +286,11 @@ class ArduinoCollector:
         self.auto_stop_triggered = False
         self.fall_monitor.reset()
         
-        print(f"✓ Measurement started with session ID: {session_id}")
+        print(f"Measurement started with session ID: {session_id}")
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
         
-        # Инициализируем логгер сессии
+        # Initialize session logger
         self.session_logger = setup_session_logging(session_id)
         if self.session_logger:
             self.session_logger.info(f"=== Session {session_id} started ===")
@@ -299,17 +298,17 @@ class ArduinoCollector:
     
 
     def _process_log_after_session(self):
-        """Обработать лог после завершения сессии"""
+        """Process log after session completion"""
         if not self.ssh_client or not self.current_session_id:
             return
         
-        print("\n📋 Reading metrics log from target device...")
+        print("\nReading metrics log from target device...")
         lines = self._read_log_file()
         
         if lines:
             self._save_log_metrics_to_db(lines, self.current_session_id)
             
-            # Создаем локальную копию лога
+            # Create local copy of log
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             local_log = f"logs/session_{self.current_session_id}_{timestamp}.log"
             os.makedirs("logs", exist_ok=True)
@@ -318,19 +317,19 @@ class ArduinoCollector:
                 for line in lines:
                     f.write(line + '\n')
             
-            print(f"  ✅ Local copy saved to {local_log}")
+            print(f"  Local copy saved to {local_log}")
         else:
-            print("  ⚠️ No log entries found")
+            print("  No log entries found")
 
     def _cmd_stop(self) -> None:
         """Handle stop command with log processing"""
         self.send_command("STOP")
         self.is_collecting = False
         
-        # Обрабатываем лог
+        # Process log
         self._process_log_after_session()
         
-        print("✓ Measurement stopped")
+        print("Measurement stopped")
         if self.session_logger:
             self.session_logger.info("Measurement stopped by user")
     
@@ -378,13 +377,11 @@ class ArduinoCollector:
                     if self.current_session_id is None:
                         self.current_session_id = msg.get('session_id')
                         self.session_logger = setup_session_logging(self.current_session_id)
-                        print(f"\n✓ New session ID: {self.current_session_id}")
+                        print(f"\nNew session ID: {self.current_session_id}")
                         if self.session_logger:
                             self.session_logger.info(f"=== Session {self.current_session_id} started ===")
                             self.session_logger.info(f"Auto-stop groups: {self.auto_stop_groups}")
                     
-                    self.groups_try_received+=1
-
                     self._handle_group_data(msg)
                 
                 elif "status" in msg:
@@ -396,15 +393,11 @@ class ArduinoCollector:
         """Handle status messages from Arduino."""
         status = msg.get('status')
         
-        if status == 'started':
-            # ... существующий код ...
-            pass
-        
-        elif status == 'stopped':
-            print(f"\n✓ Measurement stopped by Arduino")
+        if status == 'stopped':
+            print(f"\nMeasurement stopped by Arduino")
             self.is_collecting = False
             
-            # Обрабатываем лог
+            # Process log
             self._process_log_after_session()
             
             if self.session_logger:
@@ -414,10 +407,10 @@ class ArduinoCollector:
         
         elif status == 'auto_stopped':
             groups = msg.get('groups_collected', 0)
-            print(f"\n🛑 Arduino auto-stopped after {groups} groups")
+            print(f"\nArduino auto-stopped after {groups} groups")
             self.is_collecting = False
             
-            # Обрабатываем лог
+            # Process log
             self._process_log_after_session()
             
             if self.session_logger:
@@ -434,7 +427,7 @@ class ArduinoCollector:
         
         current_time_us = time.time_ns() // 1000
         
-        print(f"\n📊 STATISTICS:")
+        print(f"\nSTATISTICS:")
         print(f"  Uptime: {hours:02d}:{minutes:02d}:{seconds:02d}")
         print(f"  Groups received: {self.groups_received}")
         print(f"  Total latencies: {self.groups_received * 25:,}")
@@ -457,13 +450,13 @@ class ArduinoCollector:
         # Fall information
         if self.fall_monitor.last_data_time_us > 0 and self.is_collecting:
             time_since_last_us = current_time_us - self.fall_monitor.last_data_time_us
-            status = "⚠️ FALL" if time_since_last_us > self.fall_monitor.timeout_us else "✅ OK"
+            status = "FALL" if time_since_last_us > self.fall_monitor.timeout_us else "OK"
             print(f"  Last data: {time_since_last_us / 1_000_000:.3f} sec ago ({status})")
             print(f"  Since last data: {time_since_last_us:,} µs")
         
         if self.fall_monitor.is_fallen:
             fall_duration_us = current_time_us - self.fall_monitor.fall_start_time_us
-            print(f"  ⚠️ CURRENT FALL: {fall_duration_us / 1_000_000:.3f} sec ({fall_duration_us:,} µs)")
+            print(f"  CURRENT FALL: {fall_duration_us / 1_000_000:.3f} sec ({fall_duration_us:,} µs)")
         
         if self.groups_received > 0:
             rate = self.groups_received / elapsed
@@ -471,7 +464,7 @@ class ArduinoCollector:
             self._show_db_stats()
     
     def _connect_ssh(self):
-        """Подключение к одноплатнику по SSH"""
+        """Connect to target device via SSH"""
         try:
             self.ssh_client = paramiko.SSHClient()
             self.ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -484,13 +477,13 @@ class ArduinoCollector:
                 timeout=5
             )
             
-            # Сохраняем транспорт для отправки сигналов
+            # Save transport for sending signals
             self.ssh_transport = self.ssh_client.get_transport()
             
-            print(f"✓ SSH connected to {self.config['soc']['host']}")
+            print(f"SSH connected to {self.config['soc']['host']}")
             return True
         except Exception as e:
-            print(f"✗ SSH connection failed: {e}")
+            print(f"SSH connection failed: {e}")
             self.ssh_client = None
             self.ssh_transport = None
             return False
@@ -498,82 +491,82 @@ class ArduinoCollector:
      
     def _send_signal_to_soc(self, sig):
         """
-        Отправить сигнал процессу soc-monitor на одноплатнике.
+        Send signal to soc-monitor process on target device.
         
         Args:
-            sig: номер сигнала (например, signal.SIGUSR1)
+            sig: signal number (e.g., signal.SIGUSR1)
         """
         if not self.ssh_client:
-            print("⚠️ No SSH connection, cannot send signal")
+            print("No SSH connection, cannot send signal")
             return False
         
         try:
-            # Находим PID процесса radxa-monitor и отправляем сигнал
+            # Find PID of radxa-monitor process and send signal
             cmd = f"pkill -{sig} radxa-monitor 2>/dev/null || true"
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd)
             error = stderr.read().decode().strip()
             
             if error:
-                print(f"⚠️ Signal warning: {error}")
+                print(f"Signal warning: {error}")
             
-            # Проверяем, был ли процесс найден
+            # Check if process was found
             cmd = "pgrep radxa-monitor || echo 'not running'"
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd)
             result = stdout.read().decode().strip()
             
             if result and result != 'not running':
-                print(f"  ✅ Signal {sig} sent to radxa-monitor (PID: {result})")
+                print(f"  Signal {sig} sent to radxa-monitor (PID: {result})")
                 return True
             else:
-                print(f"  ⚠️ radxa-monitor not running on target device")
+                print(f"  radxa-monitor not running on target device")
                 return False
                 
         except Exception as e:
-            print(f"✗ Failed to send signal: {e}")
+            print(f"Failed to send signal: {e}")
             return False
     
     def _clear_log_and_reset_counter(self):
-        """Очистить лог и сбросить счетчик групп на одноплатнике"""
+        """Clear log file and reset group counter on target device"""
         if not self.ssh_client:
             return False
         
         try:
-            # 1. Очищаем лог-файл
+            # 1. Clear log file
             print("  Cleaning log file...")
             cmd = f"echo '' > {self.log_path}"
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd)
             error = stderr.read().decode().strip()
             
             if error:
-                print(f"  ⚠️ Log clear warning: {error}")
+                print(f"  Log clear warning: {error}")
             
-            # 2. Отправляем сигнал USR1 (10) для сброса счетчика
+            # 2. Send USR1 signal (10) to reset counter
             print("  Resetting group counter...")
             self._send_signal_to_soc(10)  # 10 = SIGUSR1
             
-            # 3. Небольшая пауза для обработки сигнала
+            # 3. Small pause for signal processing
             time.sleep(0.1)
             
-            # 4. Проверяем результат - читаем первую строку лога (должен быть комментарий)
+            # 4. Check result - read first line of log (should be comment)
             cmd = f"head -1 {self.log_path} 2>/dev/null || echo 'empty'"
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd)
             first_line = stdout.read().decode().strip()
             
             if first_line.startswith('#') or first_line == 'empty':
-                print(f"  ✅ Log cleared and counter reset confirmed")
+                print(f"  Log cleared and counter reset confirmed")
             else:
-                print(f"  ⚠️ Log may not be empty: {first_line[:50]}")
+                print(f"  Log may not be empty: {first_line[:50]}")
             
             return True
             
         except Exception as e:
-            print(f"✗ Failed to clear log and reset counter: {e}")
+            print(f"Failed to clear log and reset counter: {e}")
             return False
     
     def _read_log_file(self):
-        """Прочитать весь лог-файл с одноплатника"""
+        """Read entire log file from target device"""
         if not self.ssh_client:
-            print("⚠️ No SSH connection, cannot read log")
+            print("No SSH connection, cannot read log")
             return []
         
         try:
@@ -585,19 +578,19 @@ class ArduinoCollector:
                 return []
             
             lines = output.split('\n')
-            # Фильтруем комментарии
+            # Filter comments
             data_lines = [line for line in lines if line and not line.startswith('#')]
-            print(f"✓ Read {len(data_lines)} data lines from log (total {len(lines)} lines)")
+            print(f"Read {len(data_lines)} data lines from log (total {len(lines)} lines)")
             return data_lines
             
         except Exception as e:
-            print(f"✗ Failed to read log: {e}")
+            print(f"Failed to read log: {e}")
             return []
     
     
     def _parse_log_line(self, line, session_id):
         """
-        Парсинг строки лога формата:
+        Parse log line in format:
         GROUP=42 CPU_MAX=15.32 MEM_MAX=42.15 CPU_AVG=8.45 MEM_AVG=38.23 SAMPLES=1500 DURATION_MS=234.56
         """
         metrics = {
@@ -611,7 +604,7 @@ class ArduinoCollector:
             'duration_ms': None
         }
         
-        # Регулярное выражение для парсинга
+        # Regular expression patterns
         patterns = {
             'group_index': r'GROUP=(\d+)',
             'cpu_max': r'CPU_MAX=([\d.]+)',
@@ -634,7 +627,7 @@ class ArduinoCollector:
     
     
     def _save_log_metrics_to_db(self, lines, session_id):
-        """Сохранить метрики из лога в БД"""
+        """Save metrics from log to database"""
         if not lines:
             print("  No log entries to save")
             return
@@ -643,7 +636,7 @@ class ArduinoCollector:
         errors = 0
         
         for line in lines:
-            # Пропускаем комментарии и пустые строки
+            # Skip comments and empty lines
             if line.startswith('#') or not line.strip():
                 continue
             
@@ -653,9 +646,9 @@ class ArduinoCollector:
                 saved += 1
             else:
                 errors += 1
-                print(f"  ⚠️ Failed to parse line: {line[:50]}...")
+                print(f"  Failed to parse line: {line[:50]}...")
         
-        print(f"  ✅ Saved {saved} metric entries to database" + 
+        print(f"  Saved {saved} metric entries to database" + 
               (f" ({errors} lines skipped)" if errors else ""))
     
     def _show_recent_events(self, limit: int = 10) -> None:
@@ -663,16 +656,16 @@ class ArduinoCollector:
         events = db.get_recent_events(self.db_path, self.current_session_id, limit)
         
         if not events:
-            print("\n📋 No events in current session")
+            print("\nNo events in current session")
             return
         
-        print(f"\n📋 RECENT EVENTS (session {self.current_session_id}):")
+        print(f"\nRECENT EVENTS (session {self.current_session_id}):")
         print("="*100)
         print(f"{'Type':<12} {'Time':<20} {'Time(µs)':<18} {'Since start(µs)':<18} {'Group':<8} {'Details'}")
         print("-"*100)
         
         for event in events:
-            event_type = "⚠️ FALL" if event[0] == "fall" else "✅ RECOVERY"
+            event_type = "FALL" if event[0] == "fall" else "RECOVERY"
             time_str = event[1][11:19] if event[1] else "N/A"
             print(f"{event_type:<12} {time_str:<20} {event[2]:<18,} {event[3]:<18,} {event[4]:<8} {event[5]}")
         

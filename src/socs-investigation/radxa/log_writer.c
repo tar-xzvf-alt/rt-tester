@@ -7,8 +7,6 @@
 #include <unistd.h>
 #include <sys/stat.h>
 
-// Внешняя переменная из main.c
-extern int log_was_cleared;
 
 int init_log_file(SharedData *shared, const char *log_path)
 {
@@ -18,18 +16,12 @@ int init_log_file(SharedData *shared, const char *log_path)
         return -1;
     }
     
-    // Делаем файловый дескриптор неблокирующим
-    int fd = fileno(shared->log_file);
-    if (fd >= 0) {
-        // Устанавливаем флаг
-    }
-    
-    // Проверяем, был ли лог очищен извне
+    // Check if log was cleared externally
     struct stat st;
     if (stat(log_path, &st) == 0 && st.st_size == 0) {
         fprintf(shared->log_file, "# SoC Metrics Log Started at %ld\n", time(NULL));
         fflush(shared->log_file);
-        printf("📋 New log session started, counter reset to 0\n");
+        printf("New log session started, counter reset to 0\n");
     }
     
     return 0;
@@ -45,15 +37,12 @@ void write_group_to_log(SharedData *shared)
     float group_duration = (now.tv_sec - shared->current_stats.group_start.tv_sec) * 1000.0 +
                           (now.tv_usec - shared->current_stats.group_start.tv_usec) / 1000.0;
     
-    // Устанавливаем обработчик отмены для безопасной записи
+    // Set cleanup handler for safe writing
     pthread_cleanup_push((void(*)(void*))flock, 
                          (void*)(intptr_t)fileno(shared->log_file));
     
     flock(fileno(shared->log_file), LOCK_EX);
     
-    // Проверяем размер файла перед записью (для отладки)
-    struct stat st;
-    fstat(fileno(shared->log_file), &st);
     
     fprintf(shared->log_file, 
             "GROUP=%d CPU_MAX=%.2f MEM_MAX=%.2f CPU_AVG=%.2f MEM_AVG=%.2f SAMPLES=%d DURATION_MS=%.2f TIMESTAMP=%ld\n",
@@ -71,7 +60,7 @@ void write_group_to_log(SharedData *shared)
     
     pthread_cleanup_pop(0);
     
-    printf("✓ Group %d written to log (CPU_MAX=%.2f%%, MEM_MAX=%.2f%%, samples=%d)\n",
+    printf("Group %d written to log (CPU_MAX=%.2f%%, MEM_MAX=%.2f%%, samples=%d)\n",
            shared->group_counter,
            shared->current_stats.max_cpu,
            shared->current_stats.max_mem,

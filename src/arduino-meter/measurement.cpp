@@ -1,7 +1,7 @@
 #include "measurement.h"
 #include <ArduinoJson.h>
 
-// Определения глобальных переменных
+// Global variables definitions
 volatile bool active = false;
 volatile unsigned long t_start = 0;
 volatile int groupIndex = 0;
@@ -55,27 +55,24 @@ void sendGroupData() {
 
   const int WORST_COUNT = 25;
   unsigned long worstLatencies[WORST_COUNT] = {0};
-  int worstIndices[WORST_COUNT] = {-1};
   
-  // Находим 25 худших значений latency
+  // Find 25 worst latency values
   for (int i = 0; i < GROUP_SIZE; i++) {
     unsigned long currentLatency = currentGroupLatency[i];
     
     for (int j = 0; j < WORST_COUNT; j++) {
       if (currentLatency > worstLatencies[j]) {
-        // Сдвигаем меньшие значения вправо
+        // Shift smaller values to the right
         for (int k = WORST_COUNT - 1; k > j; k--) {
           worstLatencies[k] = worstLatencies[k-1];
-          worstIndices[k] = worstIndices[k-1];
         }
         worstLatencies[j] = currentLatency;
-        worstIndices[j] = i;
         break;
       }
     }
   }
   
-  // Вычисляем статистику для худших значений latency
+  // Calculate statistics for worst latency values
   unsigned long sumLatency = 0;
   unsigned long minLatency = worstLatencies[WORST_COUNT-1];
   unsigned long maxLatency = worstLatencies[0];
@@ -86,17 +83,17 @@ void sendGroupData() {
   
   float avgLatency = (float)sumLatency / WORST_COUNT;
   
-  // Джиттер считаем по всем измерениям (не только по худшим)
+  // Jitter calculated from all measurements (not just worst ones)
   unsigned long sumJitter = 0;
   for (int i = 1; i < GROUP_SIZE; i++) {
     sumJitter += currentGroupJitter[i];
   }
   float avgJitter = (float)sumJitter / (GROUP_SIZE - 1);
   
-  // Формируем JSON
+  // Form JSON
   StaticJsonDocument<512> doc;
   
-  // Используем session_id, полученный с ПК
+  // Use session_id received from PC
   doc["session_id"] = sessionId;
   doc["group_index"] = groupIndex;
   doc["timestamp"] = millis();
@@ -106,13 +103,13 @@ void sendGroupData() {
   doc["jitter_us"] = avgJitter;
   doc["worst_count"] = WORST_COUNT;
   
-  // Добавляем массив худших значений
+  // Add array of worst values
   JsonArray worstArray = doc.createNestedArray("worst_latencies_us");
   for (int i = 0; i < WORST_COUNT; i++) {
     worstArray.add(worstLatencies[i]);
   }
   
-  // Параметры измерений
+  // Measurement parameters
   JsonObject params = doc.createNestedObject("parameters");
   params["delay_us"] = DELAY_MICROSECONDS;
   params["measurements_per_group"] = GROUP_SIZE;

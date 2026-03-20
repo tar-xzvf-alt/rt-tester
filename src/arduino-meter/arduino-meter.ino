@@ -15,12 +15,12 @@ void loop() {
   checkSerialCommands();
 
   if (collectingData) {
-    // Проверяем, не достигли ли лимита групп
+    // Check if group limit reached
     if (maxGroups > 0 && groupIndex >= maxGroups) {
-      // Достигли лимита - автоматически останавливаемся
+      // Limit reached - stop automatically
       collectingData = false;
       
-      // Отправляем уведомление об остановке
+      // Send stop notification
       StaticJsonDocument<64> doc;
       doc["status"] = "auto_stopped";
       doc["session_id"] = sessionId;
@@ -66,13 +66,7 @@ void checkSerialCommands() {
     String command = Serial.readStringUntil('\n');
     command.trim();
     
-    if (command == "START") {
-      // Старый формат без параметров - для обратной совместимости
-      // Генерируем свой session_id
-      randomSeed(analogRead(0));
-      startMeasurement(random(100000, 999999), 0);
-    }
-    else if (command.startsWith("START ")) {
+    if (command.startsWith("START ")) {
       String params = command.substring(6);
       
       StaticJsonDocument<128> doc;
@@ -82,12 +76,12 @@ void checkSerialCommands() {
         unsigned long new_session_id = doc["session_id"].as<unsigned long>();
         int groups = doc["groups"] | 0;
 
-        Serial.print("Session id is ");Serial.println(new_session_id);
+        Serial.print("Session id is "); Serial.println(new_session_id); // 🔸 DEBUG: Remove in production
         
         if (new_session_id != 0) {
           startMeasurement(new_session_id, groups);
         } else {
-          // Если session_id не передан, генерируем свой
+          // If session_id not provided, generate own
           randomSeed(analogRead(0));
           startMeasurement(random(100000, 999999), groups);
         }

@@ -81,7 +81,7 @@ def load_config(config_path=None):
         'db': config.DEFAULT_DB_PATH,
         'timeout-us': config.DEFAULT_TIMEOUT_US,
         'check-interval-us': config.DEFAULT_CHECK_INTERVAL_US,
-        'auto-stop-groups': config.AUTO_STOP,  # None означает "не останавливать автоматически"
+        'auto-stop-groups': config.AUTO_STOP,  # None means "do not stop automatically"
         'soc': {
             'enabled': False,
             'host': None,
@@ -110,7 +110,7 @@ def load_config(config_path=None):
                     config_dict['soc'].update(soc_config)
                     config_dict['soc']['enabled'] = True
             
-            print(f"✓ Loaded configuration from: {config_path}")
+            print(f"Loaded configuration from: {config_path}")
             print(f"  db = {config_dict['db']}")
             print(f"  timeout-us = {config_dict['timeout-us']:,} µs ({config_dict['timeout-us']/1_000_000:.1f} sec)")
             print(f"  check-interval-us = {config_dict['check-interval-us']:,} µs ({config_dict['check-interval-us']/1_000_000:.1f} sec)")
@@ -128,7 +128,7 @@ def load_config(config_path=None):
                 print(f"  SoC monitoring: DISABLED")
             
         except Exception as e:
-            print(f"⚠️ Error loading config: {e}")
+            print(f"Warning: Error loading config: {e}")
             print("  Using default values")
     
     return config_dict

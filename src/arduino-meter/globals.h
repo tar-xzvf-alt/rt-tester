@@ -4,26 +4,26 @@
 #include <Arduino.h>
 #include "config.h"
 
-// Глобальные переменные
+// Global variables
 extern volatile bool active;
 extern volatile unsigned long t_start;
 extern volatile int groupIndex;
 extern volatile int measurementInGroup;
 extern volatile bool collectingData;
-extern volatile unsigned long sessionId;  // Получается с ПК
-extern volatile int maxGroups;  // 0 = бесконечно
+extern volatile unsigned long sessionId;  // Received from PC
+extern volatile int maxGroups;
 
-// Для прямого доступа к портам
+// For direct port access
 extern volatile uint8_t* portOutputRegisterPin7;
 extern uint8_t pin7Mask;
 extern volatile uint8_t* portInputRegisterPin20;
 extern uint8_t pin20Mask;
 
-// Временные массивы для текущей группы
+// Temporary arrays for current group
 extern volatile int currentGroupLatency[GROUP_SIZE];
 extern volatile int currentGroupJitter[GROUP_SIZE];
 
-// Функции
+// Functions
 void checkSerialCommands();
 void startMeasurement(unsigned long session_id, int groups);
 

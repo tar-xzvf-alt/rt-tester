@@ -9,11 +9,11 @@
 #include <errno.h>
 #include <pthread.h>
 
-// Обработчик очистки при отмене потока
+// Cleanup handler for thread cancellation
 void metrics_cleanup_handler(void *arg)
 {
     SharedData *shared = (SharedData*)arg;
-    printf("📊 Metrics collector thread cleaning up\n");
+    printf("Metrics collector thread cleaning up\n");
 }
 
 void update_cpu_metrics(SharedData *shared)
@@ -95,13 +95,13 @@ void* metrics_collector_thread(void* arg)
 {
     SharedData *shared = (SharedData*)arg;
     
-    // Устанавливаем обработчик очистки
+    // Set cleanup handler
     pthread_cleanup_push(metrics_cleanup_handler, shared);
     
-    printf("📊 Metrics collector thread started\n");
+    printf("Metrics collector thread started\n");
     set_current_thread_rt("metrics_collector");
     
-    // Разрешаем отмену потока
+    // Enable thread cancellation
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
     
@@ -111,41 +111,41 @@ void* metrics_collector_thread(void* arg)
     while (shared->running) {
         pthread_mutex_lock(&shared->stats_mutex);
         
-        // Ждем сигнала от GPIO потока с таймаутом
+        // Wait for signal from GPIO thread with timeout
         clock_gettime(CLOCK_REALTIME, &timeout);
-        timeout.tv_sec += 1;  // 1 секунда таймаут
+        timeout.tv_sec += 1;  // 1 second timeout
         
         int ret = pthread_cond_timedwait(&shared->measurement_cond, 
                                          &shared->stats_mutex, &timeout);
         
         if (ret == 0) {
-            // Получили сигнал - новый импульс
+            // Received signal - new pulse
             local_pulse_counter++;
             
             pthread_mutex_unlock(&shared->stats_mutex);
             
-            // Делаем замеры (точки отмены внутри этих функций)
+            // Take measurements (cancellation points inside these functions)
             update_cpu_metrics(shared);
             update_memory_metrics(shared);
             
             pthread_mutex_lock(&shared->stats_mutex);
             
-            // Проверяем, не набрали ли мы группу
+            // Check if we've completed a group
             if (local_pulse_counter >= PULSES_PER_GROUP) {
                 shared->group_counter++;
                 
                 pthread_mutex_unlock(&shared->stats_mutex);
                 
-                // Точка отмены внутри write_group_to_log
+                // Cancellation point inside write_group_to_log
                 write_group_to_log(shared);
                 
                 pthread_mutex_lock(&shared->stats_mutex);
                 
-                // Сбрасываем для следующей группы
+                // Reset for next group
                 local_pulse_counter = 0;
                 shared->pulse_counter = 0;
                 
-                // Сбрасываем статистику группы
+                // Reset group statistics
                 shared->current_stats.max_cpu = 0;
                 shared->current_stats.max_mem = 0;
                 shared->current_stats.total_cpu = 0;
@@ -157,11 +157,11 @@ void* metrics_collector_thread(void* arg)
         
         pthread_mutex_unlock(&shared->stats_mutex);
         
-        // Проверка точки отмены
+        // Check cancellation point
         pthread_testcancel();
     }
     
     pthread_cleanup_pop(1);
-    printf("📊 Metrics collector thread stopped\n");
+    printf("Metrics collector thread stopped\n");
     return NULL;
 }

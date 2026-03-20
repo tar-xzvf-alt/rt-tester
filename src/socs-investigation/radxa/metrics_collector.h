@@ -3,13 +3,13 @@
 
 #include "shared_data.h"
 
-// Функция потока сборщика метрик
+// Metrics collector thread function
 void* metrics_collector_thread(void* arg);
 
-// Обновление метрик CPU
+// Update CPU metrics
 void update_cpu_metrics(SharedData *shared);
 
-// Обновление метрик памяти
+// Update memory metrics
 void update_memory_metrics(SharedData *shared);
 
 #endif // METRICS_COLLECTOR_H

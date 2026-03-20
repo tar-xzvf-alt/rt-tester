@@ -6,13 +6,13 @@
 #include <pthread.h>
 #include "shared_data.h"
 
-// Настройка real-time приоритетов для процесса
+// Setup real-time priority for process
 void setup_rt(int pid);
 
-// Настройка real-time приоритетов для текущего потока
+// Setup real-time priority for current thread
 void set_current_thread_rt(const char* thread_name);
 
-// Очистка ресурсов
+// Cleanup resources
 void cleanup_resources(SharedData *shared);
 
 #endif // UTILS_H

@@ -134,7 +134,7 @@ def plot_comprehensive_analysis(db_path: str, session_id: int = None,
         return
     
     if soc_metrics is None or soc_metrics.empty:
-        print("⚠️ No SoC metrics found - plotting only latency and jitter")
+        print("No SoC metrics found - plotting only latency and jitter")
         soc_available = False
     else:
         soc_available = True
@@ -229,7 +229,7 @@ def plot_comprehensive_analysis(db_path: str, session_id: int = None,
         conn.close()
         
         if falls_count > 0:
-            fig.text(0.98, 0.98, f'⚠️ Falls in session: {falls_count}',
+            fig.text(0.98, 0.98, f'Falls in session: {falls_count}',
                     transform=fig.transFigure, ha='right', va='top',
                     fontsize=12, fontweight='bold',
                     bbox=dict(boxstyle='round', facecolor='lightcoral', alpha=0.7))
@@ -238,7 +238,7 @@ def plot_comprehensive_analysis(db_path: str, session_id: int = None,
     
     if output:
         plt.savefig(output, dpi=150, bbox_inches='tight')
-        print(f"✓ Comprehensive plot saved: {output}")
+        print(f"Comprehensive plot saved: {output}")
     else:
         plt.show()
 
@@ -317,7 +317,7 @@ def plot_latency_with_soc(db_path: str, session_id: int = None,
     
     if output:
         plt.savefig(output, dpi=150, bbox_inches='tight')
-        print(f"✓ Plot saved: {output}")
+        print(f"Plot saved: {output}")
     else:
         plt.show()
 
@@ -402,7 +402,7 @@ def plot_jitter_with_soc(db_path: str, session_id: int = None,
     
     if output:
         plt.savefig(output, dpi=150, bbox_inches='tight')
-        print(f"✓ Plot saved: {output}")
+        print(f"Plot saved: {output}")
     else:
         plt.show()
 
@@ -440,7 +440,7 @@ def list_sessions(db_path: str) -> None:
         print("No sessions in database")
         return
     
-    print("\n📋 SESSIONS IN DATABASE")
+    print("\nSESSIONS IN DATABASE")
     print("="*130)
     print(f"{'Session':<12} {'Groups':<8} {'Avg Lat':<10} {'Avg Jit':<10} {'Avg CPU':<10} {'Avg MEM':<10} {'Falls':<8} {'Status':<10} {'First Seen'}")
     print("-"*130)
@@ -450,11 +450,11 @@ def list_sessions(db_path: str) -> None:
         
         # Session status
         if falls == 0:
-            status = "✅ OK"
+            status = "OK"
         elif falls > 0:
-            status = "⚠️ Falls"
+            status = "Has falls"
         else:
-            status = "✅"
+            status = "OK"
         
         cpu_str = f"{cpu:.1f}%" if cpu else "N/A"
         mem_str = f"{mem:.1f}%" if mem else "N/A"

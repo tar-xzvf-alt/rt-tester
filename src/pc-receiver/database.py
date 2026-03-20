@@ -186,11 +186,11 @@ def save_fall_event(db_path: str, session_id: int, event_type: str,
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
     
-    current_time_us = datetime.now().timestamp() * 1_000_000
+    current_time_us = int(datetime.now().timestamp() * 1_000_000)
     time_since_start_us = 0
     
     if start_command_time_us:
-        time_since_start_us = int(current_time_us - start_command_time_us)
+        time_since_start_us = current_time_us - start_command_time_us
     
     cursor.execute('''
         INSERT INTO system_events 
@@ -201,7 +201,7 @@ def save_fall_event(db_path: str, session_id: int, event_type: str,
         session_id,
         event_type,
         datetime.now().isoformat(),
-        int(current_time_us),
+        current_time_us,
         time_since_start_us,
         last_group_index,
         details
@@ -319,7 +319,7 @@ def save_soc_metrics_from_log(db_path, metrics):
         metrics.get('session_id'),
         metrics.get('group_index'),
         datetime.now().isoformat(),
-        metrics.get('cpu_avg'),  # используем среднее как основное значение
+        metrics.get('cpu_avg'),  # using average as main value
         metrics.get('mem_avg'),
         metrics.get('cpu_max'),
         metrics.get('mem_max'),

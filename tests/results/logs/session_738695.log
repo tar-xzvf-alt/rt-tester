@@ -1,0 +1,12 @@
+2026-03-18 08:53:16,243 - INFO - === Session 738695 started ===
+2026-03-18 08:53:16,243 - INFO - Auto-stop groups: 2000
+2026-03-18 08:53:17,324 - INFO - Group 0 received
+2026-03-18 08:53:18,393 - INFO - Group 1 received
+2026-03-18 08:53:19,541 - INFO - Group 2 received
+2026-03-18 08:53:20,675 - INFO - Group 3 received
+2026-03-18 08:53:21,744 - INFO - Group 4 received
+2026-03-18 08:53:22,789 - INFO - Group 5 received
+2026-03-18 08:53:23,855 - INFO - Group 6 received
+2026-03-18 08:53:24,634 - INFO - Measurement stopped by user
+2026-03-18 08:53:24,644 - INFO - Session ended. Total groups: 7
+2026-03-18 08:53:24,647 - INFO - Session duration: 8.402 sec

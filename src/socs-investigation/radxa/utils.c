@@ -43,16 +43,16 @@ void cleanup_resources(SharedData *shared)
 {
     if (!shared) return;
     
-    printf("🧹 Cleaning up resources...\n");
+    printf("Cleaning up resources...\n");
     
     if (shared->log_file) {
         fflush(shared->log_file);
         fclose(shared->log_file);
         shared->log_file = NULL;
-        printf("  ✅ Log file closed\n");
+        printf("Log file closed\n");
     }
     
     pthread_mutex_destroy(&shared->stats_mutex);
     pthread_cond_destroy(&shared->measurement_cond);
-    printf("  ✅ Mutex and condition destroyed\n");
+    printf("Mutex and condition destroyed\n");
 }

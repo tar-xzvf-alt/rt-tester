@@ -50,10 +50,10 @@ def connect_to_arduino(port: Optional[str], baudrate: int) -> Optional[serial.Se
         # Clear input buffer
         ser.reset_input_buffer()
         
-        print(f"✓ Connected to {port}")
+        print(f"Connected to {port}")
         return ser
     except Exception as e:
-        print(f"✗ Connection error: {e}")
+        print(f"Connection error: {e}")
         return None
 
 
@@ -87,4 +87,4 @@ def send_command(ser: Optional[serial.Serial], command: str) -> None:
     """
     if ser and ser.is_open:
         ser.write(f"{command}\n".encode('utf-8'))
-        print(f"→ Command: {command}")
+        print(f"Command: {command}")
