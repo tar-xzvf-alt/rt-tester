@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 """
 Arduino Data Collection Daemon
-
-This script collects measurement data from Arduino via serial connection,
-stores it in SQLite database, and monitors for system falls/recoveries.
 """
 
 import time
@@ -11,33 +8,25 @@ import argparse
 import sys
 import threading
 from datetime import datetime
-import os
-import paramiko
+import random
 import config
-import re
 import database as db
-import signal
 import serial_comm
+import paramiko
 from logging_utils import setup_session_logging
 from arduino_monitor import FallMonitor
 from config_loader import load_config
-import json
+from soc_monitor import SoCMonitor  # New import
+
 
 class ArduinoCollector:
     """
     Main collector class for Arduino data acquisition.
-    
-    Handles serial communication, data storage, and system monitoring.
     """
     
     def __init__(self, config_dict, port=None, baudrate=config.DEFAULT_BAUDRATE):
         """
         Initialize Arduino collector with configuration.
-        
-        Args:
-            config_dict: Complete configuration dictionary from load_config()
-            port: Serial port for Arduino (overrides config)
-            baudrate: Serial communication speed
         """
         self.config = config_dict
         self.db_path = config_dict['db']
@@ -56,10 +45,7 @@ class ArduinoCollector:
         self.auto_stop_groups = config_dict.get('auto-stop-groups')
         self.auto_stop_triggered = False
 
-        self.ssh_client = None
-        if config_dict['soc']['enabled']:
-            self.log_path = "/var/log/soc_metrics.log"  # path to log on target device
-            self._connect_ssh()
+        self.soc_monitor = SoCMonitor(config_dict['soc'])
         
         # Logger for session logging
         self.session_logger = None
@@ -94,6 +80,13 @@ class ArduinoCollector:
         else:
             print(f"  Auto-stop: disabled")
         
+        if self.soc_monitor.enabled:
+            print(f"  SoC monitoring: ENABLED")
+            print(f"    host: {self.config['soc']['host']}")
+            print(f"    user: {self.config['soc']['username']}")
+        else:
+            print(f"  SoC monitoring: DISABLED")
+
     
     def _on_fall_detected(self, time_since_last_data_us: int) -> None:
         """Callback when fall is detected."""
@@ -102,36 +95,40 @@ class ArduinoCollector:
         
         print(f"\nSYSTEM FALL DETECTED!")
         print(f"   Time: {datetime.now().strftime('%H:%M:%S')}")
-        print(f"   Time since start: {elapsed_sec:.3f} sec ({elapsed_since_start_us:,} µs)")
+        print(f"   Time since start: {elapsed_sec:.3f} sec")
         print(f"   Last group received: {self.last_group_index}")
-        print(f"   No data for: {time_since_last_data_us / 1_000_000:.3f} sec ({time_since_last_data_us:,} µs)")
+        print(f"   No data for: {time_since_last_data_us / 1_000_000:.3f} sec")
         
-        # Save to database
-        db.save_fall_event(
-            self.db_path, self.current_session_id, "fall",
-            self.last_group_index, f"Timeout {time_since_last_data_us} µs",
+        # Save to database using unified event system
+        db.save_event(
+            self.db_path,
+            self.current_session_id,
+            "fall",
+            self.last_group_index,
+            f"Timeout {time_since_last_data_us} µs",
             self.start_command_time_us
         )
         
-        # Log to session file
         if self.session_logger:
             self.session_logger.info(f"FALL detected, last group: {self.last_group_index}")
-    
+        
     def _on_recovery_detected(self, fall_duration_us: int) -> None:
         """Callback when recovery is detected."""
         print(f"\nSYSTEM RECOVERED!")
         print(f"   Time: {datetime.now().strftime('%H:%M:%S')}")
-        print(f"   Fall duration: {fall_duration_us / 1_000_000:.3f} sec ({fall_duration_us:,} µs)")
+        print(f"   Fall duration: {fall_duration_us / 1_000_000:.3f} sec")
         print(f"   Last group before fall: {self.last_group_index}")
         
-        # Save to database
-        db.save_fall_event(
-            self.db_path, self.current_session_id, "recovery",
-            self.last_group_index, f"Fall duration {fall_duration_us} µs",
+        # Save to database using unified event system
+        db.save_event(
+            self.db_path,
+            self.current_session_id,
+            "recovery",
+            self.last_group_index,
+            f"Fall duration {fall_duration_us} µs",
             self.start_command_time_us
         )
         
-        # Log to session file
         if self.session_logger:
             self.session_logger.info(f"RECOVERY after {fall_duration_us / 1_000_000:.3f} sec")
     
@@ -260,17 +257,13 @@ class ArduinoCollector:
         else:
             print(f"Unknown command: {cmd}")
     
+    
     def _cmd_start(self) -> None:
-        """Handle start command with log cleanup and counter reset"""
-        import random
+        """Handle start command."""
         session_id = random.randint(100000, 999999)
         
-        # Clear log and reset counter on target device
-        if self.ssh_client:
-            print("  Preparing target device for new session...")
-            self._clear_log_and_reset_counter()
-        else:
-            print("  No SSH connection, target device metrics may be out of sync")
+        # Prepare target device
+        self.soc_manager.prepare_for_session()
         
         # Form command for Arduino
         params = f'{{"session_id":{session_id},"groups":{self.auto_stop_groups if self.auto_stop_groups else 0}}}'
@@ -286,6 +279,9 @@ class ArduinoCollector:
         self.auto_stop_triggered = False
         self.fall_monitor.reset()
         
+        # Save session start event
+        db.save_session_start(self.db_path, session_id, self.auto_stop_groups or 0)
+        
         print(f"Measurement started with session ID: {session_id}")
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
@@ -296,43 +292,40 @@ class ArduinoCollector:
             self.session_logger.info(f"=== Session {session_id} started ===")
             self.session_logger.info(f"Auto-stop groups: {self.auto_stop_groups}")
     
-
-    def _process_log_after_session(self):
-        """Process log after session completion"""
-        if not self.ssh_client or not self.current_session_id:
+    def _process_session_metrics(self):
+        """Process SoC metrics after session completion."""
+        if not self.current_session_id:
             return
         
-        print("\nReading metrics log from target device...")
-        lines = self._read_log_file()
+        # Read metrics from target device
+        metrics_list = self.soc_monitor.read_session_metrics(self.current_session_id)
         
-        if lines:
-            self._save_log_metrics_to_db(lines, self.current_session_id)
+        if metrics_list:
+            # Save to database
+            for metrics in metrics_list:
+                db.save_soc_metrics_from_log(self.db_path, metrics)
             
-            # Create local copy of log
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            local_log = f"logs/session_{self.current_session_id}_{timestamp}.log"
-            os.makedirs("logs", exist_ok=True)
+            print(f"  Saved {len(metrics_list)} metric entries to database")
             
-            with open(local_log, 'w') as f:
-                for line in lines:
-                    f.write(line + '\n')
-            
-            print(f"  Local copy saved to {local_log}")
+            # Save local copy
+            self.soc_monitor.save_metrics_to_local(metrics_list, self.current_session_id)
         else:
             print("  No log entries found")
 
+
+
     def _cmd_stop(self) -> None:
-        """Handle stop command with log processing"""
+        """Handle stop command with log processing."""
         self.send_command("STOP")
         self.is_collecting = False
         
-        # Process log
-        self._process_log_after_session()
+        # Process SoC metrics
+        self._process_session_metrics()
         
         print("Measurement stopped")
         if self.session_logger:
             self.session_logger.info("Measurement stopped by user")
-    
+
 
     def _cmd_status(self) -> None:
         """Handle status command."""
@@ -397,11 +390,20 @@ class ArduinoCollector:
             print(f"\nMeasurement stopped by Arduino")
             self.is_collecting = False
             
-            # Process log
-            self._process_log_after_session()
+            duration_us = (time.time_ns() // 1000) - self.start_command_time_us
+            
+            # Save session stop event
+            db.save_session_stop(
+                self.db_path,
+                self.current_session_id,
+                self.groups_received,
+                duration_us,
+                "arduino"
+            )
+            
+            self._process_session_metrics()
             
             if self.session_logger:
-                duration_us = (time.time_ns() // 1000) - self.start_command_time_us
                 self.session_logger.info(f"Session ended. Total groups: {self.groups_received}")
                 self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
         
@@ -410,11 +412,20 @@ class ArduinoCollector:
             print(f"\nArduino auto-stopped after {groups} groups")
             self.is_collecting = False
             
-            # Process log
-            self._process_log_after_session()
+            duration_us = (time.time_ns() // 1000) - self.start_command_time_us
+            
+            # Save auto-stop event
+            db.save_session_stop(
+                self.db_path,
+                self.current_session_id,
+                groups,
+                duration_us,
+                "auto"
+            )
+            
+            self._process_session_metrics()
             
             if self.session_logger:
-                duration_us = (time.time_ns() // 1000) - self.start_command_time_us
                 self.session_logger.info(f"Session auto-stopped. Total groups: {groups}")
                 self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
         
@@ -462,6 +473,16 @@ class ArduinoCollector:
             rate = self.groups_received / elapsed
             print(f"  Average rate: {rate:.2f} groups/sec")
             self._show_db_stats()
+
+        if self.soc_monitor.enabled:
+            ssh_stats = self.soc_monitor.get_connection_stats()
+            ssh_status = "ACTIVE" if ssh_stats.get('is_connected') else "DISCONNECTED"
+            print(f"\n  SoC Connection:")
+            print(f"    Status: {ssh_status}")
+            print(f"    Uptime: {ssh_stats.get('uptime_seconds', 0):.1f} sec")
+            print(f"    Reconnections: {ssh_stats.get('reconnections', 0)}")
+            print(f"    Failed attempts: {ssh_stats.get('failed_attempts', 0)}")
+
     
     def _connect_ssh(self):
         """Connect to target device via SSH"""
