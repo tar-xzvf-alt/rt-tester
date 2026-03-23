@@ -6,7 +6,6 @@ volatile bool active = false;
 volatile unsigned long t_start = 0;
 volatile int groupIndex = 0;
 volatile int measurementInGroup = 0;
-volatile int measurementInGroupLast = 0;
 volatile bool collectingData = false;
 volatile unsigned long sessionId = 0;
 volatile int maxGroups = 0;
@@ -35,8 +34,6 @@ void onResponse() {
   if (collectingData && measurementInGroup < GROUP_SIZE) {
     unsigned long currentTime = micros();
     unsigned long latency = currentTime - t_start;
-
-    Serial.print("\nEDGE!!!");
 
     unsigned long jitter = 0;
     if (measurementInGroup > 0) {

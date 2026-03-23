@@ -5,7 +5,7 @@
 #include <string.h>
 #include <errno.h>
 
-#define RT_PRIORITY 99
+#define RT_PRIORITY 80
 
 void setup_rt(int pid)
 {

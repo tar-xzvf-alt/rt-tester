@@ -9,7 +9,6 @@ extern volatile bool active;
 extern volatile unsigned long t_start;
 extern volatile int groupIndex;
 extern volatile int measurementInGroup;
-extern volatile int measurementInGroupLast;
 extern volatile bool collectingData;
 extern volatile unsigned long sessionId;  // Received from PC
 extern volatile int maxGroups;

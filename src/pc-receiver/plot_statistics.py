@@ -222,7 +222,7 @@ def plot_comprehensive_analysis(db_path: str, session_id: int = None,
         conn = sqlite3.connect(db_path)
         cursor = conn.cursor()
         cursor.execute('''
-            SELECT COUNT(*) FROM system_events 
+            SELECT COUNT(*) FROM events 
             WHERE session_id = ? AND event_type = 'fall'
         ''', (session_id,))
         falls_count = cursor.fetchone()[0]
@@ -425,7 +425,7 @@ def list_sessions(db_path: str) -> None:
              WHERE s.session_id = g.session_id) as avg_cpu,
             (SELECT AVG(memory_percent) FROM soc_metrics s 
              WHERE s.session_id = g.session_id) as avg_mem,
-            (SELECT COUNT(*) FROM system_events e 
+            (SELECT COUNT(*) FROM events e 
              WHERE e.session_id = g.session_id AND e.event_type = 'fall') as falls
         FROM groups g
         LEFT JOIN latencies l ON g.id = l.group_id

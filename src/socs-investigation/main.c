@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
     }
     
     // Setup real-time for main process
-    setup_rt(0);
+    //setup_rt(0);
     
     // Set signal handlers
     signal(SIGINT, signal_handler);

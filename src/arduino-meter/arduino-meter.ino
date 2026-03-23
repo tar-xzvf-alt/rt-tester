@@ -3,13 +3,11 @@
 #include "globals.h"
 #include "measurement.h"
 
-uint8_t first_measure = 0;
-
 void setup() {
   Serial.begin(115200);
   initPins();
   interrupts();
-
+  
   Serial.println(F("{\"status\":\"ready\",\"message\":\"Continuous measurement mode\"}"));
 }
 
@@ -21,7 +19,7 @@ void loop() {
     if (maxGroups > 0 && groupIndex >= maxGroups) {
       // Limit reached - stop automatically
       collectingData = false;
-
+      
       // Send stop notification
       StaticJsonDocument<64> doc;
       doc["status"] = "auto_stopped";
@@ -29,47 +27,26 @@ void loop() {
       doc["groups_collected"] = groupIndex;
       serializeJson(doc, Serial);
       Serial.println();
-
+      
       return;
     }
-
-    if(first_measure)
-    {
-      t_start = micros();
-      active = !active;
-      if (active) {
-        *portOutputRegisterPin7 |= pin7Mask;
-      } else {
-        *portOutputRegisterPin7 &= ~pin7Mask;
-      }
-
-      Serial.print("First measure!\n");
-
-      first_measure = 0;
+    
+    // Send pulse
+    t_start = micros();
+    active = !active;
+    if (active) {
+      *portOutputRegisterPin7 |= pin7Mask;
+    } else {
+      *portOutputRegisterPin7 &= ~pin7Mask;
     }
-
-    if(measurementInGroup > measurementInGroupLast)
-    {
-      // Send pulse
-      t_start = micros();
-      active = !active;
-      if (active) {
-        *portOutputRegisterPin7 |= pin7Mask;
-      } else {
-        *portOutputRegisterPin7 &= ~pin7Mask;
-      }
-      
-      Serial.print("Measure!\n");
-
-      measurementInGroupLast = measurementInGroup;
-    }
+    delayMicroseconds(DELAY_MICROSECONDS);
 
     // If group is complete - send statistics
     if (measurementInGroup >= GROUP_SIZE) {
       sendGroupData();
       groupIndex++;
       measurementInGroup = 0;
-
+      
       // Optional progress output
       if (groupIndex % 10 == 0) {
         Serial.print(F("{\"progress\":\""));
@@ -88,22 +65,19 @@ void checkSerialCommands() {
   if (Serial.available() > 0) {
     String command = Serial.readStringUntil('\n');
     command.trim();
-
+    
     if (command.startsWith("START ")) {
       String params = command.substring(6);
-
+      
       StaticJsonDocument<128> doc;
       DeserializationError error = deserializeJson(doc, params);
-
-      first_measure = 1;
-
+      
       if (!error) {
         unsigned long new_session_id = doc["session_id"].as<unsigned long>();
         int groups = doc["groups"] | 0;
 
-        Serial.print("Session id is ");
-        Serial.println(new_session_id);  // 
-
+        Serial.print("Session id is "); Serial.println(new_session_id); // 🔸 DEBUG: Remove in production
+        
         if (new_session_id != 0) {
           startMeasurement(new_session_id, groups);
         } else {
@@ -116,16 +90,18 @@ void checkSerialCommands() {
         Serial.print(params);
         Serial.println(F("\"}"));
       }
-    } else if (command == "STOP") {
+    }
+    else if (command == "STOP") {
       collectingData = false;
-
+      
       StaticJsonDocument<64> doc;
       doc["status"] = "stopped";
       doc["session_id"] = sessionId;
       doc["groups_collected"] = groupIndex;
       serializeJson(doc, Serial);
       Serial.println();
-    } else if (command == "STATUS") {
+    }
+    else if (command == "STATUS") {
       StaticJsonDocument<128> doc;
       doc["status"] = "status";
       doc["session_id"] = sessionId;
@@ -135,13 +111,14 @@ void checkSerialCommands() {
       doc["measurements"] = measurementInGroup;
       serializeJson(doc, Serial);
       Serial.println();
-    } else if (command == "RESET") {
+    }
+    else if (command == "RESET") {
       groupIndex = 0;
       measurementInGroup = 0;
       collectingData = false;
       maxGroups = 0;
       sessionId = 0;
-
+      
       Serial.println(F("{\"status\":\"reset\"}"));
     }
   }
@@ -153,7 +130,7 @@ void startMeasurement(unsigned long new_session_id, int groups) {
   measurementInGroup = 0;
   collectingData = true;
   maxGroups = groups;
-
+  
   StaticJsonDocument<128> doc;
   doc["status"] = "started";
   doc["session_id"] = sessionId;
