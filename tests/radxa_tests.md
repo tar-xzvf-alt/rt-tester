@@ -23,7 +23,7 @@
 
 ## Код для Radxa
 
-[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivestigation/radxa.c)
+[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivestigation/)
 
 Собрать код для Radxa:
 

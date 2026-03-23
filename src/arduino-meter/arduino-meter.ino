@@ -3,6 +3,8 @@
 #include "globals.h"
 #include "measurement.h"
 
+uint8_t first_measure = 0;
+
 void setup() {
   Serial.begin(115200);
   initPins();
@@ -31,6 +33,21 @@ void loop() {
       return;
     }
 
+    if(first_measure)
+    {
+      t_start = micros();
+      active = !active;
+      if (active) {
+        *portOutputRegisterPin7 |= pin7Mask;
+      } else {
+        *portOutputRegisterPin7 &= ~pin7Mask;
+      }
+
+      Serial.print("First measure!\n");
+
+      first_measure = 0;
+    }
+
     if(measurementInGroup > measurementInGroupLast)
     {
       // Send pulse
@@ -42,6 +59,8 @@ void loop() {
         *portOutputRegisterPin7 &= ~pin7Mask;
       }
       
+      Serial.print("Measure!\n");
+
       measurementInGroupLast = measurementInGroup;
     }
 
@@ -75,6 +94,8 @@ void checkSerialCommands() {
 
       StaticJsonDocument<128> doc;
       DeserializationError error = deserializeJson(doc, params);
+
+      first_measure = 1;
 
       if (!error) {
         unsigned long new_session_id = doc["session_id"].as<unsigned long>();

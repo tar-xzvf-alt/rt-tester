@@ -13,7 +13,7 @@
 
 После запуска код автоматически ищет подключенную Arduino Mega по доступным COM-портам или запрашивает порт вручную. Установив соединение, программа переходит в режим командной строки, где пользователь может управлять измерениями: запускать сбор данных, останавливать сбор и проверять статус.
 
-[Пример конфигурационного файла](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/measurement.conf)
+[Пример конфигурационного файла](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver/measurement.conf)
 
 Когда Arduino отправляет обработанные данные, скрипт [receiver](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver/receiver.py) парсит JSON, и сохраняет данные в SQLite базу, из которой может быть выгружена для визуализации отдельным скриптом [plot_statistics](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver/plot_statistics.py).
 

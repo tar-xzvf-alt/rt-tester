@@ -24,11 +24,11 @@
 
 ## Код для Lichee
 
-[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivestigation/lichee.c)
+[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivestigation/)
 
 Собрать код для Lichee:
 
 ```
-gcc lichee.c -lgpiod -o lichee
+gcc  -pthread -o lichee-monitor     main.c     gpio_handler_lichee.c     metrics_collector.c     utils.c     log_writer.c     -lgpiod -lrt
 ```
 

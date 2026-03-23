@@ -28,13 +28,15 @@ void initPins() {
   portInputRegisterPin20 = portInputRegister(digitalPinToPort(PIN_IN));
   pin20Mask = digitalPinToBitMask(PIN_IN);
 
-  attachInterrupt(digitalPinToInterrupt(PIN_IN), onResponse, FALLING);
+  attachInterrupt(digitalPinToInterrupt(PIN_IN), onResponse, CHANGE);
 }
 
 void onResponse() {
   if (collectingData && measurementInGroup < GROUP_SIZE) {
     unsigned long currentTime = micros();
     unsigned long latency = currentTime - t_start;
+
+    Serial.print("\nEDGE!!!");
 
     unsigned long jitter = 0;
     if (measurementInGroup > 0) {

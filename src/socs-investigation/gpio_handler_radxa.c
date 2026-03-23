@@ -64,7 +64,10 @@ void* gpio_handler_thread(void* arg)
     }
 
     struct gpiod_edge_event_buffer *evbuf;
-    evbuf = gpiod_edge_event_buffer_new(16);
+    evbuf = gpiod_edge_event_buffer_new(1);
+
+    int wait_status = 0;
+    struct gpiod_edge_event *ev;
     
     if (!evbuf) {
         perror("gpiod_edge_event_buffer_new");
@@ -73,46 +76,38 @@ void* gpio_handler_thread(void* arg)
         return NULL;
     }
 
-    printf("🔌 GPIO handler waiting for interrupts...\n");
-    printf("   (will be canceled on shutdown)\n");
+    printf("GPIO handler waiting for interrupts...\n");
+    printf("(will be canceled on shutdown)\n");
 
     while (shared->running) {
-        // BLOCKING CALL - also a cancellation point
-        int num_events = gpiod_line_request_read_edge_events(req, evbuf, 16);
         
-        // If thread is cancelled during this call,
-        // it will terminate here and execute cleanup handler
         
-        if (num_events < 0) {
-            if (errno == EINTR) {
-                // Interrupted by signal, check running flag
-                continue;
-            }
-            perror("read_edge_events");
-            break;
+        wait_status = gpiod_line_request_read_edge_events(req, evbuf,1);;
+
+        ev = gpiod_edge_event_buffer_get_event(evbuf, 0);
+
+        // Process event
+            
+        if (gpiod_edge_event_get_event_type(ev) == GPIOD_EDGE_EVENT_RISING_EDGE) {
+            gpiod_line_request_set_value(req, offsets[1], 1);
+            
+            pthread_mutex_lock(&shared->stats_mutex);
+            shared->pulse_counter++;
+            pthread_cond_signal(&shared->measurement_cond);
+            pthread_mutex_unlock(&shared->stats_mutex);
+            printf("\nRising event!");
+            
+        } else {
+            gpiod_line_request_set_value(req, offsets[1], 0);
+
+            pthread_mutex_lock(&shared->stats_mutex);
+            shared->pulse_counter++;
+            pthread_cond_signal(&shared->measurement_cond);
+            pthread_mutex_unlock(&shared->stats_mutex);
+
+            printf("\nFalling event!");
         }
         
-        if (num_events == 0) continue;
-        
-        // Process events
-        for (int i = 0; i < num_events; i++) {
-            struct gpiod_edge_event *ev = 
-                gpiod_edge_event_buffer_get_event(evbuf, i);
-            
-            if (!ev) continue;
-            
-            if (gpiod_edge_event_get_event_type(ev) == GPIOD_EDGE_EVENT_RISING_EDGE) {
-                gpiod_line_request_set_value(req, offsets[1], 1);
-                
-                pthread_mutex_lock(&shared->stats_mutex);
-                shared->pulse_counter++;
-                pthread_cond_signal(&shared->measurement_cond);
-                pthread_mutex_unlock(&shared->stats_mutex);
-                
-            } else {
-                gpiod_line_request_set_value(req, offsets[1], 0);
-            }
-        }
         
         // Check cancellation point
         pthread_testcancel();
@@ -130,7 +125,6 @@ void* gpio_handler_thread(void* arg)
     if (line_cfg) gpiod_line_config_free(line_cfg);
     if (req_cfg) gpiod_request_config_free(req_cfg);
     
-    pthread_cleanup_pop(1);
     printf("GPIO handler thread stopped\n");
     return NULL;
 }

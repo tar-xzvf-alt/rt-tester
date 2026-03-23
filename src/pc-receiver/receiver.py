@@ -13,6 +13,7 @@ import config
 import database as db
 import serial_comm
 import paramiko
+import re
 from logging_utils import setup_session_logging
 from arduino_monitor import FallMonitor
 from config_loader import load_config
@@ -263,7 +264,7 @@ class ArduinoCollector:
         session_id = random.randint(100000, 999999)
         
         # Prepare target device
-        self.soc_manager.prepare_for_session()
+        self.soc_monitor.prepare_for_session()
         
         # Form command for Arduino
         params = f'{{"session_id":{session_id},"groups":{self.auto_stop_groups if self.auto_stop_groups else 0}}}'
