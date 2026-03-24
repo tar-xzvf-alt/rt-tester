@@ -17,10 +17,8 @@ void loop() {
   if (collectingData) {
     // Check if group limit reached
     if (maxGroups > 0 && groupIndex >= maxGroups) {
-      // Limit reached - stop automatically
       collectingData = false;
       
-      // Send stop notification
       StaticJsonDocument<64> doc;
       doc["status"] = "auto_stopped";
       doc["session_id"] = sessionId;
@@ -31,31 +29,36 @@ void loop() {
       return;
     }
     
-    // Send pulse
-    t_start = micros();
-    active = !active;
-    if (active) {
-      *portOutputRegisterPin7 |= pin7Mask;
-    } else {
-      *portOutputRegisterPin7 &= ~pin7Mask;
-    }
-    delayMicroseconds(DELAY_MICROSECONDS);
-
-    // If group is complete - send statistics
-    if (measurementInGroup >= GROUP_SIZE) {
-      sendGroupData();
-      groupIndex++;
-      measurementInGroup = 0;
+    // NEW: Timer-based measurement instead of delayMicroseconds
+    unsigned long now = micros();
+    if (now - lastMeasurementTime >= MEASUREMENT_INTERVAL_US) {
+      lastMeasurementTime = now;
       
-      // Optional progress output
-      if (groupIndex % 10 == 0) {
-        Serial.print(F("{\"progress\":\""));
-        Serial.print(groupIndex);
-        if (maxGroups > 0) {
-          Serial.print(F("/"));
-          Serial.print(maxGroups);
+      // Send pulse
+      t_start = micros();
+      active = !active;
+      if (active) {
+        *portOutputRegisterPin7 |= pin7Mask;
+      } else {
+        *portOutputRegisterPin7 &= ~pin7Mask;
+      }
+
+      // If group is complete - send statistics
+      if (measurementInGroup >= GROUP_SIZE) {
+        sendGroupData();
+        groupIndex++;
+        measurementInGroup = 0;
+        
+        // Optional progress output
+        if (groupIndex % 10 == 0) {
+          Serial.print(F("{\"progress\":\""));
+          Serial.print(groupIndex);
+          if (maxGroups > 0) {
+            Serial.print(F("/"));
+            Serial.print(maxGroups);
+          }
+          Serial.println(F("\"}"));
         }
-        Serial.println(F("\"}"));
       }
     }
   }
@@ -76,12 +79,9 @@ void checkSerialCommands() {
         unsigned long new_session_id = doc["session_id"].as<unsigned long>();
         int groups = doc["groups"] | 0;
 
-        Serial.print("Session id is "); Serial.println(new_session_id); // 🔸 DEBUG: Remove in production
-        
         if (new_session_id != 0) {
           startMeasurement(new_session_id, groups);
         } else {
-          // If session_id not provided, generate own
           randomSeed(analogRead(0));
           startMeasurement(random(100000, 999999), groups);
         }
@@ -130,6 +130,7 @@ void startMeasurement(unsigned long new_session_id, int groups) {
   measurementInGroup = 0;
   collectingData = true;
   maxGroups = groups;
+  lastMeasurementTime = micros();  // Initialize timer
   
   StaticJsonDocument<128> doc;
   doc["status"] = "started";

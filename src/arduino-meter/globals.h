@@ -10,8 +10,11 @@ extern volatile unsigned long t_start;
 extern volatile int groupIndex;
 extern volatile int measurementInGroup;
 extern volatile bool collectingData;
-extern volatile unsigned long sessionId;  // Received from PC
+extern volatile unsigned long sessionId;
 extern volatile int maxGroups;
+
+// Timer variables
+extern volatile unsigned long lastMeasurementTime;
 
 // For direct port access
 extern volatile uint8_t* portOutputRegisterPin7;
@@ -21,7 +24,6 @@ extern uint8_t pin20Mask;
 
 // Temporary arrays for current group
 extern volatile int currentGroupLatency[GROUP_SIZE];
-extern volatile int currentGroupJitter[GROUP_SIZE];
 
 // Functions
 void checkSerialCommands();

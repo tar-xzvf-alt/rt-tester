@@ -10,13 +10,14 @@ volatile bool collectingData = false;
 volatile unsigned long sessionId = 0;
 volatile int maxGroups = 0;
 
+volatile unsigned long lastMeasurementTime = 0;
+
 volatile uint8_t* portOutputRegisterPin7;
 uint8_t pin7Mask;
 volatile uint8_t* portInputRegisterPin20;
 uint8_t pin20Mask;
 
 volatile int currentGroupLatency[GROUP_SIZE];
-volatile int currentGroupJitter[GROUP_SIZE];
 
 void initPins() {
   pinMode(PIN_OUT, OUTPUT);
@@ -35,17 +36,7 @@ void onResponse() {
     unsigned long currentTime = micros();
     unsigned long latency = currentTime - t_start;
 
-    unsigned long jitter = 0;
-    if (measurementInGroup > 0) {
-      if (latency > currentGroupLatency[measurementInGroup-1]) {
-        jitter = latency - currentGroupLatency[measurementInGroup-1];
-      } else {
-        jitter = currentGroupLatency[measurementInGroup-1] - latency;
-      }
-    }
-
     currentGroupLatency[measurementInGroup] = latency;
-    currentGroupJitter[measurementInGroup] = jitter;
     measurementInGroup++;
   }
 }
@@ -83,12 +74,13 @@ void sendGroupData() {
   
   float avgLatency = (float)sumLatency / WORST_COUNT;
   
-  // Jitter calculated from all measurements (not just worst ones)
-  unsigned long sumJitter = 0;
-  for (int i = 1; i < GROUP_SIZE; i++) {
-    sumJitter += currentGroupJitter[i];
+  
+  float sumSquaredDiff = 0;
+  for (int i = 0; i < GROUP_SIZE; i++) {
+    float diff = currentGroupLatency[i] - avgLatency;
+    sumSquaredDiff += diff * diff;
   }
-  float avgJitter = (float)sumJitter / (GROUP_SIZE - 1);
+  float rmsJitter = sqrt(sumSquaredDiff / GROUP_SIZE);
   
   // Form JSON
   StaticJsonDocument<512> doc;
@@ -100,7 +92,7 @@ void sendGroupData() {
   doc["avg_latency_us"] = avgLatency;
   doc["min_latency_us"] = minLatency;
   doc["max_latency_us"] = maxLatency;
-  doc["jitter_us"] = avgJitter;
+  doc["jitter_us"] = rmsJitter;
   doc["worst_count"] = WORST_COUNT;
   
   // Add array of worst values
@@ -109,9 +101,8 @@ void sendGroupData() {
     worstArray.add(worstLatencies[i]);
   }
   
-  // Measurement parameters
   JsonObject params = doc.createNestedObject("parameters");
-  params["delay_us"] = DELAY_MICROSECONDS;
+  params["delay_us"] = MEASUREMENT_INTERVAL_US;
   params["measurements_per_group"] = GROUP_SIZE;
   params["max_groups"] = maxGroups;
   
