@@ -24,7 +24,7 @@
 
 ## Код для Lichee
 
-[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivestigation/)
+[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
 
 Собрать код для Lichee:
 

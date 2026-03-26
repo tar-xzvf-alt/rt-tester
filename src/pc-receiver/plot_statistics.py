@@ -48,14 +48,12 @@ def sanitize_filename(text: str) -> str:
     return sanitized
 
 
-def get_latency_stats(db_path: str, session_id: int = None, top_n: int = 25, 
+def get_latency_stats(db_path: str, session_id: int = None, top_n: int = 125, 
                       threshold_us: int = DEFAULT_THRESHOLD_US) -> pd.DataFrame:
     """
     Calculate statistics for the worst N latencies in each group.
     Also count how many latencies exceed threshold in each group.
     """
-    if top_n < 1 or top_n > 25:
-        raise ValueError("top_n must be between 1 and 25")
     
     conn = sqlite3.connect(db_path)
     
@@ -241,7 +239,7 @@ def get_session_info(db_path: str, session_id: int, threshold_us: int = DEFAULT_
 
 
 def plot_comprehensive_analysis(db_path: str, session_id: int = None, 
-                               output: str = None, top_n: int = 25,
+                               output: str = None, top_n: int = 125,
                                threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
     """
     Generate comprehensive plot with latency, jitter, and SoC metrics.
@@ -444,7 +442,7 @@ def generate_plot_filename(db_path: str, session_id: int,
     
     # Get measurement parameters
     interval_us = info['interval_us'] if info['interval_us'] else 300
-    worst_count = info['worst_count'] if info['worst_count'] else 25
+    worst_count = info['worst_count'] if info['worst_count'] else 125
     
 
     filename = f"{session_id}_{board_clean}_{kernel_clean}_{interval_us}_{worst_count}_{stress_suffix}.png"
@@ -453,7 +451,7 @@ def generate_plot_filename(db_path: str, session_id: int,
 
 
 def plot_latency_with_soc(db_path: str, session_id: int = None, 
-                          output: str = None, top_n: int = 25,
+                          output: str = None, top_n: int = 125,
                           threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
     """Plot latency with SoC metrics overlay (alternative layout)."""
     latency_stats = get_latency_stats(db_path, session_id, top_n, threshold_us)
@@ -572,7 +570,10 @@ def plot_jitter_with_soc(db_path: str, session_id: int = None,
                          output: str = None,
                          threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
     """Plot jitter with SoC metrics overlay."""
-    latency_stats = get_latency_stats(db_path, session_id, 25, threshold_us)
+
+    info = get_session_info(db_path, session_id, threshold_us)
+
+    latency_stats = get_latency_stats(db_path, session_id, info['worst_count'], threshold_us)
     soc_metrics = get_soc_metrics(db_path, session_id)
     
     if latency_stats is None or latency_stats.empty:
@@ -821,8 +822,8 @@ def main():
     parser.add_argument('db', help='Path to SQLite database')
     parser.add_argument('--session', type=int, help='Session ID (if not specified, all sessions)')
     parser.add_argument('--output', '-o', help='Save plot to file instead of displaying')
-    parser.add_argument('--top', type=int, default=25, 
-                       help='Number of worst latencies to analyze (1-25, default: 25)')
+    parser.add_argument('--top', type=int, default=125, 
+                       help='Number of worst latencies to analyze')
     parser.add_argument('--limit', type=int, default=DEFAULT_THRESHOLD_US,
                        help=f'Latency threshold in microseconds (default: {DEFAULT_THRESHOLD_US})')
     
@@ -873,7 +874,7 @@ def main():
             print("  details      - show detailed session information")
             print("\nOptional parameters:")
             print(f"  --limit      - latency threshold in µs (default: {DEFAULT_THRESHOLD_US})")
-            print("  --top        - number of worst latencies to analyze (1-25)")
+            print("  --top        - number of worst latencies to analyze")
             print("  --output     - save plot to file (auto-named if not specified)")
             print("\nFor more information, see README.md")
             

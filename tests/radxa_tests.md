@@ -9,7 +9,7 @@
 - Arduino Mega 2560 - инструмент тестирования;
 - ПК - место сбора данных и их визуализации.
 
-[Результаты](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/results_radxa)
+[Результаты](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/results_)
 
 
 Схема подключения:
@@ -23,7 +23,7 @@
 
 ## Код для Radxa
 
-[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-ivestigation/)
+[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
 
 Собрать код для Radxa:
 
