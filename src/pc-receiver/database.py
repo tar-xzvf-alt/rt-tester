@@ -132,7 +132,7 @@ def init_database(db_path: str) -> None:
     with db.transaction() as conn:
         cursor = conn.cursor()
         
-        # Groups information table
+        # Groups information table (updated with target info)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS groups (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -145,12 +145,31 @@ def init_database(db_path: str) -> None:
                 delay_us INTEGER,
                 measurements_per_group INTEGER,
                 worst_count INTEGER,
+                target_board TEXT,
+                target_kernel TEXT,
+                target_stress TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(session_id, group_index)
             )
         ''')
         
-        # Individual latencies table (25 worst per group)
+        # Add columns if they don't exist (for existing databases)
+        try:
+            cursor.execute("ALTER TABLE groups ADD COLUMN target_board TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE groups ADD COLUMN target_kernel TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE groups ADD COLUMN target_stress TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        # Individual latencies table (N  worst per group)
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS latencies (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -297,7 +316,9 @@ def _migrate_events_tables(conn: sqlite3.Connection) -> None:
     print("  Old tables dropped, migration complete")
 
 
-def save_group_data(db_path: str, data: dict, current_time_us: int) -> Optional[int]:
+def save_group_data(db_path: str, data: dict, current_time_us: int,
+                    target_board: str = "unknown", target_kernel: str = "unknown",
+                    target_stress: str = "off") -> Optional[int]:
     """
     Save group data and worst latencies to database using transaction.
     """
@@ -311,12 +332,13 @@ def save_group_data(db_path: str, data: dict, current_time_us: int) -> Optional[
     with db.transaction() as conn:
         cursor = conn.cursor()
         
-        # Insert group information
+        # Insert group information with target info
         cursor.execute('''
             INSERT OR REPLACE INTO groups 
             (session_id, group_index, pc_timestamp, pc_timestamp_us, arduino_timestamp,
-             jitter_us, delay_us, measurements_per_group, worst_count)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+             jitter_us, delay_us, measurements_per_group, worst_count,
+             target_board, target_kernel, target_stress)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('session_id', 0),
             data['group_index'],
@@ -324,9 +346,12 @@ def save_group_data(db_path: str, data: dict, current_time_us: int) -> Optional[
             current_time_us,
             data.get('timestamp', 0),
             data.get('jitter_us', 0),
-            params.get('delay_us', 0),
+            params.get('interval_us', 0),
             params.get('measurements_per_group', 0),
-            data.get('worst_count', 25)
+            data.get('worst_count', 125),
+            target_board,
+            target_kernel,
+            target_stress
         ))
         
         # Get inserted group ID
@@ -421,11 +446,17 @@ def save_soc_metrics_from_log(db_path: str, metrics: dict) -> None:
         ))
 
 
-def save_session_start(db_path: str, session_id: int, auto_stop_groups: int = 0) -> None:
+def save_session_start(db_path: str, session_id: int, auto_stop_groups: int = 0,
+                       worst_count: int = 125, interval_us: int = 300,
+                       target_board: str = "unknown", target_kernel: str = "unknown",
+                       target_stress: str = "off") -> None:
     """
-    Save session start event.
+    Save session start event with measurement parameters and target info.
     """
-    details = f"Auto-stop groups: {auto_stop_groups}" if auto_stop_groups else "Infinite"
+    stress_status = "WITH STRESS" if target_stress == 'on' else "NO STRESS"
+    details = (f"Board: {target_board}, Kernel: {target_kernel}, Stress: {stress_status}, "
+               f"Auto-stop: {auto_stop_groups if auto_stop_groups else 'infinite'}, "
+               f"worst_count: {worst_count}, interval: {interval_us} µs")
     save_event(db_path, session_id, "start", None, details)
 
 

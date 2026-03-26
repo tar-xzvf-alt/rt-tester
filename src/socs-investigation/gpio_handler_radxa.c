@@ -95,7 +95,7 @@ void* gpio_handler_thread(void* arg)
             shared->pulse_counter++;
             pthread_cond_signal(&shared->measurement_cond);
             pthread_mutex_unlock(&shared->stats_mutex);
-            printf("\nRising event!");
+           // printf("\nRising event!");
             
         } else {
             gpiod_line_request_set_value(req, offsets[1], 0);
@@ -105,7 +105,7 @@ void* gpio_handler_thread(void* arg)
             pthread_cond_signal(&shared->measurement_cond);
             pthread_mutex_unlock(&shared->stats_mutex);
 
-            printf("\nFalling event!");
+          //  printf("\nFalling event!");
         }
         
         

@@ -12,6 +12,10 @@ volatile int maxGroups = 0;
 
 volatile unsigned long lastMeasurementTime = 0;
 
+// Measurement parameters
+volatile int worstCount = DEFAULT_WORST_COUNT;
+volatile unsigned int measurementIntervalUs = DEFAULT_MEASUREMENT_INTERVAL_US;
+
 volatile uint8_t* portOutputRegisterPin7;
 uint8_t pin7Mask;
 volatile uint8_t* portInputRegisterPin20;
@@ -44,17 +48,27 @@ void onResponse() {
 void sendGroupData() {
   if (GROUP_SIZE == 0) return;
 
-  const int WORST_COUNT = 25;
-  unsigned long worstLatencies[WORST_COUNT] = {0};
+  // Use configurable worstCount
+  int actualWorstCount = worstCount;
+  if (actualWorstCount > GROUP_SIZE) {
+    actualWorstCount = GROUP_SIZE;
+  }
+  if (actualWorstCount < 1) {
+    actualWorstCount = 1;
+  }
+
+  unsigned long worstLatencies[actualWorstCount];
+  for (int i = 0; i < actualWorstCount; i++) {
+    worstLatencies[i] = 0;
+  }
   
-  // Find 25 worst latency values
+  // Find N worst latency values
   for (int i = 0; i < GROUP_SIZE; i++) {
     unsigned long currentLatency = currentGroupLatency[i];
     
-    for (int j = 0; j < WORST_COUNT; j++) {
+    for (int j = 0; j < actualWorstCount; j++) {
       if (currentLatency > worstLatencies[j]) {
-        // Shift smaller values to the right
-        for (int k = WORST_COUNT - 1; k > j; k--) {
+        for (int k = actualWorstCount - 1; k > j; k--) {
           worstLatencies[k] = worstLatencies[k-1];
         }
         worstLatencies[j] = currentLatency;
@@ -65,44 +79,50 @@ void sendGroupData() {
   
   // Calculate statistics for worst latency values
   unsigned long sumLatency = 0;
-  unsigned long minLatency = worstLatencies[WORST_COUNT-1];
+  unsigned long minLatency = worstLatencies[actualWorstCount-1];
   unsigned long maxLatency = worstLatencies[0];
   
-  for (int i = 0; i < WORST_COUNT; i++) {
+  for (int i = 0; i < actualWorstCount; i++) {
     sumLatency += worstLatencies[i];
   }
   
-  float avgLatency = (float)sumLatency / WORST_COUNT;
+  float avgLatency = (float)sumLatency / actualWorstCount;
   
+  // Calculate mean latency for jitter
+  unsigned long sumAllLatency = 0;
+  for (int i = 0; i < GROUP_SIZE; i++) {
+    sumAllLatency += currentGroupLatency[i];
+  }
+  float meanLatency = (float)sumAllLatency / GROUP_SIZE;
   
+  // Calculate RMS jitter (standard deviation)
   float sumSquaredDiff = 0;
   for (int i = 0; i < GROUP_SIZE; i++) {
-    float diff = currentGroupLatency[i] - avgLatency;
+    float diff = currentGroupLatency[i] - meanLatency;
     sumSquaredDiff += diff * diff;
   }
   float rmsJitter = sqrt(sumSquaredDiff / GROUP_SIZE);
   
   // Form JSON
-  StaticJsonDocument<512> doc;
+  StaticJsonDocument<1024> doc;  // Increased size for variable worst count
   
-  // Use session_id received from PC
   doc["session_id"] = sessionId;
   doc["group_index"] = groupIndex;
   doc["timestamp"] = millis();
+  doc["mean_latency_us"] = meanLatency;
   doc["avg_latency_us"] = avgLatency;
   doc["min_latency_us"] = minLatency;
   doc["max_latency_us"] = maxLatency;
   doc["jitter_us"] = rmsJitter;
-  doc["worst_count"] = WORST_COUNT;
+  doc["worst_count"] = actualWorstCount;
   
-  // Add array of worst values
   JsonArray worstArray = doc.createNestedArray("worst_latencies_us");
-  for (int i = 0; i < WORST_COUNT; i++) {
+  for (int i = 0; i < actualWorstCount; i++) {
     worstArray.add(worstLatencies[i]);
   }
   
   JsonObject params = doc.createNestedObject("parameters");
-  params["delay_us"] = MEASUREMENT_INTERVAL_US;
+  params["interval_us"] = measurementIntervalUs;
   params["measurements_per_group"] = GROUP_SIZE;
   params["max_groups"] = maxGroups;
   

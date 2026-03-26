@@ -29,9 +29,9 @@ void loop() {
       return;
     }
     
-    // NEW: Timer-based measurement instead of delayMicroseconds
+    // Timer-based measurement with configurable interval
     unsigned long now = micros();
-    if (now - lastMeasurementTime >= MEASUREMENT_INTERVAL_US) {
+    if (now - lastMeasurementTime >= measurementIntervalUs) {
       lastMeasurementTime = now;
       
       // Send pulse
@@ -72,18 +72,25 @@ void checkSerialCommands() {
     if (command.startsWith("START ")) {
       String params = command.substring(6);
       
-      StaticJsonDocument<128> doc;
+      StaticJsonDocument<256> doc;  // Increased size for new parameters
       DeserializationError error = deserializeJson(doc, params);
       
       if (!error) {
         unsigned long new_session_id = doc["session_id"].as<unsigned long>();
         int groups = doc["groups"] | 0;
-
+        int worst_cnt = doc["worst_count"] | DEFAULT_WORST_COUNT;
+        unsigned int interval_us = doc["interval_us"] | DEFAULT_MEASUREMENT_INTERVAL_US;
+        
+        // Validate parameters
+        if (worst_cnt < 1) worst_cnt = 1;
+        if (worst_cnt > GROUP_SIZE) worst_cnt = GROUP_SIZE;
+        if (interval_us < 10) interval_us = 10;  // Minimum 10 microseconds
+        
         if (new_session_id != 0) {
-          startMeasurement(new_session_id, groups);
+          startMeasurement(new_session_id, groups, worst_cnt, interval_us);
         } else {
-          randomSeed(analogRead(0));
-          startMeasurement(random(100000, 999999), groups);
+          randomSeed(micros());
+          startMeasurement(random(100000, 999999), groups, worst_cnt, interval_us);
         }
       } else {
         Serial.print(F("{\"error\":\"Invalid parameters: "));
@@ -124,18 +131,27 @@ void checkSerialCommands() {
   }
 }
 
-void startMeasurement(unsigned long new_session_id, int groups) {
+void startMeasurement(unsigned long new_session_id, int groups, 
+                      int worst_cnt, unsigned int interval_us) {
+  noInterrupts();
+  
   sessionId = new_session_id;
   groupIndex = 0;
   measurementInGroup = 0;
   collectingData = true;
   maxGroups = groups;
-  lastMeasurementTime = micros();  // Initialize timer
+  worstCount = worst_cnt;
+  measurementIntervalUs = interval_us;
+  lastMeasurementTime = micros();
   
-  StaticJsonDocument<128> doc;
+  interrupts();
+  
+  StaticJsonDocument<192> doc;
   doc["status"] = "started";
   doc["session_id"] = sessionId;
   doc["max_groups"] = maxGroups;
+  doc["worst_count"] = worstCount;
+  doc["interval_us"] = measurementIntervalUs;
   if (maxGroups > 0) {
     doc["auto_stop"] = true;
   }

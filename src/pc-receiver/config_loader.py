@@ -69,19 +69,18 @@ def parse_config_file(config_path):
 def load_config(config_path=None):
     """
     Load configuration from file or use defaults.
-    
-    Args:
-        config_path: Optional path to config file
-        
-    Returns:
-        dict: Complete configuration dictionary
     """
     # Default values
     config_dict = {
         'db': config.DEFAULT_DB_PATH,
         'timeout-us': config.DEFAULT_TIMEOUT_US,
         'check-interval-us': config.DEFAULT_CHECK_INTERVAL_US,
-        'auto-stop-groups': config.AUTO_STOP,  # None means "do not stop automatically"
+        'auto-stop-groups': config.AUTO_STOP,
+        'worst-count': config.DEFAULT_WORST_COUNT,
+        'measurement-interval-us': config.DEFAULT_MEASUREMENT_INTERVAL_US,
+        'target-board': config.DEFAULT_TARGET_BOARD,
+        'target-kernel': config.DEFAULT_TARGET_KERNEL,
+        'target-stress': config.DEFAULT_TARGET_STRESS,
         'soc': {
             'enabled': False,
             'host': None,
@@ -96,14 +95,27 @@ def load_config(config_path=None):
             file_config = parse_config_file(config_path)
             
             # Update global parameters
-            for key in ['db', 'timeout-us', 'check-interval-us', 'auto-stop-groups']:
+            for key in ['db', 'timeout-us', 'check-interval-us', 'auto-stop-groups',
+                        'worst-count', 'measurement-interval-us',
+                        'target-board', 'target-kernel', 'target-stress']:
                 if key in file_config:
                     config_dict[key] = file_config[key]
+            
+            # Validate stress value
+            stress = config_dict['target-stress'].lower()
+            if stress not in ['on', 'off', 'yes', 'no', 'true', 'false', '1', '0']:
+                print(f"Warning: Invalid stress value '{config_dict['target-stress']}', using 'off'")
+                config_dict['target-stress'] = 'off'
+            else:
+                # Normalize to 'on' or 'off'
+                if stress in ['on', 'yes', 'true', '1']:
+                    config_dict['target-stress'] = 'on'
+                else:
+                    config_dict['target-stress'] = 'off'
             
             # Update soc section if present
             if 'soc' in file_config:
                 soc_config = file_config['soc']
-                # Only enable if we have minimum required params
                 if (soc_config.get('host') and 
                     soc_config.get('username') and 
                     soc_config.get('password')):
@@ -114,6 +126,11 @@ def load_config(config_path=None):
             print(f"  db = {config_dict['db']}")
             print(f"  timeout-us = {config_dict['timeout-us']:,} µs ({config_dict['timeout-us']/1_000_000:.1f} sec)")
             print(f"  check-interval-us = {config_dict['check-interval-us']:,} µs ({config_dict['check-interval-us']/1_000_000:.1f} sec)")
+            print(f"  worst-count = {config_dict['worst-count']}")
+            print(f"  measurement-interval-us = {config_dict['measurement-interval-us']} µs")
+            print(f"  target-board = {config_dict['target-board']}")
+            print(f"  target-kernel = {config_dict['target-kernel']}")
+            print(f"  target-stress = {config_dict['target-stress']}")
             
             if config_dict['auto-stop-groups']:
                 print(f"  auto-stop-groups = {config_dict['auto-stop-groups']} groups")

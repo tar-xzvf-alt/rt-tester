@@ -16,6 +16,10 @@ extern volatile int maxGroups;
 // Timer variables
 extern volatile unsigned long lastMeasurementTime;
 
+// Measurement parameters (configurable via START command)
+extern volatile int worstCount;              // Number of worst latencies to report
+extern volatile unsigned int measurementIntervalUs;  // Interval between measurements
+
 // For direct port access
 extern volatile uint8_t* portOutputRegisterPin7;
 extern uint8_t pin7Mask;
@@ -27,6 +31,6 @@ extern volatile int currentGroupLatency[GROUP_SIZE];
 
 // Functions
 void checkSerialCommands();
-void startMeasurement(unsigned long session_id, int groups);
+void startMeasurement(unsigned long session_id, int groups, int worst_cnt, unsigned int interval_us);
 
 #endif

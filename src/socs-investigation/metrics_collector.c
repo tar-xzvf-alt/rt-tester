@@ -24,22 +24,32 @@ void update_cpu_metrics(SharedData *shared)
         return;
     }
     
-    unsigned long long user, nice, system, idle, iowait, irq, softirq;
-    int ret = fscanf(stat, "cpu %llu %llu %llu %llu %llu %llu %llu",
-           &user, &nice, &system, &idle, &iowait, &irq, &softirq);
+    unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
+    int ret = fscanf(stat, "cpu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
+           &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal, &guest, &guest_nice);
     fclose(stat);
     
     if (ret < 7) return;
     
-    unsigned long long total = user + nice + system + idle + iowait + irq + softirq;
+    // Guest time is already included in user/nice, so subtract it to avoid double counting
+    user -= guest;
+    nice -= guest_nice;
+    
+    unsigned long long total = user + nice + system + idle + iowait + irq + softirq + steal;
     unsigned long long idle_all = idle + iowait;
     
+    // Only calculate if we have previous values (skip first measurement)
     if (shared->prev_total != 0) {
         unsigned long long total_diff = total - shared->prev_total;
         unsigned long long idle_diff = idle_all - (shared->prev_idle + shared->prev_iowait);
         
         if (total_diff > 0) {
+            // CPU usage = 100% * (non-idle time) / (total time)
             float cpu_usage = 100.0 * (1.0 - (float)idle_diff / total_diff);
+            
+            // Clamp to valid range [0, 100]
+            if (cpu_usage < 0) cpu_usage = 0;
+            if (cpu_usage > 100) cpu_usage = 100;
             
             pthread_mutex_lock(&shared->stats_mutex);
             
@@ -49,13 +59,25 @@ void update_cpu_metrics(SharedData *shared)
             shared->current_stats.total_cpu += cpu_usage;
             
             pthread_mutex_unlock(&shared->stats_mutex);
+            
+            // Debug output (remove in production)
+            // printf("CPU: %.2f%% (total_diff=%llu, idle_diff=%llu)\n", 
+            //        cpu_usage, total_diff, idle_diff);
         }
+    } else {
+        // First measurement - just store values
+        printf("CPU metrics: first measurement, storing baseline\n");
     }
     
+    // Store current values for next calculation
     shared->prev_user = user;
+    shared->prev_nice = nice;
     shared->prev_system = system;
     shared->prev_idle = idle;
     shared->prev_iowait = iowait;
+    shared->prev_irq = irq;
+    shared->prev_softirq = softirq;
+    shared->prev_steal = steal;
     shared->prev_total = total;
 }
 
@@ -79,6 +101,10 @@ void update_memory_metrics(SharedData *shared)
     if (mem_total > 0 && mem_available > 0) {
         float mem_usage = 100.0 * (1.0 - (float)mem_available / mem_total);
         
+        // Clamp to valid range
+        if (mem_usage < 0) mem_usage = 0;
+        if (mem_usage > 100) mem_usage = 100;
+        
         pthread_mutex_lock(&shared->stats_mutex);
         
         if (mem_usage > shared->current_stats.max_mem) {
@@ -99,7 +125,7 @@ void* metrics_collector_thread(void* arg)
     pthread_cleanup_push(metrics_cleanup_handler, shared);
     
     printf("Metrics collector thread started\n");
-    set_current_thread_rt("metrics_collector");
+    //set_current_thread_rt("metrics_collector");
     
     // Enable thread cancellation
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
@@ -107,6 +133,7 @@ void* metrics_collector_thread(void* arg)
     
     struct timespec timeout;
     int local_pulse_counter = 0;
+    int first_measurement_done = 0;  // Flag to ensure we have baseline
     
     while (shared->running) {
         pthread_mutex_lock(&shared->stats_mutex);

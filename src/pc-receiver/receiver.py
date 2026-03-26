@@ -17,6 +17,7 @@ import re
 from logging_utils import setup_session_logging
 from arduino_monitor import FallMonitor
 from config_loader import load_config
+import json
 from soc_monitor import SoCMonitor  # New import
 
 
@@ -41,7 +42,18 @@ class ArduinoCollector:
         self.last_group_index = 0
         self.start_command_time_us = 0
         self.is_collecting = False
+
+                # Measurement parameters
+        self.worst_count = config_dict.get('worst-count', config.DEFAULT_WORST_COUNT)
+        self.measurement_interval_us = config_dict.get('measurement-interval-us', 
+                                                       config.DEFAULT_MEASUREMENT_INTERVAL_US)
         
+        # Target device information
+        self.target_board = config_dict.get('target-board', config.DEFAULT_TARGET_BOARD)
+        self.target_kernel = config_dict.get('target-kernel', config.DEFAULT_TARGET_KERNEL)
+        self.target_stress = config_dict.get('target-stress', config.DEFAULT_TARGET_STRESS)
+
+
         # Auto-stop configuration
         self.auto_stop_groups = config_dict.get('auto-stop-groups')
         self.auto_stop_triggered = False
@@ -65,6 +77,7 @@ class ArduinoCollector:
         
         self._print_init_info()
     
+    
     def _print_init_info(self):
         """Print initialization information."""
         timeout_us = self.config['timeout-us']
@@ -72,9 +85,15 @@ class ArduinoCollector:
         timeout_sec = timeout_us / 1_000_000
         check_sec = check_us / 1_000_000
         
+        stress_status = "ON" if self.target_stress == 'on' else "OFF"
+        
         print(f"Database initialized: {self.db_path}")
         print(f"  Fall monitoring: timeout {timeout_us:,} µs ({timeout_sec:.1f} sec)")
         print(f"  Check interval: {check_us:,} µs ({check_sec:.1f} sec)")
+        print(f"  Target device: {self.target_board} (kernel: {self.target_kernel}) - Stress: {stress_status}")
+        print(f"  Measurement parameters:")
+        print(f"    Worst count: {self.worst_count}")
+        print(f"    Measurement interval: {self.measurement_interval_us} µs")
         
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
@@ -87,8 +106,8 @@ class ArduinoCollector:
             print(f"    user: {self.config['soc']['username']}")
         else:
             print(f"  SoC monitoring: DISABLED")
-
     
+
     def _on_fall_detected(self, time_since_last_data_us: int) -> None:
         """Callback when fall is detected."""
         elapsed_since_start_us = (time.time_ns() // 1000) - self.start_command_time_us
@@ -156,12 +175,20 @@ class ArduinoCollector:
         # Check session_id
         if msg_session_id != self.current_session_id:
             print(f"Warning: Session ID mismatch in group {group_index}: "
-                f"expected {self.current_session_id}, got {msg_session_id}")
+                  f"expected {self.current_session_id}, got {msg_session_id}")
             self.current_session_id = msg_session_id
             self.session_logger = setup_session_logging(self.current_session_id)
         
         if self.is_collecting:
-            group_id = db.save_group_data(self.db_path, msg, current_time_us)
+            # Pass target info to database
+            group_id = db.save_group_data(
+                self.db_path, 
+                msg, 
+                current_time_us,
+                self.target_board,
+                self.target_kernel,
+                self.target_stress
+            )
             
             if group_id:
                 self.groups_received += 1
@@ -172,7 +199,7 @@ class ArduinoCollector:
         else:
             if self.session_logger:
                 self.session_logger.info(f"Received group {group_index} while not collecting")
-            
+
 
     def _check_auto_stop(self) -> None:
         """Check if auto-stop condition is met."""
@@ -234,7 +261,7 @@ class ArduinoCollector:
         print("ARDUINO DATA COLLECTION DAEMON WITH FALL MONITORING")
         print("="*80)
         print(f"Database: {self.db_path}")
-        print("Mode: collecting 25 worst latencies per group")
+        print("Mode: collecting N worst latencies per group")
         print(f"Monitoring: timeout {self.fall_monitor.timeout_us:,} µs ({timeout_sec:.1f} sec)")
         print(f"            check every {self.check_interval_us:,} µs ({check_sec:.1f} sec)")
         if self.auto_stop_groups:
@@ -267,8 +294,14 @@ class ArduinoCollector:
         self.soc_monitor.prepare_for_session()
         
         # Form command for Arduino
-        params = f'{{"session_id":{session_id},"groups":{self.auto_stop_groups if self.auto_stop_groups else 0}}}'
-        cmd = f"START {params}"
+        params = {
+            "session_id": session_id,
+            "groups": self.auto_stop_groups if self.auto_stop_groups else 0,
+            "worst_count": self.worst_count,
+            "interval_us": self.measurement_interval_us
+        }
+        
+        cmd = f"START {json.dumps(params)}"
         self.send_command(cmd)
         
         # Save session information
@@ -280,10 +313,22 @@ class ArduinoCollector:
         self.auto_stop_triggered = False
         self.fall_monitor.reset()
         
-        # Save session start event
-        db.save_session_start(self.db_path, session_id, self.auto_stop_groups or 0)
+        # Save session start event with target info
+        db.save_session_start(
+            self.db_path, 
+            session_id, 
+            self.auto_stop_groups or 0,
+            self.worst_count,
+            self.measurement_interval_us,
+            self.target_board,
+            self.target_kernel,
+            self.target_stress
+        )
         
         print(f"Measurement started with session ID: {session_id}")
+        stress_status = "WITH STRESS" if self.target_stress == 'on' else "NO STRESS"
+        print(f"  Target: {self.target_board} (kernel: {self.target_kernel}) - {stress_status}")
+        print(f"  Parameters: worst_count={self.worst_count}, interval={self.measurement_interval_us} µs")
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
         
@@ -291,7 +336,13 @@ class ArduinoCollector:
         self.session_logger = setup_session_logging(session_id)
         if self.session_logger:
             self.session_logger.info(f"=== Session {session_id} started ===")
+            self.session_logger.info(f"Target board: {self.target_board}")
+            self.session_logger.info(f"Target kernel: {self.target_kernel}")
+            self.session_logger.info(f"Target stress: {self.target_stress}")
             self.session_logger.info(f"Auto-stop groups: {self.auto_stop_groups}")
+            self.session_logger.info(f"Worst count: {self.worst_count}")
+            self.session_logger.info(f"Measurement interval: {self.measurement_interval_us} µs")
+
     
     def _process_session_metrics(self):
         """Process SoC metrics after session completion."""
@@ -354,7 +405,8 @@ class ArduinoCollector:
         while self.running:
             if self.is_collecting:
                 current_time_us = time.time_ns() // 1000
-                self.fall_monitor.check(current_time_us)
+                if self.fall_monitor.last_data_time_us > 0:
+                    self.fall_monitor.check(current_time_us)
                 self._check_auto_stop()
             time.sleep(self.check_interval_us / 1_000_000)
     
@@ -401,9 +453,7 @@ class ArduinoCollector:
                 duration_us,
                 "arduino"
             )
-            
-            self._process_session_metrics()
-            
+                        
             if self.session_logger:
                 self.session_logger.info(f"Session ended. Total groups: {self.groups_received}")
                 self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
@@ -442,7 +492,7 @@ class ArduinoCollector:
         print(f"\nSTATISTICS:")
         print(f"  Uptime: {hours:02d}:{minutes:02d}:{seconds:02d}")
         print(f"  Groups received: {self.groups_received}")
-        print(f"  Total latencies: {self.groups_received * 25:,}")
+        print(f"  Total latencies: {self.groups_received * self.worst_count}")
         print(f"  Last group: {self.last_group_index}")
         
         # Collection state
@@ -701,8 +751,8 @@ class ArduinoCollector:
             print(f"  Sessions in DB: {row[0]}")
             print(f"  Total groups: {row[1]}")
             print(f"  Total latencies: {row[2]:,}")
-            print(f"  Avg latency (top-25 worst): {row[4]:.2f} µs")
-            print(f"  Min latency (from worst 25): {row[5]:.2f} µs")
+            print(f"  Avg latency (top-n worst): {row[4]:.2f} µs")
+            print(f"  Min latency (from worst n): {row[5]:.2f} µs")
             print(f"  Max latency: {row[6]:.2f} µs")
             print(f"  Avg jitter: {row[3]:.2f} µs")
             
