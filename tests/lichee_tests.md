@@ -9,7 +9,7 @@
 - Arduino Mega 2560 - инструмент тестирования;
 - ПК - место сбора данных и их визуализации.
 
-[Визуализации результатов](https://altlinux.space/besogon1238/rt-tester/src/branch/main/results)
+[Результаты](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/results_lichee)
 
 
 Схема подключения:
@@ -29,6 +29,6 @@
 Собрать код для Lichee:
 
 ```
-gcc  -pthread -o lichee-monitor     main.c     gpio_handler_lichee.c     metrics_collector.c     utils.c     log_writer.c     -lgpiod -lrt
+gcc  -pthread -o radxa-monitor main.c gpio_handler_lichee.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
 ```
 
