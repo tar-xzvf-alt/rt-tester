@@ -9,7 +9,7 @@
 - Arduino Mega 2560 - инструмент тестирования;
 - ПК - место сбора данных и их визуализации.
 
-[Результаты](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/results_)
+[Результаты](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/results_radxa)
 
 
 Схема подключения:
