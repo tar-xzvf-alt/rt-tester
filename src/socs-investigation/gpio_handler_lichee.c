@@ -54,7 +54,7 @@ void* gpio_handler_thread(void* arg)
     gpiod_line_config_add_line_settings(line_cfg, &offsets[1], 1, out_cfg);
 
     req_cfg = gpiod_request_config_new();
-    gpiod_request_config_set_consumer(req_cfg, "radxa-monitor");
+    gpiod_request_config_set_consumer(req_cfg, "lichee-monitor");
 
     req = gpiod_chip_request_lines(chip, req_cfg, line_cfg);
     if (!req) {
@@ -95,7 +95,7 @@ void* gpio_handler_thread(void* arg)
             shared->pulse_counter++;
             pthread_cond_signal(&shared->measurement_cond);
             pthread_mutex_unlock(&shared->stats_mutex);
-            printf("\nRising event!");
+            //printf("\nRising event!");
             
         } else {
             gpiod_line_request_set_value(req, offsets[1], 0);
@@ -105,7 +105,7 @@ void* gpio_handler_thread(void* arg)
             pthread_cond_signal(&shared->measurement_cond);
             pthread_mutex_unlock(&shared->stats_mutex);
 
-            printf("\nFalling event!");
+            //printf("\nFalling event!");
         }
         
         
