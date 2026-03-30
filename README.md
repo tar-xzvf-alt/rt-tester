@@ -5,6 +5,8 @@
 
 [Тестирование Radxa rk3588 5b](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/radxa_tests.md) 
 
+[Тестирование Starfive Visionfive 2](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/visionfive_tests.md) 
+
 ## Код для ПК
 
 [Код для ПК](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver)

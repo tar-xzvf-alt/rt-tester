@@ -3,3 +3,4 @@
 /venv/
 rt-tester.code-workspace
 /src/pc-receiver/logs
+/logs/
