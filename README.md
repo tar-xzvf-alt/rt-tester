@@ -7,6 +7,9 @@
 
 [Тестирование Starfive Visionfive 2](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/visionfive_tests.md) 
 
+[Тестирование БЦВМ АРМ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bcvmarm_tests.md) 
+
+
 ## Код для ПК
 
 [Код для ПК](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver)
