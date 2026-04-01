@@ -7,8 +7,9 @@
 
 [Тестирование Starfive Visionfive 2](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/visionfive_tests.md) 
 
-[Тестирование БЦВМ АРМ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bcvmarm_tests.md) 
+[Тестирование БЦВМ АРМ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bсvmarm_tests.md) 
 
+**Сводные таблицы результатов можно найти по ссылкам выше.**
 
 ## Код для ПК
 
@@ -205,6 +206,8 @@ exit # завершение сбора
 |-----------|-----------|-------------------|---------------|
 | Radxa RK3588 | `/dev/gpiochip3` | GPIO_BANK=1, LINE=2 | GPIO_BANK=1, LINE=3 |
 | Lichee RV Dock | `/dev/gpiochip0` | GPIO_LINE=4, OFFSET=15 | GPIO_LINE=4, OFFSET=12 |
+| Visionfive Starfive v2 | `/dev/gpiochip0` | GPIO_LINE=0, OFFSET=60 | GPIO_LINE=0, OFFSET=61 |
+| БЦВМ АРМ | `/dev/gpiochip0` | GPIO_LINE=0, OFFSET=15 | GPIO_LINE=0, OFFSET=9 |
 
 ## Утилиты для тестирования
 

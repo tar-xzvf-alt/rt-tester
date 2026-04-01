@@ -1,6 +1,15 @@
 # Тестирование Lichee RV Dock 
 
-[Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend.jpg)
+[Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend_lichee.jpg)
+
+#### Сводная таблица результатов тестирование в пользовательском пространстве
+
+| Условия | Количество падений | Количество выходов за порог | Худшая задержка| Avg latency в худших 5 % | Avg jitter |
+|------|-|---|---|---|---|
+| 6.12 | 2 | 45812 | 335 | 249.8 | 17.1|
+| 6.12+stress| 0 | 95198 |575| 252.8 | 18.8 |
+| 6.12-rt | 0 | 109726 |365| 255.6 | 18.0 |
+| 6.12-rt+stress| 0 | 104533 |475| 255.3 | 18.1 |
 
 ## Схема стенда
 
