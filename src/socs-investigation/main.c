@@ -12,9 +12,12 @@
 #include "gpio_handler.h"
 #include "metrics_collector.h"
 #include "log_writer.h"
+#include "prometheus_exporter.h"
 
 static SharedData *shared = NULL;
-static int log_was_cleared = 0;  // Flag indicating log was cleared externally
+static int log_was_cleared = 0;
+static char current_board[64] = "unknown";
+static char current_session[32] = "none";
 
 void signal_handler(int sig)
 {
@@ -61,6 +64,7 @@ void signal_handler(int sig)
       
         pthread_cancel(shared->metrics_thread);
 
+        stop_prometheus_exporter();
 
         printf("Threads finished\n");
     }
@@ -185,6 +189,11 @@ int main(int argc, char *argv[])
         cleanup_resources(shared);
         free(shared);
         return 1;
+    }
+    
+    // Start Prometheus exporter
+    if (start_prometheus_exporter(shared, current_board, current_session) != 0) {
+        printf("Warning: Failed to start Prometheus exporter, continuing without it\n");
     }
     
     // Wait for threads to finish

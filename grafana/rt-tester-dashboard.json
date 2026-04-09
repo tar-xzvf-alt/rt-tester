@@ -1,0 +1,287 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": "-- Grafana --",
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "gnetId": null,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "red", "value": 80}
+            ]
+          },
+          "unit": "µs"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom"}},
+      "targets": [
+        {
+          "expr": "arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"}",
+          "legendFormat": "Avg Latency Group {{group}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Average Latency per Group",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 75},
+              {"color": "red", "value": 250}
+            ]
+          },
+          "unit": "µs"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0},
+      "id": 2,
+      "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom"}},
+      "targets": [
+        {
+          "expr": "arduino_latency_max{board=\"$board\", session_id=\"$session_id\"}",
+          "legendFormat": "Max Latency Group {{group}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Maximum Latency per Group",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "µs"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8},
+      "id": 3,
+      "options": {"legend": {"calcs": [], "displayMode": "list", "placement": "bottom"}},
+      "targets": [
+        {
+          "expr": "arduino_jitter{board=\"$board\", session_id=\"$session_id\"}",
+          "legendFormat": "Jitter Group {{group}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Jitter (RMS) per Group",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "thresholds"},
+          "mappings": [],
+          "max": 100,
+          "min": 0,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {"color": "green", "value": null},
+              {"color": "yellow", "value": 70},
+              {"color": "red", "value": 90}
+            ]
+          },
+          "unit": "percent"
+        }
+      },
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
+      "id": 4,
+      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "targets": [
+        {
+          "expr": "soc_cpu_percent{board=\"$board\"}",
+          "refId": "A"
+        },
+        {
+          "expr": "soc_memory_percent{board=\"$board\"}",
+          "refId": "B"
+        }
+      ],
+      "title": "SoC CPU & Memory Usage",
+      "type": "gauge"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "µs"
+        }
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "id": 5,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}},
+      "targets": [
+        {
+          "expr": "arduino_latency_avg{board=\"$board\"}",
+          "legendFormat": "Session {{session_id}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Latency Comparison Across Sessions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            {"options": {"0": "No Stress", "1": "With Stress"}, "type": "value_mapping"}
+          ],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
+        }
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 24},
+      "id": 6,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [
+        {
+          "expr": "avg(arduino_session_info{board=\"$board\", session_id=\"$session_id\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Session Status",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
+          "unit": "none"
+        }
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 8, "y": 24},
+      "id": 7,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [
+        {
+          "expr": "count(arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Groups Collected",
+      "type": "stat"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [],
+          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 75}, {"color": "red", "value": 250}]},
+          "unit": "µs"
+        }
+      },
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 24},
+      "id": 8,
+      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
+      "targets": [
+        {
+          "expr": "avg(arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"})",
+          "refId": "A"
+        }
+      ],
+      "title": "Current Avg Latency",
+      "type": "stat"
+    }
+  ],
+  "refresh": "5s",
+  "schemaVersion": 27,
+  "style": "dark",
+  "tags": ["rt-tester", "latency", "soc"],
+  "templating": {
+    "list": [
+      {
+        "current": {"selected": false, "text": "Prometheus", "value": "Prometheus"},
+        "definition": "prometheus",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Data Source",
+        "multi": false,
+        "name": "datasource",
+        "options": [],
+        "query": {"queryType": ""},
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      },
+      {
+        "current": {"selected": false, "text": "radxa", "value": "radxa"},
+        "definition": "label_values(arduino_latency_avg, board)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Board",
+        "multi": false,
+        "name": "board",
+        "options": [],
+        "query": {"queryType": ""},
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "query"
+      },
+      {
+        "current": {"selected": false, "text": "", "value": ""},
+        "definition": "label_values(arduino_latency_avg{board=\"$board\"}, session_id)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Session",
+        "multi": false,
+        "name": "session_id",
+        "options": [],
+        "query": {"queryType": ""},
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-1h", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "RT Latency Tester Dashboard",
+  "uid": "rt-tester",
+  "version": 1
+}

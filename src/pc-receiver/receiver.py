@@ -18,7 +18,8 @@ from logging_utils import setup_session_logging
 from arduino_monitor import FallMonitor
 from config_loader import load_config
 import json
-from soc_monitor import SoCMonitor  # New import
+from soc_monitor import SoCMonitor
+from metrics_server import MetricsServer
 
 
 class ArduinoCollector:
@@ -74,6 +75,10 @@ class ArduinoCollector:
         )
         
         self.check_interval_us = config_dict['check-interval-us']
+        
+        # Initialize metrics server for Prometheus
+        self.metrics_server = MetricsServer(port=9101)
+        self.metrics_server.start()
         
         self._print_init_info()
     
@@ -180,6 +185,14 @@ class ArduinoCollector:
             self.session_logger = setup_session_logging(self.current_session_id)
         
         if self.is_collecting:
+            # Add target info to the message for Prometheus metrics
+            msg['board'] = self.target_board
+            msg['kernel'] = self.target_kernel
+            msg['stress'] = self.target_stress
+            
+            # Send to metrics server for Prometheus
+            self.metrics_server.add_group(msg)
+            
             # Pass target info to database
             group_id = db.save_group_data(
                 self.db_path, 
@@ -312,6 +325,9 @@ class ArduinoCollector:
         self.last_group_index = -1
         self.auto_stop_triggered = False
         self.fall_monitor.reset()
+        
+        # Update metrics server with new session
+        self.metrics_server.update_session(str(session_id))
         
         # Save session start event with target info
         db.save_session_start(
