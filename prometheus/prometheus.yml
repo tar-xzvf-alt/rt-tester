@@ -5,12 +5,12 @@ global:
     monitor: 'rt-tester'
 
 scrape_configs:
-  - job_name: 'radxa'
+  - job_name: 'radxa_node'
     static_configs:
       - targets: ['192.168.0.223:9100']
         labels:
           board: 'radxa'
-          location: 'lab'
+          source: 'node_exporter'
           
   - job_name: 'arduino_latency'
     static_configs:

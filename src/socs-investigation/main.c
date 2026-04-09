@@ -10,14 +10,10 @@
 #include "shared_data.h"
 #include "utils.h"
 #include "gpio_handler.h"
-#include "metrics_collector.h"
 #include "log_writer.h"
-#include "prometheus_exporter.h"
 
 static SharedData *shared = NULL;
 static int log_was_cleared = 0;
-static char current_board[64] = "unknown";
-static char current_session[32] = "none";
 
 void signal_handler(int sig)
 {
@@ -58,13 +54,8 @@ void signal_handler(int sig)
         
         // Check if threads finished
         int gpio_running = 1;
-        int metrics_running = 1;
 
         pthread_cancel(shared->gpio_thread);
-      
-        pthread_cancel(shared->metrics_thread);
-
-        stop_prometheus_exporter();
 
         printf("Threads finished\n");
     }
@@ -180,25 +171,8 @@ int main(int argc, char *argv[])
         return 1;
     }
     
-    if (pthread_create(&shared->metrics_thread, NULL, metrics_collector_thread, shared) != 0) {
-        perror("pthread_create metrics_thread");
-        shared->running = 0;
-        pthread_cond_broadcast(&shared->measurement_cond);
-        pthread_cancel(shared->gpio_thread);
-        pthread_join(shared->gpio_thread, NULL);
-        cleanup_resources(shared);
-        free(shared);
-        return 1;
-    }
-    
-    // Start Prometheus exporter
-    if (start_prometheus_exporter(shared, current_board, current_session) != 0) {
-        printf("Warning: Failed to start Prometheus exporter, continuing without it\n");
-    }
-    
     // Wait for threads to finish
     pthread_join(shared->gpio_thread, NULL);
-    pthread_join(shared->metrics_thread, NULL);
     
     // Cleanup resources
     cleanup_resources(shared);

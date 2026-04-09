@@ -265,3 +265,37 @@ def get_prometheus_client(config: Optional[Dict] = None) -> PrometheusClient:
     if config and 'prometheus' in config:
         url = config['prometheus'].get('url', url)
     return PrometheusClient(prometheus_url=url)
+
+
+def get_node_exporter_metrics(prometheus_url: str = "http://localhost:9090") -> Dict[str, float]:
+    """
+    Get current CPU and memory metrics from node_exporter.
+    
+    Args:
+        prometheus_url: Prometheus server URL
+        
+    Returns:
+        Dictionary with 'cpu_percent' and 'memory_percent'
+    """
+    client = PrometheusClient(prometheus_url=prometheus_url)
+    metrics = {"cpu_percent": None, "memory_percent": None}
+    
+    try:
+        # CPU usage (100% - idle)
+        cpu_query = '100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[30s])) * 100)'
+        result = client.query(cpu_query)
+        if result:
+            metrics["cpu_percent"] = float(result[0].get("value", [0, 0])[1])
+    except Exception:
+        pass
+    
+    try:
+        # Memory usage
+        mem_query = '(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100'
+        result = client.query(mem_query)
+        if result:
+            metrics["memory_percent"] = float(result[0].get("value", [0, 0])[1])
+    except Exception:
+        pass
+    
+    return metrics

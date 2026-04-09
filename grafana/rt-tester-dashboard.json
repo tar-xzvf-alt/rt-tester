@@ -125,15 +125,17 @@
       "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
       "targets": [
         {
-          "expr": "soc_cpu_percent{board=\"$board\"}",
+          "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[30s])) * 100)",
+          "legendFormat": "CPU Usage",
           "refId": "A"
         },
         {
-          "expr": "soc_memory_percent{board=\"$board\"}",
+          "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
+          "legendFormat": "Memory Usage",
           "refId": "B"
         }
       ],
-      "title": "SoC CPU & Memory Usage",
+      "title": "SoC CPU & Memory Usage (node_exporter)",
       "type": "gauge"
     },
     {

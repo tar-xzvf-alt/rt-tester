@@ -127,6 +127,16 @@ class PrometheusMetricsHandler(http.server.BaseHTTPRequestHandler):
         lines.append(f"# TYPE arduino_session_info gauge")
         lines.append(f'arduino_session_info{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}"}} 1')
         
+        # Add CPU/memory metrics from node_exporter (if available)
+        soc_cpu = latest.get('soc_cpu_percent')
+        soc_mem = latest.get('soc_memory_percent')
+        if soc_cpu is not None:
+            lines.append(f"# TYPE soc_cpu_percent gauge")
+            lines.append(f'soc_cpu_percent{{board="{board}",session_id="{session_id}"}} {soc_cpu:.2f}')
+        if soc_mem is not None:
+            lines.append(f"# TYPE soc_memory_percent gauge")
+            lines.append(f'soc_memory_percent{{board="{board}",session_id="{session_id}"}} {soc_mem:.2f}')
+        
         return "\n".join(lines)
 
 

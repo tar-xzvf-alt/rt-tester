@@ -20,6 +20,7 @@ from config_loader import load_config
 import json
 from soc_monitor import SoCMonitor
 from metrics_server import MetricsServer
+from prometheus_client import get_node_exporter_metrics
 
 
 class ArduinoCollector:
@@ -192,6 +193,12 @@ class ArduinoCollector:
             
             # Send to metrics server for Prometheus
             self.metrics_server.add_group(msg)
+            
+            # Get CPU/memory from node_exporter via Prometheus
+            node_metrics = get_node_exporter_metrics()
+            if node_metrics['cpu_percent'] is not None:
+                msg['soc_cpu_percent'] = node_metrics['cpu_percent']
+                msg['soc_memory_percent'] = node_metrics['memory_percent'] if node_metrics['memory_percent'] else 0
             
             # Pass target info to database
             group_id = db.save_group_data(
