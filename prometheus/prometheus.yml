@@ -4,40 +4,14 @@ global:
   external_labels:
     monitor: 'rt-tester'
 
-storage:
-  tsdb:
-    path: /var/lib/prometheus
-    retention.time: 30d
-
 scrape_configs:
   - job_name: 'radxa'
     static_configs:
-      - targets: ['192.168.1.100:9100']
+      - targets: ['192.168.0.223:9100']
         labels:
           board: 'radxa'
           location: 'lab'
-
-  - job_name: 'lichee'
-    static_configs:
-      - targets: ['192.168.1.101:9100']
-        labels:
-          board: 'lichee'
-          location: 'lab'
-
-  - job_name: 'visionfive'
-    static_configs:
-      - targets: ['192.168.1.102:9100']
-        labels:
-          board: 'visionfive'
-          location: 'lab'
-
-  - job_name: 'bcvm_arm'
-    static_configs:
-      - targets: ['192.168.1.103:9100']
-        labels:
-          board: 'bcvm_arm'
-          location: 'lab'
-
+          
   - job_name: 'arduino_latency'
     static_configs:
       - targets: ['localhost:9101']

@@ -7,7 +7,7 @@
 #include <microhttpd.h>
 
 static PrometheusExporter *exporter = NULL;
-static struct MHD_Daemon *daemon = NULL;
+static struct MHD_Daemon *mhd_daemon = NULL;
 static pthread_mutex_t metrics_mutex = PTHREAD_MUTEX_INITIALIZER;
 
 static int format_prometheus_metrics(char *buffer, size_t buffer_size)
@@ -62,7 +62,7 @@ static int format_prometheus_metrics(char *buffer, size_t buffer_size)
     return len;
 }
 
-static int handle_metrics_request(void *cls, struct MHD_Connection *connection,
+static enum MHD_Result handle_metrics_request(void *cls, struct MHD_Connection *connection,
                                   const char *url, const char *method,
                                   const char *version, const char *upload_data,
                                   size_t *upload_data_size, void **con_cls)
@@ -86,7 +86,7 @@ static int handle_metrics_request(void *cls, struct MHD_Connection *connection,
     }
 
     MHD_add_response_header(response, "Content-Type", "text/plain; version=0.0.4; charset=utf-8");
-    int ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
+    enum MHD_Result ret = MHD_queue_response(connection, MHD_HTTP_OK, response);
     MHD_destroy_response(response);
 
     return ret;
@@ -98,7 +98,7 @@ static void* exporter_thread(void *arg)
     
     printf("Prometheus exporter thread started on port %d\n", PROMETHEUS_PORT);
     
-    daemon = MHD_start_daemon(
+    mhd_daemon = MHD_start_daemon(
         MHD_USE_SELECT_INTERNALLY | MHD_USE_ERROR_LOG,
         PROMETHEUS_PORT,
         NULL, NULL,
@@ -106,7 +106,7 @@ static void* exporter_thread(void *arg)
         MHD_OPTION_END
     );
 
-    if (!daemon) {
+    if (!mhd_daemon) {
         printf("ERROR: Failed to start Prometheus exporter on port %d\n", PROMETHEUS_PORT);
         return NULL;
     }
@@ -156,9 +156,9 @@ void stop_prometheus_exporter(void)
     if (exporter) {
         exporter->running = 0;
         
-        if (daemon) {
-            MHD_stop_daemon(daemon);
-            daemon = NULL;
+        if (mhd_daemon) {
+            MHD_stop_daemon(mhd_daemon);
+            mhd_daemon = NULL;
         }
         
         free(exporter);
@@ -169,7 +169,7 @@ void stop_prometheus_exporter(void)
 
 int is_exporter_running(void)
 {
-    return exporter != NULL && daemon != NULL;
+    return exporter != NULL && mhd_daemon != NULL;
 }
 
 void update_exporter_session_id(const char *session_id)
