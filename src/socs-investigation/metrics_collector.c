@@ -24,28 +24,25 @@ void update_cpu_metrics(SharedData *shared)
         return;
     }
     
-    unsigned long long user, nice, system, idle, iowait, irq, softirq, steal, guest, guest_nice;
-    int ret = fscanf(stat, "cpu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
-           &user, &nice, &system, &idle, &iowait, &irq, &softirq, &steal, &guest, &guest_nice);
+    unsigned long long user, nice, system, idle, iowait, irq, softirq;
+    int ret = fscanf(stat, "cpu %llu %llu %llu %llu %llu %llu %llu",
+        &user, &nice, &system, &idle, &iowait, &irq, &softirq);
     fclose(stat);
     
     if (ret < 7) return;
     
-    user -= guest;
-    nice -= guest_nice;
-    
-    unsigned long long total = user + nice + system + idle + iowait + irq + softirq + steal;
+    unsigned long long total = user + nice + system + idle + iowait + irq + softirq;
     unsigned long long idle_all = idle + iowait;
-    
-    pthread_mutex_lock(&shared->stats_mutex);
-    
+        
     if (shared->prev_total != 0) {
         unsigned long long total_diff = total - shared->prev_total;
         unsigned long long idle_diff = idle_all - (shared->prev_idle + shared->prev_iowait);
         
-        if (total_diff > 0 && idle_diff >= 0 && idle_diff <= total_diff) {
+        if (total_diff > 0) {
             float cpu_usage = 100.0 * (1.0 - (float)idle_diff / total_diff);
             
+            pthread_mutex_lock(&shared->stats_mutex);
+
             if (cpu_usage < 0) cpu_usage = 0;
             if (cpu_usage > 100) cpu_usage = 100;
             
@@ -53,20 +50,18 @@ void update_cpu_metrics(SharedData *shared)
                 shared->current_stats.max_cpu = cpu_usage;
             }
             shared->current_stats.total_cpu += cpu_usage;
+            
+            pthread_mutex_unlock(&shared->stats_mutex);
         }
-        
-        shared->prev_user = user;
-        shared->prev_nice = nice;
-        shared->prev_system = system;
-        shared->prev_idle = idle;
-        shared->prev_iowait = iowait;
-        shared->prev_irq = irq;
-        shared->prev_softirq = softirq;
-        shared->prev_steal = steal;
-        shared->prev_total = total;
     }
-    
-    pthread_mutex_unlock(&shared->stats_mutex);
+
+    shared->prev_user = user;
+    shared->prev_system = system;
+    shared->prev_idle = idle;
+    shared->prev_iowait = iowait;
+
+    shared->prev_total = total;
+
 }
 
 void update_memory_metrics(SharedData *shared)

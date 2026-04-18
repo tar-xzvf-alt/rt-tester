@@ -573,8 +573,8 @@ class ArduinoCollector:
             return False
         
         try:
-            # Find PID of radxa-monitor process and send signal
-            cmd = f"pkill -{sig} radxa-monitor 2>/dev/null || true"
+            # Find PID of target_board process and send signal
+            cmd = f"pkill -{sig} {self.target_board}-monitor 2>/dev/null || true"
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd)
             error = stderr.read().decode().strip()
             
@@ -582,15 +582,15 @@ class ArduinoCollector:
                 print(f"Signal warning: {error}")
             
             # Check if process was found
-            cmd = "pgrep radxa-monitor || echo 'not running'"
+            cmd = f"pgrep {self.target_board}-monitor || echo 'not running'"
             stdin, stdout, stderr = self.ssh_client.exec_command(cmd)
             result = stdout.read().decode().strip()
             
             if result and result != 'not running':
-                print(f"  Signal {sig} sent to radxa-monitor (PID: {result})")
+                print(f"  Signal {sig} sent to {self.target_board}-monitor (PID: {result})")
                 return True
             else:
-                print(f"  radxa-monitor not running on target device")
+                print(f"  {self.target_board}-monitor not running on target device")
                 return False
                 
         except Exception as e:

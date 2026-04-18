@@ -35,13 +35,9 @@ typedef struct {
     
     // For CPU measurement (previous values)
     unsigned long long prev_user;
-    unsigned long long prev_nice;      // Added
     unsigned long long prev_system;
     unsigned long long prev_idle;
     unsigned long long prev_iowait;
-    unsigned long long prev_irq;       // Added
-    unsigned long long prev_softirq;   // Added
-    unsigned long long prev_steal;     // Added
     unsigned long long prev_total;
     
     // Log file

@@ -59,10 +59,4 @@ void write_group_to_log(SharedData *shared)
     flock(fileno(shared->log_file), LOCK_UN);
     
     pthread_cleanup_pop(0);
-    
-    //printf("Group %d written to log (CPU_MAX=%.2f%%, MEM_MAX=%.2f%%, samples=%d)\n",
-    //       shared->group_counter,
-    //       shared->current_stats.max_cpu,
-    //       shared->current_stats.max_mem,
-    //       shared->current_stats.samples);
 }
