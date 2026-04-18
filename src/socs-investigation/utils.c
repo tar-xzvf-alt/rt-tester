@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "utils.h"
 #include "shared_data.h"
 #include <stdio.h>

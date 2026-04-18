@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "metrics_collector.h"
 #include "utils.h"
 #include "log_writer.h"
@@ -33,6 +34,9 @@ void update_cpu_metrics(SharedData *shared)
     
     unsigned long long total = user + nice + system + idle + iowait + irq + softirq;
     unsigned long long idle_all = idle + iowait;
+    
+    // Lock mutex BEFORE reading prev_* variables
+    pthread_mutex_lock(&shared->stats_mutex);
         
     if (shared->prev_total != 0) {
         unsigned long long total_diff = total - shared->prev_total;
@@ -40,8 +44,6 @@ void update_cpu_metrics(SharedData *shared)
         
         if (total_diff > 0) {
             float cpu_usage = 100.0 * (1.0 - (float)idle_diff / total_diff);
-            
-            pthread_mutex_lock(&shared->stats_mutex);
 
             if (cpu_usage < 0) cpu_usage = 0;
             if (cpu_usage > 100) cpu_usage = 100;
@@ -50,18 +52,17 @@ void update_cpu_metrics(SharedData *shared)
                 shared->current_stats.max_cpu = cpu_usage;
             }
             shared->current_stats.total_cpu += cpu_usage;
-            
-            pthread_mutex_unlock(&shared->stats_mutex);
         }
     }
 
+    // Update prev_* variables inside the same critical section
     shared->prev_user = user;
     shared->prev_system = system;
     shared->prev_idle = idle;
     shared->prev_iowait = iowait;
-
     shared->prev_total = total;
-
+    
+    pthread_mutex_unlock(&shared->stats_mutex);
 }
 
 void update_memory_metrics(SharedData *shared)
@@ -117,7 +118,7 @@ void* metrics_collector_thread(void* arg)
     int local_pulse_counter = 0;
     int first_measurement_done = 0;  // Flag to ensure we have baseline
     
-    while (shared->running) {
+    while (__atomic_load_n(&shared->running, __ATOMIC_SEQ_CST)) {
         pthread_mutex_lock(&shared->stats_mutex);
         
         // Wait for signal from GPIO thread with timeout

@@ -80,23 +80,38 @@ void* gpio_handler_thread(void* arg)
 
     bool flag = 0;
 
-    while (shared->running) {
+    while (__atomic_load_n(&shared->running, __ATOMIC_SEQ_CST)) {
         
+        wait_status = gpiod_line_request_read_edge_events(req, evbuf, 1); // 100ms timeout
         
-        wait_status = gpiod_line_request_read_edge_events(req, evbuf,1);;
-
+        if (wait_status < 0) {
+            if (errno == EINTR) {
+                // Interrupted by signal, exit loop
+                break;
+            }
+            perror("gpiod_line_request_read_edge_events");
+            // Short pause on error
+            usleep(10000); // 10ms
+            continue;
+        }
+        
+        if (wait_status == 0) {
+            // Timeout, continue loop
+            continue;
+        }
+        
         ev = gpiod_edge_event_buffer_get_event(evbuf, 0);
+        if (!ev) {
+            // No event, continue
+            continue;
+        }
 
         // Process event
-            
         if (gpiod_edge_event_get_event_type(ev) == GPIOD_EDGE_EVENT_RISING_EDGE) {
             
-            if (flag)
-            {
+            if (flag) {
                 gpiod_line_request_set_value(req, offsets[1], 1);
-            }
-            else
-            {
+            } else {
                 gpiod_line_request_set_value(req, offsets[1], 0);
             }
 
@@ -108,7 +123,6 @@ void* gpio_handler_thread(void* arg)
 
             //printf("\nFalling event!");
         }
-        
         
         // Check cancellation point
         pthread_testcancel();
@@ -125,6 +139,9 @@ void* gpio_handler_thread(void* arg)
     if (out_cfg) gpiod_line_settings_free(out_cfg);
     if (line_cfg) gpiod_line_config_free(line_cfg);
     if (req_cfg) gpiod_request_config_free(req_cfg);
+    
+    // Safe cancellation point after cleanup
+    pthread_testcancel();
     
     printf("GPIO handler thread stopped\n");
     return NULL;

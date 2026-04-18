@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include "log_writer.h"
 #include "shared_data.h"
 #include <stdio.h>
@@ -31,11 +32,36 @@ void write_group_to_log(SharedData *shared)
 {
     if (!shared->log_file) return;
     
+    // Local copies for thread safety
+    int group_counter;
+    float max_cpu, max_mem, total_cpu, total_mem;
+    int samples;
+    struct timeval group_start;
+    
+    // Make copies inside critical section
+    pthread_mutex_lock(&shared->stats_mutex);
+    group_counter = shared->group_counter;
+    max_cpu = shared->current_stats.max_cpu;
+    max_mem = shared->current_stats.max_mem;
+    total_cpu = shared->current_stats.total_cpu;
+    total_mem = shared->current_stats.total_mem;
+    samples = shared->current_stats.samples;
+    group_start = shared->current_stats.group_start;
+    pthread_mutex_unlock(&shared->stats_mutex);
+    
+    // Check for division by zero
+    float cpu_avg = 0.0;
+    float mem_avg = 0.0;
+    if (samples > 0) {
+        cpu_avg = total_cpu / samples;
+        mem_avg = total_mem / samples;
+    }
+    
     struct timeval now;
     gettimeofday(&now, NULL);
     
-    float group_duration = (now.tv_sec - shared->current_stats.group_start.tv_sec) * 1000.0 +
-                          (now.tv_usec - shared->current_stats.group_start.tv_usec) / 1000.0;
+    float group_duration = (now.tv_sec - group_start.tv_sec) * 1000.0 +
+                          (now.tv_usec - group_start.tv_usec) / 1000.0;
     
     // Set cleanup handler for safe writing
     pthread_cleanup_push((void(*)(void*))flock, 
@@ -46,12 +72,12 @@ void write_group_to_log(SharedData *shared)
     
     fprintf(shared->log_file, 
             "GROUP=%d CPU_MAX=%.2f MEM_MAX=%.2f CPU_AVG=%.2f MEM_AVG=%.2f SAMPLES=%d DURATION_MS=%.2f TIMESTAMP=%ld\n",
-            shared->group_counter,
-            shared->current_stats.max_cpu,
-            shared->current_stats.max_mem,
-            shared->current_stats.total_cpu / shared->current_stats.samples,
-            shared->current_stats.total_mem / shared->current_stats.samples,
-            shared->current_stats.samples,
+            group_counter,
+            max_cpu,
+            max_mem,
+            cpu_avg,
+            mem_avg,
+            samples,
             group_duration,
             time(NULL));
     
