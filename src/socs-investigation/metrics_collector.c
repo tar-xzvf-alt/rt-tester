@@ -19,16 +19,21 @@ void metrics_cleanup_handler(void *arg)
 
 void update_cpu_metrics(SharedData *shared)
 {
-    FILE *stat = fopen("/proc/stat", "r");
-    if (!stat) {
-        perror("fopen /proc/stat");
-        return;
+    if (!shared->stat_file) {
+        shared->stat_file = fopen("/proc/stat", "r");
+        if (!shared->stat_file) {
+            perror("fopen /proc/stat");
+            return;
+        }
     }
     
+    // Rewind to beginning of file
+    rewind(shared->stat_file);
+    fflush(shared->stat_file);
+    
     unsigned long long user, nice, system, idle, iowait, irq, softirq;
-    int ret = fscanf(stat, "cpu %llu %llu %llu %llu %llu %llu %llu",
+    int ret = fscanf(shared->stat_file, "cpu %llu %llu %llu %llu %llu %llu %llu",
         &user, &nice, &system, &idle, &iowait, &irq, &softirq);
-    fclose(stat);
     
     if (ret < 7) return;
     
@@ -67,20 +72,25 @@ void update_cpu_metrics(SharedData *shared)
 
 void update_memory_metrics(SharedData *shared)
 {
-    FILE *meminfo = fopen("/proc/meminfo", "r");
-    if (!meminfo) {
-        perror("fopen /proc/meminfo");
-        return;
+    if (!shared->meminfo_file) {
+        shared->meminfo_file = fopen("/proc/meminfo", "r");
+        if (!shared->meminfo_file) {
+            perror("fopen /proc/meminfo");
+            return;
+        }
     }
+    
+    // Rewind to beginning of file
+    rewind(shared->meminfo_file);
+    fflush(shared->meminfo_file);
     
     unsigned long mem_total = 0, mem_available = 0;
     char line[256];
     
-    while (fgets(line, sizeof(line), meminfo)) {
+    while (fgets(line, sizeof(line), shared->meminfo_file)) {
         if (sscanf(line, "MemTotal: %lu kB", &mem_total) == 1) continue;
         if (sscanf(line, "MemAvailable: %lu kB", &mem_available) == 1) continue;
     }
-    fclose(meminfo);
     
     if (mem_total > 0 && mem_available > 0) {
         float mem_usage = 100.0 * (1.0 - (float)mem_available / mem_total);
@@ -94,7 +104,6 @@ void update_memory_metrics(SharedData *shared)
             shared->current_stats.max_mem = mem_usage;
         }
         shared->current_stats.total_mem += mem_usage;
-        shared->current_stats.samples++;
         
         pthread_mutex_unlock(&shared->stats_mutex);
     }
@@ -108,7 +117,7 @@ void* metrics_collector_thread(void* arg)
     pthread_cleanup_push(metrics_cleanup_handler, shared);
     
     printf("Metrics collector thread started\n");
-    //set_current_thread_rt("metrics_collector");
+    set_current_thread_rt("metrics_collector");
     
     // Enable thread cancellation
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
@@ -116,6 +125,7 @@ void* metrics_collector_thread(void* arg)
     
     struct timespec timeout;
     int local_pulse_counter = 0;
+    int measurement_counter = 0;
     int first_measurement_done = 0;  // Flag to ensure we have baseline
     
     while (__atomic_load_n(&shared->running, __ATOMIC_SEQ_CST)) {
@@ -131,12 +141,22 @@ void* metrics_collector_thread(void* arg)
         if (ret == 0) {
             // Received signal - new pulse
             local_pulse_counter++;
+            measurement_counter++;
             
             pthread_mutex_unlock(&shared->stats_mutex);
             
-            // Take measurements (cancellation points inside these functions)
-            update_cpu_metrics(shared);
-            update_memory_metrics(shared);
+            // Take measurements every 100 pulses (instead of every pulse)
+            if (measurement_counter >= 100) {
+                update_cpu_metrics(shared);
+                update_memory_metrics(shared);
+                
+                // Increment sample count for this measurement cycle
+                pthread_mutex_lock(&shared->stats_mutex);
+                shared->current_stats.samples++;
+                pthread_mutex_unlock(&shared->stats_mutex);
+                
+                measurement_counter = 0;
+            }
             
             pthread_mutex_lock(&shared->stats_mutex);
             
@@ -153,6 +173,7 @@ void* metrics_collector_thread(void* arg)
                 
                 // Reset for next group
                 local_pulse_counter = 0;
+                measurement_counter = 0;
                 shared->pulse_counter = 0;
                 
                 // Reset group statistics

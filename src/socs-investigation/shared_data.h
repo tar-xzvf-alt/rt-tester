@@ -43,6 +43,10 @@ typedef struct {
     // Log file
     FILE *log_file;
     
+    // Cached file descriptors for metrics collection
+    FILE *stat_file;
+    FILE *meminfo_file;
+    
     // Thread IDs for forceful termination
     pthread_t gpio_thread;
     pthread_t metrics_thread;

@@ -139,6 +139,10 @@ int main(int argc, char *argv[])
     shared->prev_idle = 0;
     shared->prev_iowait = 0;
     
+    // Initialize file descriptors (will be opened on first use)
+    shared->stat_file = NULL;
+    shared->meminfo_file = NULL;
+    
     // Check log file state at startup
     if (is_log_file_empty(log_path)) {
         printf("Log file is empty, starting with fresh counter\n");
@@ -181,7 +185,15 @@ int main(int argc, char *argv[])
         free(shared);
         return 1;
     }
+
+    // Try to set IRQ thread priority (requires root)
+    // Must be called from main process before creating threads
+    printf("Setting IRQ thread priority...\n");
+    if (set_irq_thread_priority() != 0) {
+        printf("Note: IRQ priority setting failed (run as root for maximum performance)\n");
+    }
     
+
     // Wait for threads to finish
     pthread_join(shared->gpio_thread, NULL);
     pthread_join(shared->metrics_thread, NULL);

@@ -1,6 +1,7 @@
 #include "gpio_handler.h"
 #include "utils.h"
 #include "shared_data.h"
+#include "consumer_names.h"
 #include <gpiod.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -53,7 +54,7 @@ void* gpio_handler_thread(void* arg)
     gpiod_line_config_add_line_settings(line_cfg, &offsets[1], 1, out_cfg);
 
     req_cfg = gpiod_request_config_new();
-    gpiod_request_config_set_consumer(req_cfg, "bcvm-monitor");
+    gpiod_request_config_set_consumer(req_cfg, CONSUMER_BCVM);
 
     req = gpiod_chip_request_lines(chip, req_cfg, line_cfg);
     if (!req) {
