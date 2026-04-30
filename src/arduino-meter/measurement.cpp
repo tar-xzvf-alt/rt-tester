@@ -29,7 +29,7 @@ void initPins() {
   portOutputRegisterPin7 = portOutputRegister(digitalPinToPort(PIN_OUT));
   pin7Mask = digitalPinToBitMask(PIN_OUT);
 
-  pinMode(PIN_IN, INPUT);
+  pinMode(PIN_IN, INPUT_PULLUP);
   portInputRegisterPin20 = portInputRegister(digitalPinToPort(PIN_IN));
   pin20Mask = digitalPinToBitMask(PIN_IN);
 

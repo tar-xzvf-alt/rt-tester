@@ -1,21 +1,21 @@
-# Тестирование БЦВМ АРМ
+# Тестирование БВЦ АРМ
 
-[Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend_bcvm.jpg)
+[Стенд](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/stend_bvc.jpg)
 
 #### Сводная таблица результатов тестирование в пользовательском пространстве
 
 | Условия | Количество падений | Количество выходов за порог | Худшая задержка| Avg latency в худших 5 % | Avg jitter |
-|------|-|---|---|---|---|
-| 6.12 | 2 | 45812 | 335 | 249.8 | 17.1|
-| 6.12+stress| 0 | 95198 | 252.8 | 18.8 |
-| 6.12-rt | 0 | 109726 | 255.6 | 18.0 |
-| 6.12-rt+stress| 0 | 45812 | 255.3 | 18.1 |
+| - | - | - | - | - | - |
+| - | 0 | 0 | 0 | 0 | 0 |
+| - | 0 | 0 | 0 | 0 | 0 |
+| - | 0 | 0 | 0 | 0 | 0 |
+| - | 0 | 0 | 0 | 0 | 0 |
 
 
 ## Схема стенда
 
 Текущая реализация предполагает собой схему, при которой 
-- БЦВМ АРМ - исследуемая плата.
+- БВЦ АРМ - исследуемая плата.
 - Arduino Mega 2560 - инструмент тестирования;
 - ПК - место сбора данных и их визуализации.
 
@@ -24,21 +24,21 @@
 
 Схема подключения:
 
- - Arduino pin 7 → БЦВМ_АРМ pin (/dev/gpiochip1 GPIO 15)
- - БЦВМ АРМ pin (/dev/gpiochip1 GPIO 9) →  Arduino pin 20
+ - Arduino pin 7 → БВЦ_АРМ pin (/dev/gpiochip0 GPIO 0)
+ - БЦВМ АРМ pin (/dev/gpiochip0 GPIO 4) →  Arduino pin 20
 
  Между устройствами стоит логический преобразователь уровней.
 
-[Распиновка](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/pinout_bcvm.jpg)
+[Распиновка](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/pinout_bvс.jpg)
 
 
-## Код для БЦВМ АРМ
+## Код для БВЦ АРМ
 
 [Код для БВЦ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
 
-Собрать код для Starfive:
+Собрать код для БВЦ:
 
 ```
-gcc  -pthread -o bcvm_arm-monitor main.c gpio_handler_bcvm.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
+gcc  -pthread -o bvc_arm-monitor main.c gpio_handler_bvc.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
 ```
 
