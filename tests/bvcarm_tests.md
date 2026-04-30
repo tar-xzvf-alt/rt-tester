@@ -39,6 +39,6 @@
 Собрать код для БВЦ:
 
 ```
-gcc  -pthread -o bvc_arm-monitor main.c gpio_handler_bvc.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
+make BOARD=bvc_arm
 ```
 

@@ -38,6 +38,6 @@
 Собрать код для Starfive:
 
 ```
-gcc  -pthread -o starfive-monitor main.c gpio_handler_starfive.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
+make BOARD=starfive
 ```
 

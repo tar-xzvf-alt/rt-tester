@@ -38,6 +38,6 @@
 Собрать код для Radxa:
 
 ```
-gcc  -pthread -o radxa-monitor main.c gpio_handler_radxa.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
+make BOARD=radxa
 ```
     

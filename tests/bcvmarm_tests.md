@@ -42,6 +42,6 @@
 Собрать код для Starfive:
 
 ```
-gcc  -pthread -o bcvm_arm-monitor main.c gpio_handler_bcvm.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
+make BOARD=bcvm
 ```
 

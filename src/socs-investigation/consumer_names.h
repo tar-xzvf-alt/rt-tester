@@ -6,5 +6,6 @@
 #define CONSUMER_RADXA    "radxa-monitor"
 #define CONSUMER_STARFIVE "starfive-monitor"
 #define CONSUMER_BCVM     "bcvm-monitor"
+#define CONSUMER_BVCARM   "bvcarm-mo"
 
 #endif // CONSUMER_NAMES_H

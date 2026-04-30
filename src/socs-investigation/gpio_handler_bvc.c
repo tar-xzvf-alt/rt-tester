@@ -21,19 +21,12 @@ void* gpio_handler_thread(void* arg)
     printf("GPIO handler thread started\n");
     set_current_thread_rt("gpio_handler");
     
-    // Enable thread cancellation
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_DEFERRED, NULL);
     
     struct gpiod_chip *chip;
-    struct gpiod_line_request *req;
-    struct gpiod_line_settings *in_cfg, *out_cfg;
-    struct gpiod_line_config *line_cfg;
-    struct gpiod_request_config *req_cfg;
-    unsigned int offsets[2];
-
-    offsets[0] = GPIO_IN_LINE;   // Input
-    offsets[1] = GPIO_OUT_LINE;  // Output
+    struct gpiod_line *in_line, *out_line;
+    int ret;
 
     chip = gpiod_chip_open(GPIO_CHIP);
     if (!chip) {
@@ -41,111 +34,90 @@ void* gpio_handler_thread(void* arg)
         return NULL;
     }
 
-    in_cfg = gpiod_line_settings_new();
-    gpiod_line_settings_set_direction(in_cfg, GPIOD_LINE_DIRECTION_INPUT);
-    gpiod_line_settings_set_edge_detection(in_cfg, GPIOD_LINE_EDGE_BOTH);
-
-    out_cfg = gpiod_line_settings_new();
-    gpiod_line_settings_set_direction(out_cfg, GPIOD_LINE_DIRECTION_OUTPUT);
-    gpiod_line_settings_set_output_value(out_cfg, 0);
-
-    line_cfg = gpiod_line_config_new();
-    gpiod_line_config_add_line_settings(line_cfg, &offsets[0], 1, in_cfg);
-    gpiod_line_config_add_line_settings(line_cfg, &offsets[1], 1, out_cfg);
-
-    req_cfg = gpiod_request_config_new();
-    gpiod_request_config_set_consumer(req_cfg, CONSUMER_STARFIVE);
-
-    req = gpiod_chip_request_lines(chip, req_cfg, line_cfg);
-    if (!req) {
-        perror("gpiod_chip_request_lines");
+    in_line = gpiod_chip_get_line(chip, GPIO_IN_LINE);
+    if (!in_line) {
+        perror("gpiod_chip_get_line (input)");
         gpiod_chip_close(chip);
         return NULL;
     }
 
-    struct gpiod_edge_event_buffer *evbuf;
-    evbuf = gpiod_edge_event_buffer_new(1);
-
-    int wait_status = 0;
-    struct gpiod_edge_event *ev;
-    
-    if (!evbuf) {
-        perror("gpiod_edge_event_buffer_new");
-        gpiod_line_request_release(req);
+    out_line = gpiod_chip_get_line(chip, GPIO_OUT_LINE);
+    if (!out_line) {
+        perror("gpiod_chip_get_line (output)");
         gpiod_chip_close(chip);
         return NULL;
     }
+
+    ret = gpiod_line_request_both_edges_events(in_line, CONSUMER_BVCARM);
+    if (ret < 0) {
+        perror("gpiod_line_request_both_edges_events");
+        gpiod_chip_close(chip);
+        return NULL;
+    }
+
+    ret = gpiod_line_request_output(out_line, CONSUMER_BVCARM, 0);
+    if (ret < 0) {
+        perror("gpiod_line_request_output");
+        gpiod_line_release(in_line);
+        gpiod_chip_close(chip);
+        return NULL;
+    }
+
+    struct gpiod_line_event event;
+    struct timespec timeout = { .tv_sec = 0, .tv_nsec = 100000000 }; // 100ms
 
     printf("GPIO handler waiting for interrupts...\n");
     printf("(will be canceled on shutdown)\n");
 
     while (__atomic_load_n(&shared->running, __ATOMIC_SEQ_CST)) {
         
+        ret = gpiod_line_event_wait(in_line, &timeout);
         
-        wait_status = gpiod_line_request_read_edge_events(req, evbuf, 1);
-        
-        if (wait_status < 0) {
+        if (ret < 0) {
             if (errno == EINTR) {
-                // Interrupted by signal, exit loop
                 break;
             }
-            perror("gpiod_line_request_read_edge_events");
-            // Short pause on error
-            usleep(10000); // 10ms
+            perror("gpiod_line_event_wait");
+            usleep(10000);
             continue;
         }
         
-        if (wait_status == 0) {
-            // Timeout, continue loop
+        if (ret == 0) {
             continue;
         }
         
-        ev = gpiod_edge_event_buffer_get_event(evbuf, 0);
-        if (!ev) {
-            // No event, continue
+        ret = gpiod_line_event_read(in_line, &event);
+        if (ret < 0) {
+            perror("gpiod_line_event_read");
             continue;
         }
 
-        // Process event
-            
-        if (gpiod_edge_event_get_event_type(ev) == GPIOD_EDGE_EVENT_RISING_EDGE) {
-            gpiod_line_request_set_value(req, offsets[1], 1);
+        if (event.event_type == GPIOD_LINE_EVENT_RISING_EDGE) {
+            gpiod_line_set_value(out_line, 1);
             
             pthread_mutex_lock(&shared->stats_mutex);
             shared->pulse_counter++;
             pthread_cond_signal(&shared->measurement_cond);
             pthread_mutex_unlock(&shared->stats_mutex);
-            //printf("\nRising event!");
             
         } else {
-            gpiod_line_request_set_value(req, offsets[1], 0);
+            gpiod_line_set_value(out_line, 0);
 
             pthread_mutex_lock(&shared->stats_mutex);
             shared->pulse_counter++;
             pthread_cond_signal(&shared->measurement_cond);
             pthread_mutex_unlock(&shared->stats_mutex);
-
-            //printf("\nFalling event!");
         }
         
-        
-        // Check cancellation point
         pthread_testcancel();
     }
 
     printf("\nGPIO handler stopping...\n");
     
-    // Cleanup GPIO resources
-    if (evbuf) gpiod_edge_event_buffer_free(evbuf);
-    if (req) gpiod_line_request_release(req);
-    if (chip) gpiod_chip_close(chip);
+    gpiod_line_release(in_line);
+    gpiod_line_release(out_line);
+    gpiod_chip_close(chip);
     
-    if (in_cfg) gpiod_line_settings_free(in_cfg);
-    if (out_cfg) gpiod_line_settings_free(out_cfg);
-    if (line_cfg) gpiod_line_config_free(line_cfg);
-    if (req_cfg) gpiod_request_config_free(req_cfg);
-    
-    // Safe cancellation point after cleanup
     pthread_testcancel();
     printf("GPIO handler thread stopped\n");
     return NULL;

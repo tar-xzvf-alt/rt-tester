@@ -43,7 +43,7 @@ class ArduinoCollector:
         self.start_command_time_us = 0
         self.is_collecting = False
 
-                # Measurement parameters
+        # Measurement parameters
         self.worst_count = config_dict.get('worst-count', config.DEFAULT_WORST_COUNT)
         self.measurement_interval_us = config_dict.get('measurement-interval-us', 
                                                        config.DEFAULT_MEASUREMENT_INTERVAL_US)

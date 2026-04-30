@@ -2,12 +2,13 @@
 
 [Тестирование Lichee RV Dock](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/lichee_tests.md) 
 
-
 [Тестирование Radxa rk3588 5b](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/radxa_tests.md) 
 
 [Тестирование Starfive Visionfive 2](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/visionfive_tests.md) 
 
-[Тестирование БЦВМ АРМ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bсvmarm_tests.md) 
+[Тестирование БЦВМ АРМ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bcvmarm_tests.md) 
+
+[Тестирование БВЦ АРМ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/bvcarm_tests.md) 
 
 **Сводные таблицы результатов можно найти по ссылкам выше.**
 

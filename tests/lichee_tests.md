@@ -38,6 +38,6 @@
 Собрать код для Lichee:
 
 ```
-gcc  -pthread -o lichee-monitor main.c gpio_handler_lichee.c metrics_collector.c utils.c log_writer.c -lgpiod -lrt
+make BOARD=lichee
 ```
 
