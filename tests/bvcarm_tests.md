@@ -19,7 +19,7 @@
 - Arduino Mega 2560 - инструмент тестирования;
 - ПК - место сбора данных и их визуализации.
 
-[Результаты](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/results_bcvmarm)
+[Результаты](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/results_bvcarm)
 
 
 Схема подключения:
@@ -29,7 +29,9 @@
 
  Между устройствами стоит логический преобразователь уровней.
 
-[Распиновка](https://altlinux.space/besogon1238/rt-tester/src/branch/main/pictures/pinout_bvс.jpg)
+**Распиновка**: 
+
+9 пин интерфейса X11- земля, 7 пин - GPI0, 8 пин - GPO0. GPI0 сопоставляется gpiochip0 линия 0, а GPO0 сопоставлен gpiochip0 линия 4.
 
 
 ## Код для БВЦ АРМ
