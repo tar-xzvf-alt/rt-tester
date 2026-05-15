@@ -1,6 +1,7 @@
 #include "gpio_handler.h"
 #include "utils.h"
 #include "shared_data.h"
+#include "consumer_names.h"
 #include <gpiod.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -53,7 +54,7 @@ void* gpio_handler_thread(void* arg)
     gpiod_line_config_add_line_settings(line_cfg, &offsets[1], 1, out_cfg);
 
     req_cfg = gpiod_request_config_new();
-    gpiod_request_config_set_consumer(req_cfg, "starfive-monitor");
+    gpiod_request_config_set_consumer(req_cfg, CONSUMER_STARFIVE);
 
     req = gpiod_chip_request_lines(chip, req_cfg, line_cfg);
     if (!req) {
@@ -78,12 +79,32 @@ void* gpio_handler_thread(void* arg)
     printf("GPIO handler waiting for interrupts...\n");
     printf("(will be canceled on shutdown)\n");
 
-    while (shared->running) {
+    while (__atomic_load_n(&shared->running, __ATOMIC_SEQ_CST)) {
         
         
-        wait_status = gpiod_line_request_read_edge_events(req, evbuf,1);;
-
+        wait_status = gpiod_line_request_read_edge_events(req, evbuf, 1);
+        
+        if (wait_status < 0) {
+            if (errno == EINTR) {
+                // Interrupted by signal, exit loop
+                break;
+            }
+            perror("gpiod_line_request_read_edge_events");
+            // Short pause on error
+            usleep(10000); // 10ms
+            continue;
+        }
+        
+        if (wait_status == 0) {
+            // Timeout, continue loop
+            continue;
+        }
+        
         ev = gpiod_edge_event_buffer_get_event(evbuf, 0);
+        if (!ev) {
+            // No event, continue
+            continue;
+        }
 
         // Process event
             
@@ -124,6 +145,8 @@ void* gpio_handler_thread(void* arg)
     if (line_cfg) gpiod_line_config_free(line_cfg);
     if (req_cfg) gpiod_request_config_free(req_cfg);
     
+    // Safe cancellation point after cleanup
+    pthread_testcancel();
     printf("GPIO handler thread stopped\n");
     return NULL;
 }

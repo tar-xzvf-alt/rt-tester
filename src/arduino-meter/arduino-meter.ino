@@ -31,8 +31,10 @@ void loop() {
     
     // Timer-based measurement with configurable interval
     unsigned long now = micros();
-    if (now - lastMeasurementTime >= measurementIntervalUs) {
+    if ((now - lastMeasurementTime >= measurementIntervalUs)&&(measurementInGroup==sendingInGroup)||((now - lastMeasurementTime >= measurementIntervalUs*2))) {
       lastMeasurementTime = now;
+
+      sendingInGroup = measurementInGroup+1;
       
       // Send pulse
       t_start = micros();
@@ -48,6 +50,7 @@ void loop() {
         sendGroupData();
         groupIndex++;
         measurementInGroup = 0;
+        sendingInGroup = 0;
         
         // Optional progress output
         if (groupIndex % 10 == 0) {
@@ -122,6 +125,7 @@ void checkSerialCommands() {
     else if (command == "RESET") {
       groupIndex = 0;
       measurementInGroup = 0;
+      sendingInGroup = 0;
       collectingData = false;
       maxGroups = 0;
       sessionId = 0;
@@ -138,6 +142,7 @@ void startMeasurement(unsigned long new_session_id, int groups,
   sessionId = new_session_id;
   groupIndex = 0;
   measurementInGroup = 0;
+  sendingInGroup = 0;
   collectingData = true;
   maxGroups = groups;
   worstCount = worst_cnt;

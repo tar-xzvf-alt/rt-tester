@@ -72,10 +72,10 @@ class SSHConnection:
                 hostname=self.host,
                 port=self.port,
                 username=self.username,
-                password=self.password,
+                password=str(self.password),
                 timeout=5,
-                allow_agent=False,
-                look_for_keys=False
+                allow_agent=True,
+                look_for_keys=True
             )
             
             self.transport = self.client.get_transport()

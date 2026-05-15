@@ -1,3 +1,4 @@
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <signal.h>
@@ -7,13 +8,15 @@
 #include <sys/time.h>
 #include <errno.h>
 #include <sys/stat.h>  
+#include <time.h>
 #include "shared_data.h"
 #include "utils.h"
 #include "gpio_handler.h"
+#include "metrics_collector.h"
 #include "log_writer.h"
 
 static SharedData *shared = NULL;
-static int log_was_cleared = 0;
+static int log_was_cleared = 0;  // Flag indicating log was cleared externally
 
 void signal_handler(int sig)
 {
@@ -41,23 +44,19 @@ void signal_handler(int sig)
     
     if (shared) {
         // Set stop flag
-        shared->running = 0;
+        __atomic_store_n(&shared->running, 0, __ATOMIC_SEQ_CST);
         
         // Wake up waiting threads
         pthread_mutex_lock(&shared->stats_mutex);
         pthread_cond_broadcast(&shared->measurement_cond);
         pthread_mutex_unlock(&shared->stats_mutex);
         
-        // Give time for graceful shutdown (1 second)
-        printf("Waiting for threads to finish (1 sec)...\n");
-        sleep(1);
+        // Give threads a moment to exit
+        usleep(100000); // 100ms
         
-        // Check if threads finished
-        int gpio_running = 1;
-
+        // Force cancel threads if they're still running
         pthread_cancel(shared->gpio_thread);
-
-        printf("Threads finished\n");
+        pthread_cancel(shared->metrics_thread);
     }
 }
 
@@ -78,12 +77,13 @@ void reset_group_counter_if_needed(SharedData *shared, const char *log_path) {
         shared->group_counter = 0;
         shared->current_stats.group_number = 0;
         gettimeofday(&shared->current_stats.group_start, NULL);
-        pthread_mutex_unlock(&shared->stats_mutex);
         
         // Also reset previous CPU values for correct calculation
         shared->prev_total = 0;
         shared->prev_idle = 0;
         shared->prev_iowait = 0;
+        
+        pthread_mutex_unlock(&shared->stats_mutex);
         
         log_was_cleared = 1;
     } else {
@@ -122,7 +122,7 @@ int main(int argc, char *argv[])
     pthread_mutex_init(&shared->stats_mutex, NULL);
     pthread_cond_init(&shared->measurement_cond, NULL);
     
-    shared->running = 1;
+    __atomic_store_n(&shared->running, 1, __ATOMIC_SEQ_CST);
     shared->pulse_counter = 0;
     shared->group_counter = 0;
     
@@ -138,6 +138,10 @@ int main(int argc, char *argv[])
     shared->prev_total = 0;
     shared->prev_idle = 0;
     shared->prev_iowait = 0;
+    
+    // Initialize file descriptors (will be opened on first use)
+    shared->stat_file = NULL;
+    shared->meminfo_file = NULL;
     
     // Check log file state at startup
     if (is_log_file_empty(log_path)) {
@@ -171,8 +175,28 @@ int main(int argc, char *argv[])
         return 1;
     }
     
+    if (pthread_create(&shared->metrics_thread, NULL, metrics_collector_thread, shared) != 0) {
+        perror("pthread_create metrics_thread");
+        __atomic_store_n(&shared->running, 0, __ATOMIC_SEQ_CST);
+        pthread_cond_broadcast(&shared->measurement_cond);
+        pthread_cancel(shared->gpio_thread);
+        pthread_join(shared->gpio_thread, NULL);
+        cleanup_resources(shared);
+        free(shared);
+        return 1;
+    }
+
+    // Try to set IRQ thread priority (requires root)
+    // Must be called from main process before creating threads
+    printf("Setting IRQ thread priority...\n");
+    if (set_irq_thread_priority() != 0) {
+        printf("Note: IRQ priority setting failed (run as root for maximum performance)\n");
+    }
+    
+
     // Wait for threads to finish
     pthread_join(shared->gpio_thread, NULL);
+    pthread_join(shared->metrics_thread, NULL);
     
     // Cleanup resources
     cleanup_resources(shared);

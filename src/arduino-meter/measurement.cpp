@@ -6,6 +6,7 @@ volatile bool active = false;
 volatile unsigned long t_start = 0;
 volatile int groupIndex = 0;
 volatile int measurementInGroup = 0;
+volatile int sendingInGroup = 0;
 volatile bool collectingData = false;
 volatile unsigned long sessionId = 0;
 volatile int maxGroups = 0;
@@ -28,7 +29,7 @@ void initPins() {
   portOutputRegisterPin7 = portOutputRegister(digitalPinToPort(PIN_OUT));
   pin7Mask = digitalPinToBitMask(PIN_OUT);
 
-  pinMode(PIN_IN, INPUT);
+  pinMode(PIN_IN, INPUT_PULLUP);
   portInputRegisterPin20 = portInputRegister(digitalPinToPort(PIN_IN));
   pin20Mask = digitalPinToBitMask(PIN_IN);
 
