@@ -220,6 +220,51 @@ ps -eLo pid,cls,rtprio,cmd | grep SoC # узнать текущий приори
 stress-ng --cpu $(nproc) --vm $(nproc) --vm-bytes 100% & # нагрузка на процессор и память
 ```
 
+## Зависимости (ALT Linux)
+
+### ПК (receiver + Prometheus + Grafana)
+
+```bash
+apt-get install python3-module-serial python3-module-paramiko \
+    python3-module-requests python3-module-prometheus_client \
+    prometheus grafana
+```
+
+| Пакет | Назначение |
+|-------|-----------|
+| `python3-module-serial` | Связь с Arduino по COM-порту |
+| `python3-module-paramiko` | SSH-подключение к одноплатнику |
+| `python3-module-requests` | Запросы к Prometheus API |
+| `python3-module-prometheus_client` | Prometheus client library |
+| `prometheus` | Сервер сбора метрик |
+| `grafana` | Визуализация (опционально) |
+
+### Одноплатник (SoC)
+
+```bash
+apt-get install libgpiod2 libgpiod-devel gcc make \
+    prometheus-node_exporter stress-ng
+```
+
+| Пакет | Назначение |
+|-------|-----------|
+| `libgpiod2` | GPIO-библиотека |
+| `libgpiod-devel` | Заголовки GPIO для сборки |
+| `gcc` / `make` | Компиляция C-кода |
+| `prometheus-node_exporter` | Экспорт метрик CPU/памяти (опционально) |
+| `stress-ng` | Нагрузочное тестирование |
+
+### Arduino
+
+```bash
+apt-get install arduino-core avr-gcc
+```
+
+| Пакет | Назначение |
+|-------|-----------|
+| `arduino-core` | Ядро Arduino |
+| `avr-gcc` | Компилятор для AVR (Arduino Mega) |
+
 ## Методика испытаний
 
 На текущий момент методику испытаний можно описать так:

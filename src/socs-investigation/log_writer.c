@@ -7,6 +7,13 @@
 #include <sys/time.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <stdint.h>
+
+// Wrapper for pthread_cleanup_push — flock() has incompatible signature (int, int)
+static void flock_unlock(void *arg)
+{
+    flock((int)(intptr_t)arg, LOCK_UN);
+}
 
 
 int init_log_file(SharedData *shared, const char *log_path)
@@ -63,11 +70,12 @@ void write_group_to_log(SharedData *shared)
     float group_duration = (now.tv_sec - group_start.tv_sec) * 1000.0 +
                           (now.tv_usec - group_start.tv_usec) / 1000.0;
     
-    // Set cleanup handler for safe writing
-    pthread_cleanup_push((void(*)(void*))flock, 
-                         (void*)(intptr_t)fileno(shared->log_file));
+    int log_fd = fileno(shared->log_file);
     
-    flock(fileno(shared->log_file), LOCK_EX);
+    // Set cleanup handler for safe writing
+    pthread_cleanup_push(flock_unlock, (void*)(intptr_t)log_fd);
+    
+    flock(log_fd, LOCK_EX);
     
     
     fprintf(shared->log_file, 
@@ -82,7 +90,7 @@ void write_group_to_log(SharedData *shared)
             time(NULL));
     
     fflush(shared->log_file);
-    flock(fileno(shared->log_file), LOCK_UN);
+    flock(log_fd, LOCK_UN);
     
     pthread_cleanup_pop(0);
 }

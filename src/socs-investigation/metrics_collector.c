@@ -13,7 +13,7 @@
 // Cleanup handler for thread cancellation
 void metrics_cleanup_handler(void *arg)
 {
-    SharedData *shared = (SharedData*)arg;
+    (void)arg;
     printf("Metrics collector thread cleaning up\n");
 }
 
@@ -84,16 +84,20 @@ void update_memory_metrics(SharedData *shared)
     rewind(shared->meminfo_file);
     fflush(shared->meminfo_file);
     
-    unsigned long mem_total = 0, mem_available = 0;
+    unsigned long mem_total = 0, mem_available = 0, mem_free = 0;
     char line[256];
     
     while (fgets(line, sizeof(line), shared->meminfo_file)) {
         if (sscanf(line, "MemTotal: %lu kB", &mem_total) == 1) continue;
         if (sscanf(line, "MemAvailable: %lu kB", &mem_available) == 1) continue;
+        if (sscanf(line, "MemFree: %lu kB", &mem_free) == 1) continue;
     }
     
-    if (mem_total > 0 && mem_available > 0) {
-        float mem_usage = 100.0 * (1.0 - (float)mem_available / mem_total);
+    // Fallback to MemFree if MemAvailable not present (older kernels)
+    unsigned long mem_avail = mem_available > 0 ? mem_available : mem_free;
+    
+    if (mem_total > 0 && mem_avail > 0) {
+        float mem_usage = 100.0 * (1.0 - (float)mem_avail / mem_total);
         
         if (mem_usage < 0) mem_usage = 0;
         if (mem_usage > 100) mem_usage = 100;
@@ -126,7 +130,6 @@ void* metrics_collector_thread(void* arg)
     struct timespec timeout;
     int local_pulse_counter = 0;
     int measurement_counter = 0;
-    int first_measurement_done = 0;  // Flag to ensure we have baseline
     
     while (__atomic_load_n(&shared->running, __ATOMIC_SEQ_CST)) {
         pthread_mutex_lock(&shared->stats_mutex);

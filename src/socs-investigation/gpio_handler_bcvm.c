@@ -3,6 +3,7 @@
 #include "shared_data.h"
 #include "consumer_names.h"
 #include <gpiod.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>

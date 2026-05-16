@@ -5,7 +5,7 @@ LDFLAGS  = -lgpiod -lrt
 COMMON_SRC = main.c metrics_collector.c utils.c log_writer.c
 COMMON_OBJ = $(COMMON_SRC:.c=.o)
 
-BOARD    ?= bvc_arm
+BOARD    ?= bvc
 TARGET   = $(BOARD)-monitor
 HANDLER  = gpio_handler_$(BOARD).c
 HANDLER_O = gpio_handler_$(BOARD).o

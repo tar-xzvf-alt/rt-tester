@@ -311,7 +311,6 @@ def _migrate_events_tables(conn: sqlite3.Connection) -> None:
     
     # Drop old tables
     cursor.execute("DROP TABLE IF EXISTS system_events")
-    cursor.execute("DROP TABLE IF EXISTS events")
     
     print("  Old tables dropped, migration complete")
 

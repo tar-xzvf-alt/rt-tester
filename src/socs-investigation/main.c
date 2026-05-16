@@ -16,7 +16,6 @@
 #include "log_writer.h"
 
 static SharedData *shared = NULL;
-static int log_was_cleared = 0;  // Flag indicating log was cleared externally
 
 void signal_handler(int sig)
 {
@@ -67,28 +66,6 @@ int is_log_file_empty(const char *log_path) {
         return 1;
     }
     return st.st_size == 0;
-}
-
-// Function to handle external signal (called from main at startup)
-void reset_group_counter_if_needed(SharedData *shared, const char *log_path) {
-    if (is_log_file_empty(log_path)) {
-        printf("Log file is empty, resetting group counter to 0\n");
-        pthread_mutex_lock(&shared->stats_mutex);
-        shared->group_counter = 0;
-        shared->current_stats.group_number = 0;
-        gettimeofday(&shared->current_stats.group_start, NULL);
-        
-        // Also reset previous CPU values for correct calculation
-        shared->prev_total = 0;
-        shared->prev_idle = 0;
-        shared->prev_iowait = 0;
-        
-        pthread_mutex_unlock(&shared->stats_mutex);
-        
-        log_was_cleared = 1;
-    } else {
-        printf("Log file has content, keeping group counter at %d\n", shared->group_counter);
-    }
 }
 
 int main(int argc, char *argv[])

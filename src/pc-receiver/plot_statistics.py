@@ -572,6 +572,9 @@ def plot_jitter_with_soc(db_path: str, session_id: int = None,
     """Plot jitter with SoC metrics overlay."""
 
     info = get_session_info(db_path, session_id, threshold_us)
+    if info is None:
+        print("Session not found")
+        return
 
     latency_stats = get_latency_stats(db_path, session_id, info['worst_count'], threshold_us)
     soc_metrics = get_soc_metrics(db_path, session_id)
@@ -793,7 +796,11 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
     print(f"  Measurements/group:  {info['measurements_per_group']}")
     print(f"  Worst count/group:   {info['worst_count']}")
     print(f"\nPerformance Metrics:")
-    print(f"  Average Latency:     {info.get('avg_latency', 'N/A'):.2f} µs")
+    avg_latency = info.get('avg_latency')
+    if avg_latency is not None:
+        print(f"  Average Latency:     {avg_latency:.2f} µs")
+    else:
+        print(f"  Average Latency:     N/A")
     print(f"  Average Jitter:      {info['avg_jitter']:.2f} µs")
     print(f"  Falls:               {info['falls_count']}")
     
