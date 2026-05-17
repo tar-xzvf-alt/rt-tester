@@ -42,7 +42,8 @@
         {
           "expr": "arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"}",
           "legendFormat": "Avg Latency Group {{group}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "500ms"
         }
       ],
       "title": "Average Latency per Group",
@@ -72,7 +73,8 @@
         {
           "expr": "arduino_latency_max{board=\"$board\", session_id=\"$session_id\"}",
           "legendFormat": "Max Latency Group {{group}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "500ms"
         }
       ],
       "title": "Maximum Latency per Group",
@@ -95,7 +97,8 @@
         {
           "expr": "arduino_jitter{board=\"$board\", session_id=\"$session_id\"}",
           "legendFormat": "Jitter Group {{group}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "500ms"
         }
       ],
       "title": "Jitter (RMS) per Group",
@@ -156,7 +159,8 @@
         {
           "expr": "arduino_latency_avg{board=\"$board\"}",
           "legendFormat": "Session {{session_id}}",
-          "refId": "A"
+          "refId": "A",
+          "interval": "500ms"
         }
       ],
       "title": "Latency Comparison Across Sessions",

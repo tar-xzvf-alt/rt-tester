@@ -191,6 +191,9 @@ class ArduinoCollector:
             
             # Send to metrics server for Prometheus
             self.metrics_server.add_group(msg)
+
+            with open('/tmp/metrics_all_groups.log', 'a') as f:
+                f.write(json.dumps(msg) + '\n')
             
             # Get CPU/memory from node_exporter via Prometheus
             node_metrics = get_node_exporter_metrics()

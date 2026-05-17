@@ -24,7 +24,7 @@
 Схема подключения:
 
  - Arduino pin 7 → Lichee pin PE15(GPIO 143)
- - Lichee pin PE12(GPIO 140) →  Arduino pin 20
+ - Lichee pin PE16(GPIO 144) →  Arduino pin 20
 
  Между устройствами стоит логический преобразователь уровней.
 

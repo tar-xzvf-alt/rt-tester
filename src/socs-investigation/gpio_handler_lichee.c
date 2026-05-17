@@ -11,8 +11,8 @@
 
 #define GPIO_CHIP      "/dev/gpiochip0"
 #define GPIO_LINE 4
-#define GPIO_IN_LINE   15
-#define GPIO_OUT_LINE  12
+#define GPIO_IN_LINE   12
+#define GPIO_OUT_LINE  16
 
 
 void* gpio_handler_thread(void* arg)

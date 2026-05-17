@@ -11,9 +11,9 @@ This guide explains how to set up Prometheus and Grafana for monitoring RT laten
 │   SoC 1     │ ─────────────────► │             │
 │  (Radxa)    │   scrape           │             │
 └─────────────┘                    │             │
-                                  │  Prometheus │ ──► Grafana
-┌─────────────┐   :9101/metrics   │   Server    │
-│  PC Client  │ ─────────────────► │ (localhost)│    (localhost:3000)
+                                   │  Prometheus │ ──► Grafana
+┌─────────────┐   :9101/metrics    │   Server    │
+│  PC Client  │ ─────────────────► │ (localhost) │   (localhost:3000)
 │  (receiver) │   scrape           │             │
 └─────────────┘                    └─────────────┘
 ```
