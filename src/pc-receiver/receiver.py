@@ -191,15 +191,15 @@ class ArduinoCollector:
             
             # Send to metrics server for Prometheus
             self.metrics_server.add_group(msg)
-
-            with open('/tmp/metrics_all_groups.log', 'a') as f:
-                f.write(json.dumps(msg) + '\n')
             
             # Get CPU/memory from node_exporter via Prometheus
             node_metrics = get_node_exporter_metrics()
             if node_metrics['cpu_percent'] is not None:
                 msg['soc_cpu_percent'] = node_metrics['cpu_percent']
                 msg['soc_memory_percent'] = node_metrics['memory_percent'] if node_metrics['memory_percent'] else 0
+            
+            with open('/tmp/metrics_all_groups.log', 'a') as f:
+                f.write(json.dumps(msg) + '\n')
             
             # Pass target info to database
             group_id = db.save_group_data(
@@ -312,7 +312,7 @@ class ArduinoCollector:
         session_id = random.randint(100000, 999999)
         
         # Prepare target device
-        self.soc_monitor.prepare_for_session()
+        self.soc_monitor.prepare_for_session(self.target_board)
         
         # Form command for Arduino
         params = {

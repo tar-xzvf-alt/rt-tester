@@ -522,7 +522,7 @@ class SoCMonitor:
             return False
         return self.ssh_conn.is_connected and self.ssh_conn.is_active()
     
-    def prepare_for_session(self, process_name: str = "radxa-monitor") -> bool:
+    def prepare_for_session(self, target_board) -> bool:
         """
         Prepare target device for new session: clear log and reset counter.
         
@@ -532,6 +532,7 @@ class SoCMonitor:
         Returns:
             bool: True if successful
         """
+        process_name = target_board+'-monitor'
         if not self.enabled or not self.ssh_conn:
             print("  SoC monitoring disabled or no SSH connection")
             return False

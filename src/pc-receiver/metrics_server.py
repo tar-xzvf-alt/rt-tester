@@ -92,7 +92,6 @@ class PrometheusMetricsHandler(http.server.BaseHTTPRequestHandler):
         board = latest.get('board', 'unknown')
         kernel = latest.get('kernel', 'unknown')
         stress = latest.get('stress', 'off')
-        group_index = latest.get('group_index', 0)
         
         mean_latency = latest.get('mean_latency_us', 0)
         avg_latency = latest.get('avg_latency_us', 0)
@@ -101,20 +100,22 @@ class PrometheusMetricsHandler(http.server.BaseHTTPRequestHandler):
         jitter = latest.get('jitter_us', 0)
         worst_count = latest.get('worst_count', 0)
         
+        labels = f'board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}"'
+        
         lines.append(f"# TYPE arduino_latency_avg gauge")
-        lines.append(f'arduino_latency_avg{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}",group="{group_index}"}} {avg_latency}')
+        lines.append(f'arduino_latency_avg{{{labels}}} {avg_latency}')
         
         lines.append(f"# TYPE arduino_latency_mean gauge")
-        lines.append(f'arduino_latency_mean{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}",group="{group_index}"}} {mean_latency}')
+        lines.append(f'arduino_latency_mean{{{labels}}} {mean_latency}')
         
         lines.append(f"# TYPE arduino_latency_min gauge")
-        lines.append(f'arduino_latency_min{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}",group="{group_index}"}} {min_latency}')
+        lines.append(f'arduino_latency_min{{{labels}}} {min_latency}')
         
         lines.append(f"# TYPE arduino_latency_max gauge")
-        lines.append(f'arduino_latency_max{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}",group="{group_index}"}} {max_latency}')
+        lines.append(f'arduino_latency_max{{{labels}}} {max_latency}')
         
         lines.append(f"# TYPE arduino_jitter gauge")
-        lines.append(f'arduino_jitter{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}",group="{group_index}"}} {jitter}')
+        lines.append(f'arduino_jitter{{{labels}}} {jitter}')
         
         lines.append(f"# TYPE arduino_worst_count gauge")
         lines.append(f'arduino_worst_count{{board="{board}",kernel="{kernel}",session_id="{session_id}"}} {worst_count}')
@@ -123,7 +124,7 @@ class PrometheusMetricsHandler(http.server.BaseHTTPRequestHandler):
         if worst_latencies:
             for i, lat in enumerate(worst_latencies[:25]):
                 lines.append(f"# TYPE arduino_latency_worst_{i+1} gauge")
-                lines.append(f'arduino_latency_worst_{i+1}{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}",group="{group_index}"}} {lat}')
+                lines.append(f'arduino_latency_worst_{i+1}{{{labels}}} {lat}')
         
         lines.append(f"# TYPE arduino_session_info gauge")
         lines.append(f'arduino_session_info{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}"}} 1')

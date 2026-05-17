@@ -41,7 +41,7 @@
       "targets": [
         {
           "expr": "arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"}",
-          "legendFormat": "Avg Latency Group {{group}}",
+          "legendFormat": "Avg Latency",
           "refId": "A",
           "interval": "500ms"
         }
@@ -72,7 +72,7 @@
       "targets": [
         {
           "expr": "arduino_latency_max{board=\"$board\", session_id=\"$session_id\"}",
-          "legendFormat": "Max Latency Group {{group}}",
+          "legendFormat": "Max Latency",
           "refId": "A",
           "interval": "500ms"
         }
@@ -96,7 +96,7 @@
       "targets": [
         {
           "expr": "arduino_jitter{board=\"$board\", session_id=\"$session_id\"}",
-          "legendFormat": "Jitter Group {{group}}",
+          "legendFormat": "Jitter (RMS)",
           "refId": "A",
           "interval": "500ms"
         }
