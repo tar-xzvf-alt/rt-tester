@@ -1,16 +1,15 @@
 CC       = gcc
-CFLAGS   = -pthread -Wall -O2
+CFLAGS   = -pthread -Wall -O2 -D_GNU_SOURCE
 LDFLAGS  = -lgpiod -lrt
 
-COMMON_SRC = main.c metrics_collector.c utils.c log_writer.c
+COMMON_SRC = main.c metrics_collector.c utils.c log_writer.c gpio_handler.c
 COMMON_OBJ = $(COMMON_SRC:.c=.o)
 
 BOARD    ?= bvc
 TARGET   = $(BOARD)-monitor
-HANDLER  = gpio_handler_$(BOARD).c
-HANDLER_O = gpio_handler_$(BOARD).o
+CFLAGS  += -DBOARD_$(BOARD)
 
-OBJS     = $(COMMON_OBJ) $(HANDLER_O)
+OBJS     = $(COMMON_OBJ)
 
 VALID_BOARDS = bvc bcvm starfive lichee radxa bvc_arm
 

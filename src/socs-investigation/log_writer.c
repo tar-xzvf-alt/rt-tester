@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include "log_writer.h"
 #include "shared_data.h"
 #include <stdio.h>

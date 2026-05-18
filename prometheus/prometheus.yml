@@ -8,9 +8,9 @@ scrape_configs:
   - job_name: 'radxa_node'
     scrape_interval: 500ms
     static_configs:
-      - targets: ['192.168.0.223:9100']
+      - targets: ['192.168.0.73:9100']
         labels:
-          board: 'radxa'
+          board: 'lichee'
           source: 'node_exporter'
           
   - job_name: 'arduino_latency'

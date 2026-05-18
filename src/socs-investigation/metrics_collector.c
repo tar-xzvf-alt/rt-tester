@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include "metrics_collector.h"
 #include "utils.h"
 #include "log_writer.h"
