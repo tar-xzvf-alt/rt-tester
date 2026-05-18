@@ -7,5 +7,6 @@
 #define CONSUMER_STARFIVE "starfive-monitor"
 #define CONSUMER_BCVM     "bcvm-monitor"
 #define CONSUMER_BVCARM   "bvcarm-mo"
+#define CONSUMER_MANGOPI   "mangopi-monitor"
 
 #endif // CONSUMER_NAMES_H

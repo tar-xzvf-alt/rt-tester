@@ -209,6 +209,8 @@ exit # завершение сбора
 | Lichee RV Dock | `/dev/gpiochip0` | GPIO_LINE=4, OFFSET=15 | GPIO_LINE=4, OFFSET=12 |
 | Visionfive Starfive v2 | `/dev/gpiochip0` | GPIO_LINE=0, OFFSET=60 | GPIO_LINE=0, OFFSET=61 |
 | БЦВМ АРМ | `/dev/gpiochip0` | GPIO_LINE=0, OFFSET=15 | GPIO_LINE=0, OFFSET=9 |
+| БВЦ АРМ | `/dev/gpiochip0` | ? |? |
+| MangoPI | `/dev/gpiochip0` | ? | ? |
 
 ## Утилиты для тестирования
 

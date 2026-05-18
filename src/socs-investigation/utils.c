@@ -59,7 +59,8 @@ int set_irq_thread_priority(void)
         CONSUMER_RADXA,
         CONSUMER_STARFIVE,
         CONSUMER_BCVM,
-        CONSUMER_BVCARM
+        CONSUMER_BVCARM,
+        CONSUMER_MANGOPI
     };
     int num_names = sizeof(consumer_names) / sizeof(consumer_names[0]);
 
