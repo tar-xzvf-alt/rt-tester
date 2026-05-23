@@ -10,7 +10,7 @@
 #include <pthread.h>
 
 #define GPIO_CHIP      "/dev/gpiochip4"
-#define GPIO_LINE 4
+#define GPIO_LINE 0
 #define GPIO_IN_LINE   6
 #define GPIO_OUT_LINE  7
 

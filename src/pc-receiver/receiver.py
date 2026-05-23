@@ -291,7 +291,7 @@ class ArduinoCollector:
         session_id = random.randint(100000, 999999)
         
         # Prepare target device
-        self.soc_monitor.prepare_for_session()
+        self.soc_monitor.prepare_for_session(self.target_board)
         
         # Form command for Arduino
         params = {
