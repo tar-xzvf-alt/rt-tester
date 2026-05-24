@@ -49,6 +49,33 @@
   #define GPIO_EDGE         GPIOD_LINE_EDGE_BOTH
   #define GPIO_CONSUMER     CONSUMER_STARFIVE
 
+#elif defined(BOARD_mangopi)
+  #define GPIO_CHIP         "/dev/gpiochip0"
+  #define GPIO_BANK         1
+  #define GPIO_BANK_MULT    32
+  #define GPIO_LINE_IN      3
+  #define GPIO_LINE_OUT     4
+  #define GPIO_EDGE         GPIOD_LINE_EDGE_BOTH
+  #define GPIO_CONSUMER     CONSUMER_MANGOPI
+
+#elif defined(BOARD_rockpi4)
+  #define GPIO_CHIP         "/dev/gpiochip4"
+  #define GPIO_BANK         0
+  #define GPIO_BANK_MULT    0
+  #define GPIO_LINE_IN      6
+  #define GPIO_LINE_OUT     7
+  #define GPIO_EDGE         GPIOD_LINE_EDGE_BOTH
+  #define GPIO_CONSUMER     CONSUMER_ROCKPI4
+
+#elif defined(BOARD_repkapi4)
+  #define GPIO_CHIP         "/dev/gpiochip1"
+  #define GPIO_BANK         6
+  #define GPIO_BANK_MULT    32
+  #define GPIO_LINE_IN      13
+  #define GPIO_LINE_OUT     12
+  #define GPIO_EDGE         GPIOD_LINE_EDGE_BOTH
+  #define GPIO_CONSUMER     CONSUMER_REPKAPI4
+
 #else
   #error "No BOARD_xxx defined. Use -DBOARD_lichee or similar in CFLAGS"
 #endif

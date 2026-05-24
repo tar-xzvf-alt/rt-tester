@@ -522,17 +522,18 @@ class SoCMonitor:
             return False
         return self.ssh_conn.is_connected and self.ssh_conn.is_active()
     
-    def prepare_for_session(self, target_board) -> bool:
+    def prepare_for_session(self, board_name) -> bool:
         """
         Prepare target device for new session: clear log and reset counter.
         
         Args:
-            process_name: Name of the monitoring process
+            board_name: Name of the monitoring board
         
         Returns:
             bool: True if successful
         """
-        process_name = target_board+'-monitor'
+        
+        process_name = board_name+'-monitor'
         if not self.enabled or not self.ssh_conn:
             print("  SoC monitoring disabled or no SSH connection")
             return False

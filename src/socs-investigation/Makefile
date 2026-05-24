@@ -11,7 +11,7 @@ CFLAGS  += -DBOARD_$(BOARD)
 
 OBJS     = $(COMMON_OBJ)
 
-VALID_BOARDS = bvc bcvm starfive lichee radxa bvc_arm
+VALID_BOARDS = bvc bcvm starfive lichee radxa bvc_arm mangopi rockpi4 repkapi4
 
 .PHONY: all clean check-board
 
