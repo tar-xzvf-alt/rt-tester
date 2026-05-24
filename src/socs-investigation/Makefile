@@ -12,7 +12,7 @@ HANDLER_O = gpio_handler_$(BOARD).o
 
 OBJS     = $(COMMON_OBJ) $(HANDLER_O)
 
-VALID_BOARDS = bvc bcvm starfive lichee radxa bvc_arm mangopi rockpi4
+VALID_BOARDS = bvc bcvm starfive lichee radxa bvc_arm mangopi rockpi4 repkapi4
 
 .PHONY: all clean check-board
 

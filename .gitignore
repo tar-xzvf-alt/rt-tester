@@ -4,3 +4,4 @@
 rt-tester.code-workspace
 /src/pc-receiver/logs
 /logs/
+src/pc-receiver/measurement.conf

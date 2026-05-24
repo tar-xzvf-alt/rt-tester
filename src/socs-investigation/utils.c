@@ -61,7 +61,8 @@ int set_irq_thread_priority(void)
         CONSUMER_BCVM,
         CONSUMER_BVCARM,
         CONSUMER_MANGOPI,
-        CONSUMER_ROCKPI4
+        CONSUMER_ROCKPI4,
+        CONSUMER_REPKAPI4
     };
     int num_names = sizeof(consumer_names) / sizeof(consumer_names[0]);
 

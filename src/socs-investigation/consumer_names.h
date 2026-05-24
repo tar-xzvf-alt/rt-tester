@@ -9,5 +9,6 @@
 #define CONSUMER_BVCARM   "bvcarm-mo"
 #define CONSUMER_MANGOPI   "mangopi-monitor"
 #define CONSUMER_ROCKPI4   "rockpi4-monitor"
+#define CONSUMER_REPKAPI4   "repkapi4-monitor"
 
 #endif // CONSUMER_NAMES_H
