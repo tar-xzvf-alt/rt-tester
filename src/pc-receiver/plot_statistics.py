@@ -820,13 +820,205 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
     print("="*80)
 
 
+def show_session_details_prom(info: dict, threshold_us: int = 75) -> None:
+    """Print session details from Prometheus-backed info dict."""
+    stress_status = "WITH STRESS" if info.get('target_stress') == 'on' else "NO STRESS"
+
+    print(f"\n{'='*80}")
+    print(f"Session: {info['session_id']}")
+    print(f"{'='*80}")
+    print(f"Target Board:  {info['target_board']}")
+    print(f"Target Kernel: {info['target_kernel']}")
+    print(f"Stress State:  {stress_status}")
+    print(f"Start Time:    {info['start_time']}")
+    print(f"End Time:      {info['end_time']}")
+    print(f"Duration:      {info['groups_count']} groups")
+    print(f"\nMeasurement Parameters:")
+    print(f"  Interval:            {info['interval_us']} µs")
+    print(f"  Measurements/group:  {info['measurements_per_group']}")
+    print(f"  Worst count/group:   {info['worst_count']}")
+    print(f"\nPerformance Metrics:")
+    print(f"  Average Jitter:      {info['avg_jitter']:.2f} µs")
+    if info.get('avg_cpu') is not None:
+        print(f"\nSoC Metrics (averages):")
+        print(f"  CPU Usage:   {info['avg_cpu']:.2f}%")
+        print(f"  Memory:      {info['avg_mem']:.2f}%")
+    print(f"\nNote: falls/recoveries not tracked in Prometheus (SQLite only)")
+    print(f"{'='*80}")
+
+
+def plot_comprehensive_analysis_prom(client, session_id=None, output=None,
+                                      top_n=125, threshold_us=75):
+    """Prometheus-backed version of plot_comprehensive_analysis."""
+    from promql_metrics import (get_latency_stats as p_ls,
+                                get_soc_metrics as p_sm,
+                                get_session_info as p_si)
+    from prometheus_client import PrometheusClient
+
+    latency_stats = p_ls(client, session_id, top_n, threshold_us)
+    soc_metrics = p_sm(client, session_id)
+
+    if latency_stats is None or latency_stats.empty:
+        print("No latency data to display")
+        return
+
+    session_info = p_si(client, session_id, threshold_us) if session_id else None
+
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(16, 12))
+    groups = latency_stats['group_index']
+
+    # Latency
+    ax1.plot(groups, latency_stats['avg_latency_us'], 'b-', label='Avg Latency', linewidth=1)
+    ax1.fill_between(groups, latency_stats['avg_latency_us'], latency_stats['max_latency_us'],
+                     alpha=0.3, color='red', label='Max Latency')
+    ax1.axhline(y=threshold_us, color='r', linestyle='--', alpha=0.5, label=f'Threshold ({threshold_us} µs)')
+    ax1.set_ylabel('Latency (µs)')
+    ax1.set_title('Latency per Group')
+    ax1.legend()
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    # Jitter
+    ax2.plot(groups, latency_stats['jitter_us'], 'g-', linewidth=1)
+    ax2.set_ylabel('Jitter (µs)')
+    ax2.set_title('RMS Jitter per Group')
+    ax2.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    # Exceeds
+    exceeds = latency_stats[latency_stats['exceeds_threshold_count'] > 0]
+    if not exceeds.empty:
+        ax3.bar(exceeds['group_index'], exceeds['exceeds_threshold_count'], color='red', alpha=0.7)
+    ax3.set_xlabel('Group Number')
+    ax3.set_ylabel('Exceed Count')
+    ax3.set_title(f'Threshold Exceedances (>{threshold_us} µs)')
+    ax3.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    # SoC
+    if soc_metrics is not None and not soc_metrics.empty:
+        ax4.plot(soc_metrics['group_index'], soc_metrics['cpu_percent'], 'b-', label='CPU %', linewidth=1)
+        ax4.plot(soc_metrics['group_index'], soc_metrics['memory_percent'], 'g-', label='Memory %', linewidth=1)
+        ax4.set_xlabel('Group Number')
+        ax4.set_ylabel('Usage (%)')
+        ax4.set_title('SoC Metrics')
+        ax4.legend()
+        ax4.xaxis.set_major_locator(MaxNLocator(integer=True))
+    else:
+        ax4.text(0.5, 0.5, 'No SoC metrics in Prometheus\n(run node_exporter on SoC)',
+                ha='center', va='center', transform=ax4.transAxes)
+
+    plt.tight_layout()
+    if output:
+        plt.savefig(output, dpi=150, bbox_inches='tight')
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
+
+
+def plot_latency_with_soc_prom(client, session_id=None, output=None,
+                                top_n=125, threshold_us=75):
+    """Prometheus-backed version of plot_latency_with_soc."""
+    from promql_metrics import (get_latency_stats as p_ls,
+                                get_soc_metrics as p_sm,
+                                get_session_info as p_si)
+    latency_stats = p_ls(client, session_id, top_n, threshold_us)
+    soc_metrics = p_sm(client, session_id)
+
+    if latency_stats is None or latency_stats.empty:
+        print("No latency data to display")
+        return
+
+    session_info = p_si(client, session_id, threshold_us) if session_id else None
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+    groups = latency_stats['group_index']
+
+    ax1.plot(groups, latency_stats['avg_latency_us'], 'b-', label='Avg Latency', linewidth=1)
+    ax1.fill_between(groups, latency_stats['avg_latency_us'], latency_stats['max_latency_us'],
+                     alpha=0.3, color='red', label='Max Latency')
+    ax1.axhline(y=threshold_us, color='r', linestyle='--', alpha=0.5, label=f'Threshold ({threshold_us} µs)')
+    ax1.set_ylabel('Latency (µs)')
+    ax1.legend()
+    if session_info:
+        title = f"{session_info.get('target_board','')} / {session_info.get('target_kernel','')} / Stress: {session_info.get('target_stress','off')}"
+        ax1.set_title(f"Latency — {title}")
+
+    if soc_metrics is not None and not soc_metrics.empty:
+        ax2.plot(soc_metrics['group_index'], soc_metrics['cpu_percent'], 'b-', label='CPU %', linewidth=1)
+        ax2.plot(soc_metrics['group_index'], soc_metrics['memory_percent'], 'g-', label='Memory %', linewidth=1)
+        ax2.set_xlabel('Group Number')
+        ax2.set_ylabel('Usage (%)')
+        ax2.set_title('SoC CPU & Memory Usage')
+        ax2.legend()
+    else:
+        ax2.text(0.5, 0.5, 'No SoC metrics in Prometheus\n(run node_exporter on SoC)',
+                ha='center', va='center', transform=ax2.transAxes)
+
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.tight_layout()
+    if output:
+        plt.savefig(output, dpi=150, bbox_inches='tight')
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
+
+
+def plot_jitter_with_soc_prom(client, session_id=None, output=None,
+                               threshold_us=75):
+    """Prometheus-backed version of plot_jitter_with_soc."""
+    from promql_metrics import (get_session_info as p_si,
+                                get_latency_stats as p_ls,
+                                get_soc_metrics as p_sm)
+    info = p_si(client, session_id, threshold_us)
+    if info is None:
+        print("Session not found")
+        return
+
+    latency_stats = p_ls(client, session_id, info['worst_count'], threshold_us)
+    soc_metrics = p_sm(client, session_id)
+
+    if latency_stats is None or latency_stats.empty:
+        print("No jitter data to display")
+        return
+
+    session_info = p_si(client, session_id, threshold_us) if session_id else None
+
+    fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+    groups = latency_stats['group_index']
+
+    ax1.plot(groups, latency_stats['jitter_us'], 'g-', linewidth=1)
+    ax1.set_ylabel('Jitter (µs)', color='green')
+    ax1.set_title('RMS Jitter per Group')
+
+    if soc_metrics is not None and not soc_metrics.empty:
+        ax2.plot(soc_metrics['group_index'], soc_metrics['cpu_percent'], 'b-', label='CPU %', linewidth=1)
+        ax2.plot(soc_metrics['group_index'], soc_metrics['memory_percent'], 'g-', label='Memory %', linewidth=1)
+        ax2.set_xlabel('Group Number')
+        ax2.set_ylabel('Usage (%)')
+        ax2.set_title('SoC CPU & Memory Usage')
+        ax2.legend()
+    else:
+        ax2.text(0.5, 0.5, 'No SoC metrics in Prometheus\n(run node_exporter on SoC)',
+                ha='center', va='center', transform=ax2.transAxes)
+
+    ax1.xaxis.set_major_locator(MaxNLocator(integer=True))
+    plt.tight_layout()
+    if output:
+        plt.savefig(output, dpi=150, bbox_inches='tight')
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
+
+
 def main():
     """Main entry point with command line argument parsing."""
     parser = argparse.ArgumentParser(
         description='Arduino Data Visualization with SoC Metrics',
         epilog='For more information, see README.md'
     )
-    parser.add_argument('db', help='Path to SQLite database')
+    parser.add_argument('db', nargs='?', help='Path to SQLite database (required for sqlite source)')
+    parser.add_argument('--source', choices=['sqlite', 'prometheus'], default='sqlite',
+                       help='Data source: sqlite (default) or prometheus')
+    parser.add_argument('--prom-url', default='http://localhost:9090',
+                       help='Prometheus server URL (default: http://localhost:9090)')
     parser.add_argument('--session', type=int, help='Session ID (if not specified, all sessions)')
     parser.add_argument('--output', '-o', help='Save plot to file instead of displaying')
     parser.add_argument('--top', type=int, default=125, 
@@ -851,26 +1043,54 @@ def main():
     parser_details.add_argument('session_id', type=int, help='Session ID to show details')
     
     args = parser.parse_args()
-    
-    if not os.path.exists(args.db):
-        print(f"Error: Database file {args.db} not found")
-        return
-    
+
+    if args.source == 'sqlite':
+        if not args.db or not os.path.exists(args.db):
+            print(f"Error: Database file {args.db or '(not specified)'} not found")
+            return
+
     try:
+        if args.source == 'prometheus':
+            from prometheus_client import PrometheusClient
+            from promql_metrics import (get_session_info as prom_get_session_info,
+                                        get_latency_stats as prom_get_latency_stats,
+                                        get_soc_metrics as prom_get_soc_metrics,
+                                        list_sessions as prom_list_sessions)
+            client = PrometheusClient(args.prom_url)
+
         if args.command == 'sessions':
-            list_sessions(args.db, args.limit)
-        
+            if args.source == 'prometheus':
+                prom_list_sessions(client, args.limit)
+            else:
+                list_sessions(args.db, args.limit)
+
         elif args.command == 'details':
-            show_session_details(args.db, args.session_id, args.limit)
-        
+            if args.source == 'prometheus':
+                info = prom_get_session_info(client, args.session_id, args.limit)
+                if info:
+                    show_session_details_prom(info, args.limit)
+                else:
+                    print(f"Session {args.session_id} not found in Prometheus")
+            else:
+                show_session_details(args.db, args.session_id, args.limit)
+
         elif args.command == 'all':
-            plot_comprehensive_analysis(args.db, args.session, args.output, args.top, args.limit)
-        
+            if args.source == 'prometheus':
+                plot_comprehensive_analysis_prom(client, args.session, args.output, args.top, args.limit)
+            else:
+                plot_comprehensive_analysis(args.db, args.session, args.output, args.top, args.limit)
+
         elif args.command == 'latency+soc':
-            plot_latency_with_soc(args.db, args.session, args.output, args.top, args.limit)
-        
+            if args.source == 'prometheus':
+                plot_latency_with_soc_prom(client, args.session, args.output, args.top, args.limit)
+            else:
+                plot_latency_with_soc(args.db, args.session, args.output, args.top, args.limit)
+
         elif args.command == 'jitter+soc':
-            plot_jitter_with_soc(args.db, args.session, args.output, args.limit)
+            if args.source == 'prometheus':
+                plot_jitter_with_soc_prom(client, args.session, args.output, args.limit)
+            else:
+                plot_jitter_with_soc(args.db, args.session, args.output, args.limit)
         
         else:
             print("Please specify a command. Available commands:")

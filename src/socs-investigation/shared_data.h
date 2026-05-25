@@ -33,23 +33,11 @@ typedef struct {
     // Current group statistics
     GroupStats current_stats;
     
-    // For CPU measurement (previous values)
-    unsigned long long prev_user;
-    unsigned long long prev_system;
-    unsigned long long prev_idle;
-    unsigned long long prev_iowait;
-    unsigned long long prev_total;
-    
     // Log file
     FILE *log_file;
     
-    // Cached file descriptors for metrics collection
-    FILE *stat_file;
-    FILE *meminfo_file;
-    
     // Thread IDs for forceful termination
     pthread_t gpio_thread;
-    pthread_t metrics_thread;
 } SharedData;
 
 #endif // SHARED_DATA_H

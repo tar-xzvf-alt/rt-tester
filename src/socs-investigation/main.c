@@ -11,7 +11,6 @@
 #include "shared_data.h"
 #include "utils.h"
 #include "gpio_handler.h"
-#include "metrics_collector.h"
 #include "log_writer.h"
 
 static SharedData *shared = NULL;
@@ -29,10 +28,6 @@ void signal_handler(int sig)
             shared->current_stats.group_number = 0;
             gettimeofday(&shared->current_stats.group_start, NULL);
             
-            // Also reset previous CPU values
-            shared->prev_total = 0;
-            shared->prev_idle = 0;
-            shared->prev_iowait = 0;
             pthread_mutex_unlock(&shared->stats_mutex);
             
             printf("Group counter reset to 0\n");
@@ -54,7 +49,6 @@ void signal_handler(int sig)
         
         // Force cancel threads if they're still running
         pthread_cancel(shared->gpio_thread);
-        pthread_cancel(shared->metrics_thread);
     }
 }
 
@@ -110,15 +104,6 @@ int main(int argc, char *argv[])
     shared->current_stats.total_mem = 0;
     shared->current_stats.samples = 0;
     
-    // Initialize previous CPU values
-    shared->prev_total = 0;
-    shared->prev_idle = 0;
-    shared->prev_iowait = 0;
-    
-    // Initialize file descriptors (will be opened on first use)
-    shared->stat_file = NULL;
-    shared->meminfo_file = NULL;
-    
     // Check log file state at startup
     if (is_log_file_empty(log_path)) {
         printf("Log file is empty, starting with fresh counter\n");
@@ -150,17 +135,6 @@ int main(int argc, char *argv[])
         free(shared);
         return 1;
     }
-    
-    if (pthread_create(&shared->metrics_thread, NULL, metrics_collector_thread, shared) != 0) {
-        perror("pthread_create metrics_thread");
-        __atomic_store_n(&shared->running, 0, __ATOMIC_SEQ_CST);
-        pthread_cond_broadcast(&shared->measurement_cond);
-        pthread_cancel(shared->gpio_thread);
-        pthread_join(shared->gpio_thread, NULL);
-        cleanup_resources(shared);
-        free(shared);
-        return 1;
-    }
 
     // Try to set IRQ thread priority (requires root)
     // Must be called from main process before creating threads
@@ -172,7 +146,6 @@ int main(int argc, char *argv[])
 
     // Wait for threads to finish
     pthread_join(shared->gpio_thread, NULL);
-    pthread_join(shared->metrics_thread, NULL);
     
     // Cleanup resources
     cleanup_resources(shared);

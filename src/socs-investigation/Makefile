@@ -2,7 +2,7 @@ CC       = gcc
 CFLAGS   = -pthread -Wall -O2 -D_GNU_SOURCE
 LDFLAGS  = -lgpiod -lrt
 
-COMMON_SRC = main.c metrics_collector.c utils.c log_writer.c gpio_handler.c
+COMMON_SRC = main.c utils.c log_writer.c gpio_handler.c
 COMMON_OBJ = $(COMMON_SRC:.c=.o)
 
 BOARD    ?= bvc

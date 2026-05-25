@@ -367,36 +367,11 @@ class ArduinoCollector:
             self.session_logger.info(f"Worst count: {self.worst_count}")
             self.session_logger.info(f"Measurement interval: {self.measurement_interval_us} µs")
 
-    
-    def _process_session_metrics(self):
-        """Process SoC metrics after session completion."""
-        if not self.current_session_id:
-            return
-        
-        # Read metrics from target device
-        metrics_list = self.soc_monitor.read_session_metrics(self.current_session_id)
-        
-        if metrics_list:
-            # Save to database
-            for metrics in metrics_list:
-                db.save_soc_metrics_from_log(self.db_path, metrics)
-            
-            print(f"  Saved {len(metrics_list)} metric entries to database")
-            
-            # Save local copy
-            self.soc_monitor.save_metrics_to_local(metrics_list, self.current_session_id)
-        else:
-            print("  No log entries found")
-
-
 
     def _cmd_stop(self) -> None:
         """Handle stop command with log processing."""
         self.send_command("STOP")
         self.is_collecting = False
-        
-        # Process SoC metrics
-        self._process_session_metrics()
         
         print("Measurement stopped")
         if self.session_logger:
@@ -497,8 +472,6 @@ class ArduinoCollector:
                 duration_us,
                 "auto"
             )
-            
-            self._process_session_metrics()
             
             if self.session_logger:
                 self.session_logger.info(f"Session auto-stopped. Total groups: {groups}")

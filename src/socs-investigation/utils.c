@@ -27,11 +27,6 @@ void set_current_thread_rt(const char* thread_name)
     pthread_t self = pthread_self();
     int priority = RT_PRIORITY;
     
-    // Set lower priority for metrics collector thread
-    if (strcmp(thread_name, "metrics_collector") == 0) {
-        priority = 79;  // One lower than GPIO handler
-    }
-    
     struct sched_param sp = {
         .sched_priority = priority
     };
@@ -144,18 +139,6 @@ void cleanup_resources(SharedData *shared)
         fclose(shared->log_file);
         shared->log_file = NULL;
         printf("Log file closed\n");
-    }
-    
-    if (shared->stat_file) {
-        fclose(shared->stat_file);
-        shared->stat_file = NULL;
-        printf("/proc/stat file closed\n");
-    }
-    
-    if (shared->meminfo_file) {
-        fclose(shared->meminfo_file);
-        shared->meminfo_file = NULL;
-        printf("/proc/meminfo file closed\n");
     }
     
     pthread_mutex_destroy(&shared->stats_mutex);
