@@ -10,7 +10,6 @@ Usage:
 """
 
 import http.server
-import socket
 import socketserver
 import threading
 import json
@@ -142,6 +141,10 @@ class PrometheusMetricsHandler(http.server.BaseHTTPRequestHandler):
         return "\n".join(lines)
 
 
+class ReuseTCPServer(socketserver.TCPServer):
+    allow_reuse_address = True
+
+
 class MetricsServer:
     """HTTP server for Prometheus metrics."""
     
@@ -155,9 +158,7 @@ class MetricsServer:
         """Start the metrics HTTP server."""
         PrometheusMetricsHandler.storage = self.storage
         
-        self.server = socketserver.TCPServer(("", self.port), PrometheusMetricsHandler)
-        self.server.allow_reuse_address = True
-        self.server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.server = ReuseTCPServer(("", self.port), PrometheusMetricsHandler)
         
         self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         self.thread.start()
