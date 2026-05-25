@@ -82,7 +82,7 @@ void checkSerialCommands() {
         unsigned long new_session_id = doc["session_id"].as<unsigned long>();
         int groups = doc["groups"] | 0;
         int worst_cnt = doc["worst_count"] | DEFAULT_WORST_COUNT;
-        unsigned int interval_us = doc["interval_us"] | DEFAULT_MEASUREMENT_INTERVAL_US;
+        unsigned long interval_us = doc["interval_us"] | DEFAULT_MEASUREMENT_INTERVAL_US;
         
         // Validate parameters
         if (worst_cnt < 1) worst_cnt = 1;
@@ -136,7 +136,7 @@ void checkSerialCommands() {
 }
 
 void startMeasurement(unsigned long new_session_id, int groups, 
-                      int worst_cnt, unsigned int interval_us) {
+                      int worst_cnt, unsigned long interval_us) {
   noInterrupts();
   
   sessionId = new_session_id;

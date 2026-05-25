@@ -15,7 +15,7 @@ volatile unsigned long lastMeasurementTime = 0;
 
 // Measurement parameters
 volatile int worstCount = DEFAULT_WORST_COUNT;
-volatile unsigned int measurementIntervalUs = DEFAULT_MEASUREMENT_INTERVAL_US;
+volatile unsigned long measurementIntervalUs = DEFAULT_MEASUREMENT_INTERVAL_US;
 
 volatile uint8_t* portOutputRegisterPin7;
 uint8_t pin7Mask;
