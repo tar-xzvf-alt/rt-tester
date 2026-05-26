@@ -16,7 +16,6 @@ from logging_utils import setup_session_logging
 from arduino_monitor import FallMonitor
 from config_loader import load_config
 import json
-from soc_monitor import SoCMonitor
 from metrics_server import MetricsServer
 from prometheus_client import get_node_exporter_metrics
 
@@ -57,8 +56,6 @@ class ArduinoCollector:
         # Auto-stop configuration
         self.auto_stop_groups = config_dict.get('auto-stop-groups')
         self.auto_stop_triggered = False
-
-        self.soc_monitor = SoCMonitor(config_dict['soc'])
         
         # Logger for session logging
         self.session_logger = None
@@ -103,13 +100,6 @@ class ArduinoCollector:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
         else:
             print(f"  Auto-stop: disabled")
-        
-        if self.soc_monitor.enabled:
-            print(f"  SoC monitoring: ENABLED")
-            print(f"    host: {self.config['soc']['host']}")
-            print(f"    user: {self.config['soc']['username']}")
-        else:
-            print(f"  SoC monitoring: DISABLED")
     
 
     def _on_fall_detected(self, time_since_last_data_us: int) -> None:
@@ -310,9 +300,6 @@ class ArduinoCollector:
     def _cmd_start(self) -> None:
         """Handle start command."""
         session_id = random.randint(100000, 999999)
-        
-        # Prepare target device
-        self.soc_monitor.prepare_for_session(self.target_board)
         
         # Form command for Arduino
         params = {
@@ -521,15 +508,6 @@ class ArduinoCollector:
             rate = self.groups_received / elapsed
             print(f"  Average rate: {rate:.2f} groups/sec")
             self._show_db_stats()
-
-        if self.soc_monitor.enabled:
-            ssh_stats = self.soc_monitor.get_connection_stats()
-            ssh_status = "ACTIVE" if ssh_stats.get('is_connected') else "DISCONNECTED"
-            print(f"\n  SoC Connection:")
-            print(f"    Status: {ssh_status}")
-            print(f"    Uptime: {ssh_stats.get('uptime_seconds', 0):.1f} sec")
-            print(f"    Reconnections: {ssh_stats.get('reconnections', 0)}")
-            print(f"    Failed attempts: {ssh_stats.get('failed_attempts', 0)}")
 
     def _show_recent_events(self, limit: int = 10) -> None:
         """Show recent fall/recovery events."""
