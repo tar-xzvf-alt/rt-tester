@@ -22,7 +22,7 @@ uint8_t pin7Mask;
 volatile uint8_t* portInputRegisterPin20;
 uint8_t pin20Mask;
 
-volatile int currentGroupLatency[GROUP_SIZE];
+volatile unsigned long currentGroupLatency[GROUP_SIZE];
 
 void initPins() {
   pinMode(PIN_OUT, OUTPUT);
