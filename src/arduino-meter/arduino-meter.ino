@@ -36,8 +36,10 @@ void loop() {
 
       sendingInGroup = measurementInGroup+1;
       
-      // Send pulse
+      // Send pulse — protect 32-bit t_start write from ISR on 8-bit AVR
+      noInterrupts();
       t_start = micros();
+      interrupts();
       active = !active;
       if (active) {
         *portOutputRegisterPin7 |= pin7Mask;
