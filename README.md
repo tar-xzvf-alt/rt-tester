@@ -93,9 +93,10 @@ exit # завершение сбора
 # Сравнение латентности и джиттера между двумя сессиями (реальные µs, без нормализации)
 ./plot_statistics.py arduino.db compare 228465 362956
 
-# Только латентность или только джиттер
+# Только латентность, только джиттер или наложение на одном графике
 ./plot_statistics.py arduino.db compare 228465 362956 --mode latency
 ./plot_statistics.py arduino.db compare 228465 362956 --mode jitter --output jitter_only.png
+./plot_statistics.py arduino.db compare 228465 362956 --mode overlay  # оба на одном графике
 ```
 
 ### Структура базы данных SQLite

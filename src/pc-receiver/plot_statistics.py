@@ -858,33 +858,54 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
     label1 = board_label(info1, session_id_1)
     label2 = board_label(info2, session_id_2)
 
-    show_latency = mode in ("combined", "latency")
-    show_jitter = mode in ("combined", "jitter")
+    show_latency = mode in ("combined", "latency", "overlay")
+    show_jitter  = mode in ("combined", "jitter", "overlay")
 
     if mode == "combined":
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
     else:
-        fig, ax = plt.subplots(1, 1, figsize=(14, 6))
-        ax1 = ax2 = ax  # single-plot fallback handled below
+        fig, ax1 = plt.subplots(1, 1, figsize=(14, 6))
 
     if show_latency:
-        ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8)
-        ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8)
-        ax1.set_title('Max Latency Comparison')
-        ax1.set_ylabel('Max latency (µs)')
-        ax1.legend([f'{label1}  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
-                    f'{label2}  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)'],
-                   fontsize=8, loc='upper right')
+        if mode == "overlay":
+            ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8)
+            ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8)
+        else:
+            ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8)
+            ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8)
+            ax1.set_title('Max Latency Comparison')
+            ax1.set_ylabel('Max latency (µs)')
+            ax1.legend([f'{label1}  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
+                        f'{label2}  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)'],
+                       fontsize=8, loc='upper right')
 
     if show_jitter:
-        target_ax = ax2 if mode == "combined" else ax1
-        target_ax.plot(df1['group_index'], df1['jitter_us'], 'b-', linewidth=1, alpha=0.8)
-        target_ax.plot(df2['group_index'], df2['jitter_us'], 'r-', linewidth=1, alpha=0.8)
-        target_ax.set_title('Jitter Comparison' if mode == "combined" else 'Max Latency & Jitter Comparison')
-        target_ax.set_ylabel('Jitter (µs)' if mode == "combined" else 'µs')
-        target_ax.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
-                          f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
-                         fontsize=8, loc='upper right')
+        if mode == "overlay":
+            ax1.plot(df1['group_index'], df1['jitter_us'], 'b--', linewidth=1, alpha=0.7)
+            ax1.plot(df2['group_index'], df2['jitter_us'], 'r--', linewidth=1, alpha=0.7)
+            ax1.set_title('Max Latency & Jitter Comparison')
+            ax1.set_ylabel('µs')
+            ax1.legend([f'{label1} max  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
+                        f'{label2} max  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)',
+                        f'{label1} rms  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
+                        f'{label2} rms  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
+                       fontsize=8, loc='upper right')
+        elif mode == "combined":
+            ax2.plot(df1['group_index'], df1['jitter_us'], 'b-', linewidth=1, alpha=0.8)
+            ax2.plot(df2['group_index'], df2['jitter_us'], 'r-', linewidth=1, alpha=0.8)
+            ax2.set_title('Jitter Comparison')
+            ax2.set_ylabel('Jitter (µs)')
+            ax2.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
+                        f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
+                       fontsize=8, loc='upper right')
+        else:
+            ax1.plot(df1['group_index'], df1['jitter_us'], 'b-', linewidth=1, alpha=0.8)
+            ax1.plot(df2['group_index'], df2['jitter_us'], 'r-', linewidth=1, alpha=0.8)
+            ax1.set_title('Jitter Comparison')
+            ax1.set_ylabel('Jitter (µs)')
+            ax1.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
+                        f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
+                       fontsize=8, loc='upper right')
 
     plt.tight_layout()
     if output:
@@ -928,8 +949,8 @@ def main():
     parser_comp = subparsers.add_parser('compare', help='Compare latency/jitter between two sessions')
     parser_comp.add_argument('session_id_1', type=int, help='First session ID')
     parser_comp.add_argument('session_id_2', type=int, help='Second session ID')
-    parser_comp.add_argument('--mode', choices=['combined', 'latency', 'jitter'], default='combined',
-                            help='What to compare: combined (default), latency only, or jitter only')
+    parser_comp.add_argument('--mode', choices=['combined', 'latency', 'jitter', 'overlay'], default='combined',
+                            help='What to compare: combined (default), latency only, jitter only, or overlay (both on one graph)')
     
     args = parser.parse_args()
     
