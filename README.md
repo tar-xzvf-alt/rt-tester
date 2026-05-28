@@ -16,7 +16,7 @@
 
 [Код для ПК](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver)
 
-Код на Python управляет измерениями задержек между Arduino Mega и одноплатником, а также узнает у одноплатнику текущую нагрузку на систему во время получения информации об очередной группе. Он подключается к Arduino через последовательный порт, отправляет команды управления и принимает обработанные данные в формате JSON. Программа работает в интерактивном режиме с консольным управлением.
+Код на Python управляет измерениями задержек между Arduino Mega и одноплатником. Подключается к Arduino через последовательный порт, отправляет команды управления и принимает обработанные данные в формате JSON. Программа работает в интерактивном режиме с консольным управлением. Метрики CPU/памяти собираются через Prometheus (node_exporter) и сохраняются в SQLite базу.
 
 После запуска код автоматически ищет подключенную Arduino Mega по доступным COM-портам или запрашивает порт вручную. Установив соединение, программа переходит в режим командной строки, где пользователь может управлять измерениями: запускать сбор данных, останавливать сбор и проверять статус.
 
@@ -88,6 +88,9 @@ exit # завершение сбора
 
 # Автоматическое именование файла: sessionid_board_kernel_interval_worstcount_avg_latency_stress.png
 ./plot_statistics.py arduino_data.db all --session 123456
+
+# Сравнение латентности и джиттера между двумя сессиями (нормализованная ось Y)
+./plot_statistics.py arduino_data.db compare 123456 789012 --output compare.png
 ```
 
 ### Структура базы данных SQLite
@@ -156,15 +159,15 @@ exit # завершение сбора
 Код на Arduino C измеряет задержки в системе связи с SoC. Он отправляет импульсы через пин 7 и принимает ответные сигналы через пин 20 (на Arduino Mega). Для каждого импульса измеряется **время отклика системы** (разница между отправкой сигнала на SoC и получением ответа).
 
 **Параметры измерения (настраиваются через START команду):**
-- `GROUP_SIZE = 1500` измерений в группе (фиксировано)
-- `worst_count` - количество сохраняемых худших задержек (1-25, по умолчанию 25)
-- `measurement_interval_us` - интервал между измерениями (мкс, по умолчанию 300)
+- `measurements_per_group` — количество измерений в группе (200-1500, по умолчанию 1500)
+- `worst_count` — количество худших задержек (авто 5% от `measurements_per_group`)
+- `measurement_interval_us` — интервал между измерениями (мкс, по умолчанию 300)
 
 **Режим работы:**
 - Arduino генерирует меандр с переключением каждые `measurement_interval_us` мкс
 - Прерывание `CHANGE` на входном пине фиксирует момент получения ответа от SoC
-- По команде `START {"session_id":123,"groups":100,"worst_count":25,"interval_us":300}` начинается сбор данных
-- После заполнения группы (1500 измерений) формируется JSON-пакет со статистикой
+- По команде `START {"session_id":123,"groups":100,"worst_count":75,"interval_us":300,"measurements_per_group":1500}` начинается сбор данных
+- После заполнения группы (заданного числа измерений) формируется JSON-пакет со статистикой
 - Данные отправляются на ПК через Serial
 
 После сбора всех N групп программа формирует JSON-пакет со статистикой о группе, который отправляется на ПК автоматически после того как группа из 1500 измерений была проведена.
@@ -203,21 +206,21 @@ exit # завершение сбора
 - Логирование статистики в файл
 
 **Архитектура программы:**
-- `gpio_handler_thread` - обработчик GPIO-событий (реагирует на фронты от Arduino)
-- `metrics_collector_thread` - сбор метрик CPU/памяти по сигналу от GPIO handler
-- `log_writer` - запись статистики групп в лог-файл
+- `gpio_handler_thread` — обработчик GPIO-событий (реагирует на фронты от Arduino)
+- Для Ethernet round-trip тестирования используется `controller-emu` из проекта [rt-supervisor](https://altlinux.space/besogon1238/rt-supervisor) (ветка `polygon`)
 
 **Конфигурация GPIO (различается для разных плат):**
 
 | Платформа | GPIO Chip | Вход (от Arduino) | Выход (ответ) |
 |-----------|-----------|-------------------|---------------|
-| Radxa RK3588 | `/dev/gpiochip3` | GPIO_BANK=1, LINE=2 | GPIO_BANK=1, LINE=3 |
-| Lichee RV Dock | `/dev/gpiochip0` | GPIO_LINE=4, OFFSET=15 | GPIO_LINE=4, OFFSET=12 |
-| Visionfive Starfive v2 | `/dev/gpiochip0` | GPIO_LINE=0, OFFSET=60 | GPIO_LINE=0, OFFSET=61 |
-| БЦВМ АРМ | `/dev/gpiochip0` | GPIO_LINE=0, OFFSET=15 | GPIO_LINE=0, OFFSET=9 |
-| БВЦ АРМ | `/dev/gpiochip0` | ? |? |
-| MangoPI | `/dev/gpiochip0` | GPIO_LINE=0, OFFSET=3 | GPIO_LINE=0, OFFSET=4 |
-| RockPI4 | `/dev/gpiochip4` | GPIO_LINE=4, OFFSET=6 | GPIO_LINE=4, OFFSET=7 |
+| Radxa RK3588 | `/dev/gpiochip3` | BANK=1, LINE=2 | BANK=1, LINE=3 |
+| Lichee RV Dock | `/dev/gpiochip0` | BANK=4, LINE=12 | BANK=4, LINE=16 |
+| Visionfive Starfive v2 | `/dev/gpiochip0` | LINE=60 | LINE=61 |
+| БЦВМ АРМ | `/dev/gpiochip0` | LINE=15 | LINE=9 |
+| БВЦ АРМ | `/dev/gpiochip0` | LINE=0 | LINE=4 |
+| RepkaPI4 | `/dev/gpiochip1` | BANK=6, LINE=13 | BANK=6, LINE=12 |
+| MangoPI | `/dev/gpiochip0` | BANK=1, LINE=3 | BANK=1, LINE=4 |
+| RockPI4 | `/dev/gpiochip4` | LINE=6 | LINE=7 |
 
 ## Утилиты для тестирования
 
@@ -229,69 +232,49 @@ ps -eLo pid,cls,rtprio,cmd | grep SoC # узнать текущий приори
 stress-ng --cpu $(nproc) --vm $(nproc) --vm-bytes 100% & # нагрузка на процессор и память
 ```
 
-## Зависимости (ALT Linux)
+## Prometheus и Grafana
 
-### ПК (receiver + Prometheus + Grafana)
-
-```bash
-apt-get install python3-module-serial python3-module-paramiko \
-    python3-module-requests python3-module-prometheus_client \
-    prometheus grafana
-```
-
-| Пакет | Назначение |
-|-------|-----------|
-| `python3-module-serial` | Связь с Arduino по COM-порту |
-| `python3-module-paramiko` | SSH-подключение к одноплатнику |
-| `python3-module-requests` | Запросы к Prometheus API |
-| `python3-module-prometheus_client` | Prometheus client library |
-| `prometheus` | Сервер сбора метрик |
-| `grafana` | Визуализация (опционально) |
-
-### Одноплатник (SoC)
+**Запуск Prometheus (systemd):**
 
 ```bash
-apt-get install libgpiod2 libgpiod-devel gcc make \
-    prometheus-node_exporter stress-ng
+sudo cp prometheus/prometheus.yml /etc/prometheus/prometheus.yml
+sudo systemctl restart prometheus
 ```
 
-| Пакет | Назначение |
-|-------|-----------|
-| `libgpiod2` | GPIO-библиотека |
-| `libgpiod-devel` | Заголовки GPIO для сборки |
-| `gcc` / `make` | Компиляция C-кода |
-| `prometheus-node_exporter` | Экспорт метрик CPU/памяти (опционально) |
-| `stress-ng` | Нагрузочное тестирование |
+Конфигурация в `prometheus/prometheus.yml`:
+- Scrape interval: 500ms
+- node_exporter на SoC: `<IP_SOC>:9100`
+- receiver metrics server: `localhost:9101`
+- Retention: размерный (10GB) в systemd override
 
-### Arduino
+**Импорт дашборда Grafana:**
 
 ```bash
-apt-get install arduino-core avr-gcc
+curl -X POST http://admin:admin@localhost:3000/api/dashboards/db \
+  -H "Content-Type: application/json" \
+  -d "{\"dashboard\":$(cat grafana/rt-tester-dashboard.json),\"overwrite\":true}"
 ```
-
-| Пакет | Назначение |
-|-------|-----------|
-| `arduino-core` | Ядро Arduino |
-| `avr-gcc` | Компилятор для AVR (Arduino Mega) |
 
 ## Методика испытаний
 
 На текущий момент методику испытаний можно описать так:
 
 0. Прошивка Arduino
-1. Компиляция и запуск программы на одноплатнике(приоритет потока отвечающего на импульсы автоматически равен 80)
-2. Изменение приоритета прерывания, по которому срабатывает Arduino передает сигналы
-3. (Опциональный) Нагрузка системы с помощью stress-ng
-4. Конфигурация настроечного файла в зависимости от цели испытания:
-   - на каждую сессию 2500 групп с целью проведения испытаний длительностью около 30 минут,
-   - количество отбираемых худших задержек 125 (5% от 2500), 
-   - временной порог ответов для ненагруженной системы 75 мкс, для нагруженной 250. 
-5. Запуск *receiver.py* с указанием параметра --params
-6. Цикл сбора данных:
+1. Запуск `controller-emu` + `alt-rt-supervisor` на одноплатнике (через `cmake --build Build --target run` в rt-supervisor)
+2. (Опциональный) Нагрузка системы с помощью stress-ng
+3. Конфигурация настроечного файла:
+   - `measurements-per-group` — количество измерений в группе (200-1500)
+   - `measurement-interval-us` — интервал между импульсами
+   - `auto-stop-groups` — количество групп до автоостановки
+   - `worst-count` рассчитывается автоматически (5% от группы)
+   - временной порог ответов для ненагруженной системы 75 мкс, для нагруженной 250
+4. Запуск *receiver.py* с указанием параметра --params
+5. Цикл сбора данных:
   - Подача команды start
   - Ожидание автоматического завершения сессии
-  - Фиксация номера сессии для дальнейшей визаулизации
+  - Фиксация номера сессии для дальнейшей визуализации
   - Подача команды exit
-7. Запуск *plot_statistics* для получения результатов сессии, указывая --limit 75 для сессий без нагрузок и --limit 250 для сессий с нагрузкой.
+6. Запуск *plot_statistics* для получения результатов сессии, указывая --limit 75 для сессий без нагрузок и --limit 250 для сессий с нагрузкой.
+7. Данные доступны в Grafana (в реальном времени) и через plot_statistics (post-hoc анализ)
 
 [Пример артефактов после обработки одной сессии](https://altlinux.space/besogon1238/rt-tester/src/branch/main/tests/examples/)
