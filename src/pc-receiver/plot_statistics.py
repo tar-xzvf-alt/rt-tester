@@ -823,6 +823,70 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
     print("="*80)
 
 
+def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
+                         output: str = None, top_n: int = 125,
+                         threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
+    """Compare latency and jitter between two sessions with normalized Y-axis."""
+    df1 = get_latency_stats(db_path, session_id_1, top_n, threshold_us)
+    df2 = get_latency_stats(db_path, session_id_2, top_n, threshold_us)
+
+    if df1 is None or df1.empty:
+        print(f"No data for session {session_id_1}")
+        return
+    if df2 is None or df2.empty:
+        print(f"No data for session {session_id_2}")
+        return
+
+    info1 = get_session_info(db_path, session_id_1, threshold_us)
+    info2 = get_session_info(db_path, session_id_2, threshold_us)
+
+    label1 = f"S{str(session_id_1)[-3:]}"
+    label2 = f"S{str(session_id_2)[-3:]}"
+
+    def normalize(s):
+        mn, mx = s.min(), s.max()
+        if mx > mn:
+            return (s - mn) / (mx - mn)
+        return s
+
+    norm_lat1 = normalize(df1['avg_latency_us'])
+    norm_lat2 = normalize(df2['avg_latency_us'])
+    norm_max1 = normalize(df1['max_latency_us'])
+    norm_max2 = normalize(df2['max_latency_us'])
+    norm_jit1 = normalize(df1['jitter_us'])
+    norm_jit2 = normalize(df2['jitter_us'])
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Latency comparison
+    ax1.plot(df1['group_index'], norm_lat1, 'b-', linewidth=1, alpha=0.7)
+    ax1.plot(df2['group_index'], norm_lat2, 'r-', linewidth=1, alpha=0.7)
+    ax1.plot(df1['group_index'], norm_max1, 'b--', linewidth=0.7, alpha=0.5)
+    ax1.plot(df2['group_index'], norm_max2, 'r--', linewidth=0.7, alpha=0.5)
+    ax1.set_title('Latency Comparison (normalized)')
+    ax1.set_ylabel('Normalized latency')
+    ax1.legend([f'{label1} avg ({df1["avg_latency_us"].min():.0f}–{df1["avg_latency_us"].max():.0f} µs)',
+                f'{label2} avg ({df2["avg_latency_us"].min():.0f}–{df2["avg_latency_us"].max():.0f} µs)',
+                f'{label1} max', f'{label2} max'],
+               fontsize=8)
+
+    # Jitter comparison
+    ax2.plot(df1['group_index'], norm_jit1, 'b-', linewidth=1, alpha=0.7)
+    ax2.plot(df2['group_index'], norm_jit2, 'r-', linewidth=1, alpha=0.7)
+    ax2.set_title('Jitter Comparison (normalized)')
+    ax2.set_ylabel('Normalized jitter')
+    ax2.legend([f'{label1} ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
+                f'{label2} ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
+               fontsize=8)
+
+    plt.tight_layout()
+    if output:
+        plt.savefig(output, dpi=150, bbox_inches='tight')
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
+
+
 def main():
     """Main entry point with command line argument parsing."""
     parser = argparse.ArgumentParser(
@@ -853,6 +917,11 @@ def main():
     parser_details = subparsers.add_parser('details', help='Show detailed session information')
     parser_details.add_argument('session_id', type=int, help='Session ID to show details')
     
+    # Session comparison
+    parser_comp = subparsers.add_parser('compare', help='Compare latency/jitter between two sessions')
+    parser_comp.add_argument('session_id_1', type=int, help='First session ID')
+    parser_comp.add_argument('session_id_2', type=int, help='Second session ID')
+    
     args = parser.parse_args()
     
     if not os.path.exists(args.db):
@@ -875,6 +944,10 @@ def main():
         elif args.command == 'jitter+soc':
             plot_jitter_with_soc(args.db, args.session, args.output, args.limit)
         
+        elif args.command == 'compare':
+            plot_session_compare(args.db, args.session_id_1, args.session_id_2,
+                                args.output, args.top, args.limit)
+        
         else:
             print("Please specify a command. Available commands:")
             print("  all          - comprehensive view (4 plots: latency, jitter, exceeds, SoC)")
@@ -882,6 +955,7 @@ def main():
             print("  jitter+soc   - jitter with SoC overlay and exceeds")
             print("  sessions     - list all sessions with target info and exceed counts")
             print("  details      - show detailed session information")
+            print("  compare      - compare latency/jitter between two sessions (normalized Y-axis)")
             print("\nOptional parameters:")
             print(f"  --limit      - latency threshold in µs (default: {DEFAULT_THRESHOLD_US})")
             print("  --top        - number of worst latencies to analyze")
