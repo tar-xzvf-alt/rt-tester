@@ -832,8 +832,9 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
 
 def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
                          output: str = None, top_n: int = 125,
-                         threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
-    """Compare max latency and jitter between two sessions with normalized Y-axis."""
+                         threshold_us: int = DEFAULT_THRESHOLD_US,
+                         mode: str = "combined") -> None:
+    """Compare latency and jitter between two sessions with real µs values."""
     df1 = get_latency_stats(db_path, session_id_1, top_n, threshold_us)
     df2 = get_latency_stats(db_path, session_id_2, top_n, threshold_us)
 
@@ -857,50 +858,33 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
     label1 = board_label(info1, session_id_1)
     label2 = board_label(info2, session_id_2)
 
-    def normalize(s):
-        mn, mx = s.min(), s.max()
-        if mx > mn:
-            return (s - mn) / (mx - mn)
-        return s
+    show_latency = mode in ("combined", "latency")
+    show_jitter = mode in ("combined", "jitter")
 
-    norm_max1 = normalize(df1['max_latency_us'])
-    norm_max2 = normalize(df2['max_latency_us'])
-    norm_jit1 = normalize(df1['jitter_us'])
-    norm_jit2 = normalize(df2['jitter_us'])
+    if mode == "combined":
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    else:
+        fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+        ax1 = ax2 = ax  # single-plot fallback handled below
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    if show_latency:
+        ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8)
+        ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8)
+        ax1.set_title('Max Latency Comparison')
+        ax1.set_ylabel('Max latency (µs)')
+        ax1.legend([f'{label1}  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
+                    f'{label2}  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)'],
+                   fontsize=8, loc='upper right')
 
-    # Left: max latency comparison (normalized left Y, real µs right Y)
-    real_max_min = min(df1['max_latency_us'].min(), df2['max_latency_us'].min())
-    real_max_max = max(df1['max_latency_us'].max(), df2['max_latency_us'].max())
-
-    ax1.plot(df1['group_index'], norm_max1, 'b-', linewidth=1, alpha=0.8)
-    ax1.plot(df2['group_index'], norm_max2, 'r-', linewidth=1, alpha=0.8)
-    ax1.set_title('Max Latency Comparison (normalized)')
-    ax1.set_ylabel('Normalized')
-    ax1_r = ax1.twinx()
-    ax1_r.set_ylim(real_max_min, real_max_max)
-    ax1_r.set_ylabel('Max latency (µs)')
-    ax1_r.plot([], [])  # dummy to align legend
-    ax1.legend([f'{label1}  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
-                f'{label2}  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)'],
-               fontsize=8, loc='upper right')
-
-    # Right: jitter comparison (normalized left Y, real µs right Y)
-    real_jit_min = min(df1['jitter_us'].min(), df2['jitter_us'].min())
-    real_jit_max = max(df1['jitter_us'].max(), df2['jitter_us'].max())
-
-    ax2.plot(df1['group_index'], norm_jit1, 'b-', linewidth=1, alpha=0.8)
-    ax2.plot(df2['group_index'], norm_jit2, 'r-', linewidth=1, alpha=0.8)
-    ax2.set_title('Jitter Comparison (normalized)')
-    ax2.set_ylabel('Normalized')
-    ax2_r = ax2.twinx()
-    ax2_r.set_ylim(real_jit_min, real_jit_max)
-    ax2_r.set_ylabel('Jitter (µs)')
-    ax2_r.plot([], [])  # dummy to align legend
-    ax2.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
-                f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
-               fontsize=8, loc='upper right')
+    if show_jitter:
+        target_ax = ax2 if mode == "combined" else ax1
+        target_ax.plot(df1['group_index'], df1['jitter_us'], 'b-', linewidth=1, alpha=0.8)
+        target_ax.plot(df2['group_index'], df2['jitter_us'], 'r-', linewidth=1, alpha=0.8)
+        target_ax.set_title('Jitter Comparison' if mode == "combined" else 'Max Latency & Jitter Comparison')
+        target_ax.set_ylabel('Jitter (µs)' if mode == "combined" else 'µs')
+        target_ax.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
+                          f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
+                         fontsize=8, loc='upper right')
 
     plt.tight_layout()
     if output:
@@ -944,6 +928,8 @@ def main():
     parser_comp = subparsers.add_parser('compare', help='Compare latency/jitter between two sessions')
     parser_comp.add_argument('session_id_1', type=int, help='First session ID')
     parser_comp.add_argument('session_id_2', type=int, help='Second session ID')
+    parser_comp.add_argument('--mode', choices=['combined', 'latency', 'jitter'], default='combined',
+                            help='What to compare: combined (default), latency only, or jitter only')
     
     args = parser.parse_args()
     
@@ -969,7 +955,7 @@ def main():
         
         elif args.command == 'compare':
             plot_session_compare(args.db, args.session_id_1, args.session_id_2,
-                                args.output, args.top, args.limit)
+                                args.output, args.top, args.limit, args.mode)
         
         else:
             print("Please specify a command. Available commands:")
@@ -978,7 +964,7 @@ def main():
             print("  jitter+soc   - jitter with SoC overlay and exceeds")
             print("  sessions     - list all sessions with target info and exceed counts")
             print("  details      - show detailed session information")
-            print("  compare      - compare latency/jitter between two sessions (normalized Y-axis)")
+            print("  compare      - compare latency/jitter between two sessions")
             print("\nOptional parameters:")
             print(f"  --limit      - latency threshold in µs (default: {DEFAULT_THRESHOLD_US})")
             print("  --top        - number of worst latencies to analyze")

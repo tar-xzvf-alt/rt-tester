@@ -90,8 +90,12 @@ exit # завершение сбора
 # Автоматическое именование файла: sessionid_board_kernel_interval_worstcount_avg_latency_stress.png
 ./plot_statistics.py arduino_data.db all --session 123456
 
-# Сравнение максимальной латентности и джиттера между двумя сессиями
-./plot_statistics.py --output lichee_radxa_rt_stress_on.png  arduino.db compare 228465 362956 
+# Сравнение латентности и джиттера между двумя сессиями (реальные µs, без нормализации)
+./plot_statistics.py arduino.db compare 228465 362956
+
+# Только латентность или только джиттер
+./plot_statistics.py arduino.db compare 228465 362956 --mode latency
+./plot_statistics.py arduino.db compare 228465 362956 --mode jitter --output jitter_only.png
 ```
 
 ### Структура базы данных SQLite
