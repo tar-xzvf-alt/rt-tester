@@ -826,7 +826,7 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
 def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
                          output: str = None, top_n: int = 125,
                          threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
-    """Compare latency and jitter between two sessions with normalized Y-axis."""
+    """Compare max latency and jitter between two sessions with normalized Y-axis."""
     df1 = get_latency_stats(db_path, session_id_1, top_n, threshold_us)
     df2 = get_latency_stats(db_path, session_id_2, top_n, threshold_us)
 
@@ -840,8 +840,14 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
     info1 = get_session_info(db_path, session_id_1, threshold_us)
     info2 = get_session_info(db_path, session_id_2, threshold_us)
 
-    label1 = f"S{str(session_id_1)[-3:]}"
-    label2 = f"S{str(session_id_2)[-3:]}"
+    def board_label(info, sid):
+        board = info.get('target_board', '?') if info else '?'
+        kernel = info.get('target_kernel', '?') if info else '?'
+        stress = info.get('target_stress', 'off') if info else 'off'
+        return f"[{sid}] {board} / {kernel} / stress={stress}"
+
+    label1 = board_label(info1, session_id_1)
+    label2 = board_label(info2, session_id_2)
 
     def normalize(s):
         mn, mx = s.min(), s.max()
@@ -849,8 +855,6 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
             return (s - mn) / (mx - mn)
         return s
 
-    norm_lat1 = normalize(df1['avg_latency_us'])
-    norm_lat2 = normalize(df2['avg_latency_us'])
     norm_max1 = normalize(df1['max_latency_us'])
     norm_max2 = normalize(df2['max_latency_us'])
     norm_jit1 = normalize(df1['jitter_us'])
@@ -858,26 +862,37 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
 
-    # Latency comparison
-    ax1.plot(df1['group_index'], norm_lat1, 'b-', linewidth=1, alpha=0.7)
-    ax1.plot(df2['group_index'], norm_lat2, 'r-', linewidth=1, alpha=0.7)
-    ax1.plot(df1['group_index'], norm_max1, 'b--', linewidth=0.7, alpha=0.5)
-    ax1.plot(df2['group_index'], norm_max2, 'r--', linewidth=0.7, alpha=0.5)
-    ax1.set_title('Latency Comparison (normalized)')
-    ax1.set_ylabel('Normalized latency')
-    ax1.legend([f'{label1} avg ({df1["avg_latency_us"].min():.0f}–{df1["avg_latency_us"].max():.0f} µs)',
-                f'{label2} avg ({df2["avg_latency_us"].min():.0f}–{df2["avg_latency_us"].max():.0f} µs)',
-                f'{label1} max', f'{label2} max'],
-               fontsize=8)
+    # Left: max latency comparison (normalized left Y, real µs right Y)
+    real_max_min = min(df1['max_latency_us'].min(), df2['max_latency_us'].min())
+    real_max_max = max(df1['max_latency_us'].max(), df2['max_latency_us'].max())
 
-    # Jitter comparison
-    ax2.plot(df1['group_index'], norm_jit1, 'b-', linewidth=1, alpha=0.7)
-    ax2.plot(df2['group_index'], norm_jit2, 'r-', linewidth=1, alpha=0.7)
+    ax1.plot(df1['group_index'], norm_max1, 'b-', linewidth=1, alpha=0.8)
+    ax1.plot(df2['group_index'], norm_max2, 'r-', linewidth=1, alpha=0.8)
+    ax1.set_title('Max Latency Comparison (normalized)')
+    ax1.set_ylabel('Normalized')
+    ax1_r = ax1.twinx()
+    ax1_r.set_ylim(real_max_min, real_max_max)
+    ax1_r.set_ylabel('Max latency (µs)')
+    ax1_r.plot([], [])  # dummy to align legend
+    ax1.legend([f'{label1}  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
+                f'{label2}  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)'],
+               fontsize=8, loc='upper right')
+
+    # Right: jitter comparison (normalized left Y, real µs right Y)
+    real_jit_min = min(df1['jitter_us'].min(), df2['jitter_us'].min())
+    real_jit_max = max(df1['jitter_us'].max(), df2['jitter_us'].max())
+
+    ax2.plot(df1['group_index'], norm_jit1, 'b-', linewidth=1, alpha=0.8)
+    ax2.plot(df2['group_index'], norm_jit2, 'r-', linewidth=1, alpha=0.8)
     ax2.set_title('Jitter Comparison (normalized)')
-    ax2.set_ylabel('Normalized jitter')
-    ax2.legend([f'{label1} ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
-                f'{label2} ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
-               fontsize=8)
+    ax2.set_ylabel('Normalized')
+    ax2_r = ax2.twinx()
+    ax2_r.set_ylim(real_jit_min, real_jit_max)
+    ax2_r.set_ylabel('Jitter (µs)')
+    ax2_r.plot([], [])  # dummy to align legend
+    ax2.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
+                f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
+               fontsize=8, loc='upper right')
 
     plt.tight_layout()
     if output:
