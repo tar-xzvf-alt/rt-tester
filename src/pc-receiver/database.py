@@ -148,6 +148,7 @@ def init_database(db_path: str) -> None:
                 target_board TEXT,
                 target_kernel TEXT,
                 target_stress TEXT,
+                target_payload TEXT DEFAULT 'off',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 UNIQUE(session_id, group_index)
             )
@@ -166,6 +167,11 @@ def init_database(db_path: str) -> None:
         
         try:
             cursor.execute("ALTER TABLE groups ADD COLUMN target_stress TEXT")
+        except sqlite3.OperationalError:
+            pass
+        
+        try:
+            cursor.execute("ALTER TABLE groups ADD COLUMN target_payload TEXT DEFAULT 'off'")
         except sqlite3.OperationalError:
             pass
         
@@ -317,7 +323,8 @@ def _migrate_events_tables(conn: sqlite3.Connection) -> None:
 
 def save_group_data(db_path: str, data: dict, current_time_us: int,
                     target_board: str = "unknown", target_kernel: str = "unknown",
-                    target_stress: str = "off") -> Optional[int]:
+                    target_stress: str = "off",
+                    target_payload: str = "off") -> Optional[int]:
     """
     Save group data and worst latencies to database using transaction.
     """
@@ -336,8 +343,8 @@ def save_group_data(db_path: str, data: dict, current_time_us: int,
             INSERT OR REPLACE INTO groups 
             (session_id, group_index, pc_timestamp, pc_timestamp_us, arduino_timestamp,
              jitter_us, delay_us, measurements_per_group, worst_count,
-             target_board, target_kernel, target_stress)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+             target_board, target_kernel, target_stress, target_payload)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('session_id', 0),
             data['group_index'],
@@ -350,7 +357,8 @@ def save_group_data(db_path: str, data: dict, current_time_us: int,
             data.get('worst_count', 125),
             target_board,
             target_kernel,
-            target_stress
+            target_stress,
+            target_payload
         ))
         
         # Get inserted group ID
@@ -448,12 +456,15 @@ def save_soc_metrics_from_log(db_path: str, metrics: dict) -> None:
 def save_session_start(db_path: str, session_id: int, auto_stop_groups: int = 0,
                        worst_count: int = 125, interval_us: int = 300,
                        target_board: str = "unknown", target_kernel: str = "unknown",
-                       target_stress: str = "off") -> None:
+                       target_stress: str = "off",
+                       target_payload: str = "off") -> None:
     """
     Save session start event with measurement parameters and target info.
     """
     stress_status = "WITH STRESS" if target_stress == 'on' else "NO STRESS"
+    payload_status = "WITH PAYLOAD" if target_payload == 'on' else "NO PAYLOAD"
     details = (f"Board: {target_board}, Kernel: {target_kernel}, Stress: {stress_status}, "
+               f"Payload: {payload_status}, "
                f"Auto-stop: {auto_stop_groups if auto_stop_groups else 'infinite'}, "
                f"worst_count: {worst_count}, interval: {interval_us} µs")
     save_event(db_path, session_id, "start", None, details)

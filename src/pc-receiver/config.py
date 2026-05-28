@@ -22,6 +22,7 @@ DEFAULT_MEASUREMENTS_PER_GROUP = 1500
 DEFAULT_TARGET_BOARD = "unknown"
 DEFAULT_TARGET_KERNEL = "unknown"
 DEFAULT_TARGET_STRESS = "off"  # on - stress applied, off - no stress
+DEFAULT_TARGET_PAYLOAD = "off"  # on - payload between pulses, off - idle between pulses
 
 AUTO_STOP = 2500
 

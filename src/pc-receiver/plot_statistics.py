@@ -66,6 +66,7 @@ def get_latency_stats(db_path: str, session_id: int = None, top_n: int = 125,
             g.target_board,
             g.target_kernel,
             g.target_stress,
+            g.target_payload,
             l.latency_us,
             l.rank_in_group
         FROM groups g
@@ -94,12 +95,14 @@ def get_latency_stats(db_path: str, session_id: int = None, top_n: int = 125,
         'jitter_us': 'first',
         'target_board': 'first',
         'target_kernel': 'first',
-        'target_stress': 'first'
+        'target_stress': 'first',
+        'target_payload': 'first'
     }).reset_index()
     
     stats.columns = ['group_index', 'avg_latency_us', 'min_latency_us', 
                      'max_latency_us', 'latencies_used', 'jitter_us',
-                     'target_board', 'target_kernel', 'target_stress']
+                     'target_board', 'target_kernel', 'target_stress',
+                     'target_payload']
     
     # Count how many latencies exceed threshold in each group
     df['exceeds_threshold'] = df['latency_us'] > threshold_us
@@ -163,6 +166,7 @@ def get_session_info(db_path: str, session_id: int, threshold_us: int = DEFAULT_
             target_board,
             target_kernel,
             target_stress,
+            target_payload,
             COUNT(*) as groups_count,
             AVG(jitter_us) as avg_jitter,
             MIN(delay_us) as interval_us,
@@ -183,11 +187,12 @@ def get_session_info(db_path: str, session_id: int, threshold_us: int = DEFAULT_
             'target_board': row[3],
             'target_kernel': row[4],
             'target_stress': row[5] if row[5] else 'off',
-            'groups_count': row[6],
-            'avg_jitter': row[7],
-            'interval_us': row[8],
-            'measurements_per_group': row[9],
-            'worst_count': row[10]
+            'target_payload': row[6] if row[6] else 'off',
+            'groups_count': row[7],
+            'avg_jitter': row[8],
+            'interval_us': row[9],
+            'measurements_per_group': row[10],
+            'worst_count': row[11]
         }
         
         # Get fall events count
@@ -784,6 +789,7 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
         return
     
     stress_status = "WITH STRESS" if info['target_stress'] == 'on' else "NO STRESS"
+    payload_status = "WITH PAYLOAD" if info.get('target_payload') == 'on' else "NO PAYLOAD"
     
     print("\n" + "="*80)
     print(f"SESSION DETAILS: {session_id}")
@@ -791,6 +797,7 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
     print(f"Target Board:  {info['target_board']}")
     print(f"Target Kernel: {info['target_kernel']}")
     print(f"Stress State:  {stress_status}")
+    print(f"Payload State: {payload_status}")
     print(f"Start Time:    {info['start_time']}")
     print(f"End Time:      {info['end_time']}")
     print(f"Duration:      {info['groups_count']} groups")
@@ -844,7 +851,8 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
         board = info.get('target_board', '?') if info else '?'
         kernel = info.get('target_kernel', '?') if info else '?'
         stress = info.get('target_stress', 'off') if info else 'off'
-        return f"[{sid}] {board} / {kernel} / stress={stress}"
+        payload = info.get('target_payload', 'off') if info else 'off'
+        return f"[{sid}] {board} / {kernel} / stress={stress} payload={payload}"
 
     label1 = board_label(info1, session_id_1)
     label2 = board_label(info2, session_id_2)

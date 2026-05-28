@@ -63,6 +63,7 @@ class ArduinoCollector:
         self.target_board = config_dict.get('target-board', config.DEFAULT_TARGET_BOARD)
         self.target_kernel = config_dict.get('target-kernel', config.DEFAULT_TARGET_KERNEL)
         self.target_stress = config_dict.get('target-stress', config.DEFAULT_TARGET_STRESS)
+        self.target_payload = config_dict.get('target-payload', config.DEFAULT_TARGET_PAYLOAD)
 
 
         # Auto-stop configuration
@@ -99,11 +100,12 @@ class ArduinoCollector:
         check_sec = check_us / 1_000_000
 
         stress_status = "ON" if self.target_stress == 'on' else "OFF"
+        payload_status = "ON" if self.target_payload == 'on' else "OFF"
 
         print(f"Database initialized: {self.db_path}")
         print(f"  Fall monitoring: timeout {timeout_us:,} µs ({timeout_sec:.1f} sec)")
         print(f"  Check interval: {check_us:,} µs ({check_sec:.1f} sec)")
-        print(f"  Target device: {self.target_board} (kernel: {self.target_kernel}) - Stress: {stress_status}")
+        print(f"  Target device: {self.target_board} (kernel: {self.target_kernel}) - Stress: {stress_status}, Payload: {payload_status}")
         print(f"  Measurement parameters:")
         print(f"    Measurements per group: {self.measurements_per_group}")
         print(f"    Worst count (5%): {self.worst_count}")
@@ -211,7 +213,8 @@ class ArduinoCollector:
                 current_time_us,
                 self.target_board,
                 self.target_kernel,
-                self.target_stress
+                self.target_stress,
+                self.target_payload
             )
             
             if group_id:
@@ -363,12 +366,14 @@ class ArduinoCollector:
             self.measurement_interval_us,
             self.target_board,
             self.target_kernel,
-            self.target_stress
+            self.target_stress,
+            self.target_payload
         )
         
         print(f"Measurement started with session ID: {session_id}")
         stress_status = "WITH STRESS" if self.target_stress == 'on' else "NO STRESS"
-        print(f"  Target: {self.target_board} (kernel: {self.target_kernel}) - {stress_status}")
+        payload_status = "WITH PAYLOAD" if self.target_payload == 'on' else "NO PAYLOAD"
+        print(f"  Target: {self.target_board} (kernel: {self.target_kernel}) - {stress_status}, {payload_status}")
         print(f"  Measurements per group: {self.measurements_per_group}")
         print(f"  Worst count (5%): {self.worst_count}")
         print(f"  Interval: {self.measurement_interval_us} µs")
@@ -382,6 +387,7 @@ class ArduinoCollector:
             self.session_logger.info(f"Target board: {self.target_board}")
             self.session_logger.info(f"Target kernel: {self.target_kernel}")
             self.session_logger.info(f"Target stress: {self.target_stress}")
+            self.session_logger.info(f"Target payload: {self.target_payload}")
             self.session_logger.info(f"Auto-stop groups: {self.auto_stop_groups}")
             self.session_logger.info(f"Worst count: {self.worst_count}")
             self.session_logger.info(f"Measurement interval: {self.measurement_interval_us} µs")

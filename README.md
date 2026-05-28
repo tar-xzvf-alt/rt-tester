@@ -32,7 +32,8 @@
 | `auto-stop-groups` | Автоостановка после N групп (0 = бесконечно) | `2500` |
 | `target-board` | Название тестируемой платы | `unknown` |
 | `target-kernel` | Версия ядра на тестируемой плате | `unknown` |
-| `target-stress` | Наличие нагрузки на плате (`on`/`off`) | `off` |
+| `target-stress` | Наличие системной нагрузки на плате (`on`/`off`) | `off` |
+| `target-payload` | Полезная нагрузка между импульсами (`on`/`off`) | `off` |
 
 **Автоматически рассчитываемые параметры:**
 
@@ -89,8 +90,8 @@ exit # завершение сбора
 # Автоматическое именование файла: sessionid_board_kernel_interval_worstcount_avg_latency_stress.png
 ./plot_statistics.py arduino_data.db all --session 123456
 
-# Сравнение латентности и джиттера между двумя сессиями (нормализованная ось Y)
-./plot_statistics.py arduino_data.db compare 123456 789012 --output compare.png
+# Сравнение максимальной латентности и джиттера между двумя сессиями
+./plot_statistics.py --output lichee_radxa_rt_stress_on.png  arduino.db compare 228465 362956 
 ```
 
 ### Структура базы данных SQLite

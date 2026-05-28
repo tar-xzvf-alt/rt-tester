@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS groups (
     target_board TEXT,
     target_kernel TEXT,
     target_stress TEXT,
+    target_payload TEXT DEFAULT 'off',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(session_id, group_index)
 );
@@ -142,7 +143,8 @@ def merge_all(results_dir, output_db):
         groups_cols = ['session_id', 'group_index', 'pc_timestamp',
                        'pc_timestamp_us', 'arduino_timestamp', 'jitter_us',
                        'delay_us', 'measurements_per_group', 'worst_count',
-                       'target_board', 'target_kernel', 'target_stress']
+                       'target_board', 'target_kernel', 'target_stress',
+                       'target_payload']
 
         latencies_cols = ['group_id', 'latency_us', 'rank_in_group']
         soc_cols = ['session_id', 'group_index', 'pc_timestamp', 'cpu_percent',
