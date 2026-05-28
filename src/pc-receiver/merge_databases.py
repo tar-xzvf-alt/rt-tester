@@ -69,7 +69,8 @@ CREATE TABLE IF NOT EXISTS events (
     event_time_us INTEGER,
     time_since_start_us INTEGER,
     group_index INTEGER,
-    details TEXT
+    details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS schema_version (
