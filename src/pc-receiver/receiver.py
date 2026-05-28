@@ -56,8 +56,8 @@ class ArduinoCollector:
 
         # Auto-calculate timeout and check interval from group duration
         group_duration_us = self.measurement_interval_us * self.measurements_per_group
-        timeout_us = int(config_dict.get('timeout-us', group_duration_us * 2))
-        check_us   = int(config_dict.get('check-interval-us', group_duration_us))
+        timeout_us = int(config_dict.get('timeout-us', group_duration_us * 3))
+        check_us   = int(config_dict.get('check-interval-us', group_duration_us*3))
 
         # Target device information
         self.target_board = config_dict.get('target-board', config.DEFAULT_TARGET_BOARD)
@@ -217,6 +217,22 @@ class ArduinoCollector:
             if group_id:
                 self.groups_received += 1
                 self.last_group_index = group_index
+
+                # Save CPU/memory from node_exporter to SQLite
+                if node_metrics['cpu_percent'] is not None:
+                    metric_entry = {
+                        'session_id': self.current_session_id,
+                        'group_index': msg['group_index'],
+                        'cpu_percent': node_metrics['cpu_percent'],
+                        'memory_percent': node_metrics['memory_percent'] or 0,
+                        'cpu_max': node_metrics['cpu_percent'],
+                        'mem_max': node_metrics['memory_percent'] or 0,
+                        'cpu_avg': node_metrics['cpu_percent'],
+                        'mem_avg': node_metrics['memory_percent'] or 0,
+                        'samples': 1,
+                        'duration_ms': 0,
+                    }
+                    db.save_soc_metrics_from_log(self.db_path, metric_entry)
                 
                 if self.session_logger:
                     self.session_logger.info(f"Group {group_index} received")
