@@ -108,38 +108,76 @@
       "datasource": null,
       "fieldConfig": {
         "defaults": {
-          "color": {"mode": "thresholds"},
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
           "mappings": [],
-          "max": 100,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {"color": "green", "value": null},
-              {"color": "yellow", "value": 70},
-              {"color": "red", "value": 90}
-            ]
-          },
           "unit": "percent"
         }
       },
       "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8},
       "id": 4,
-      "options": {"orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "showThresholdLabels": false, "showThresholdMarkers": true},
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}},
       "targets": [
         {
           "expr": "100 - (avg(irate(node_cpu_seconds_total{mode=\"idle\"}[30s])) * 100)",
-          "legendFormat": "CPU Usage",
-          "refId": "A"
+          "legendFormat": "CPU",
+          "refId": "A",
+          "interval": "5s"
         },
         {
           "expr": "(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100",
-          "legendFormat": "Memory Usage",
-          "refId": "B"
+          "legendFormat": "Memory",
+          "refId": "B",
+          "interval": "5s"
         }
       ],
-      "title": "SoC CPU & Memory Usage (node_exporter)",
-      "type": "gauge"
+      "title": "SoC CPU & Memory Usage",
+      "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {"mode": "palette-classic"},
+          "custom": {"lineWidth": 1},
+          "mappings": [],
+          "unit": "µs"
+        },
+        "overrides": [
+          {
+            "matcher": {"id": "byName", "options": "CPU %"},
+            "properties": [
+              {"id": "unit", "value": "percent"},
+              {"id": "custom.axisPlacement", "value": "right"}
+            ]
+          }
+        ]
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "id": 9,
+      "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}},
+      "targets": [
+        {
+          "expr": "arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"}",
+          "legendFormat": "Avg Latency",
+          "refId": "A",
+          "interval": "500ms"
+        },
+        {
+          "expr": "arduino_latency_max{board=\"$board\", session_id=\"$session_id\"}",
+          "legendFormat": "Max Latency",
+          "refId": "B",
+          "interval": "500ms"
+        },
+        {
+          "expr": "soc_cpu_percent{board=\"$board\", session_id=\"$session_id\"}",
+          "legendFormat": "CPU %",
+          "refId": "C",
+          "interval": "5s"
+        }
+      ],
+      "title": "Latency + CPU Correlation",
+      "type": "timeseries"
     },
     {
       "datasource": null,
@@ -152,7 +190,7 @@
           "unit": "µs"
         }
       },
-      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 24},
       "id": 5,
       "options": {"legend": {"calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom"}},
       "targets": [
@@ -165,70 +203,6 @@
       ],
       "title": "Latency Comparison Across Sessions",
       "type": "timeseries"
-    },
-    {
-      "datasource": null,
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [
-            {"options": {"0": "No Stress", "1": "With Stress"}, "type": "value_mapping"}
-          ],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}
-        }
-      },
-      "gridPos": {"h": 4, "w": 8, "x": 0, "y": 24},
-      "id": 6,
-      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [
-        {
-          "expr": "avg(arduino_session_info{board=\"$board\", session_id=\"$session_id\"})",
-          "refId": "A"
-        }
-      ],
-      "title": "Session Status",
-      "type": "stat"
-    },
-    {
-      "datasource": null,
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]},
-          "unit": "none"
-        }
-      },
-      "gridPos": {"h": 4, "w": 8, "x": 8, "y": 24},
-      "id": 7,
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [
-        {
-          "expr": "count(arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"})",
-          "refId": "A"
-        }
-      ],
-      "title": "Groups Collected",
-      "type": "stat"
-    },
-    {
-      "datasource": null,
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 75}, {"color": "red", "value": 250}]},
-          "unit": "µs"
-        }
-      },
-      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 24},
-      "id": 8,
-      "options": {"colorMode": "value", "graphMode": "area", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto"},
-      "targets": [
-        {
-          "expr": "avg(arduino_latency_avg{board=\"$board\", session_id=\"$session_id\"})",
-          "refId": "A"
-        }
-      ],
-      "title": "Current Avg Latency",
-      "type": "stat"
     }
   ],
   "refresh": "5s",
