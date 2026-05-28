@@ -16,6 +16,7 @@ volatile unsigned long lastMeasurementTime = 0;
 // Measurement parameters
 volatile int worstCount = DEFAULT_WORST_COUNT;
 volatile unsigned long measurementIntervalUs = DEFAULT_MEASUREMENT_INTERVAL_US;
+volatile int measurementsPerGroup = GROUP_SIZE;
 
 volatile uint8_t* portOutputRegisterPin7;
 uint8_t pin7Mask;
@@ -37,7 +38,7 @@ void initPins() {
 }
 
 void onResponse() {
-  if (collectingData && measurementInGroup < GROUP_SIZE) {
+  if (collectingData && measurementInGroup < measurementsPerGroup) {
     unsigned long currentTime = micros();
     unsigned long latency = currentTime - t_start;
 
@@ -47,12 +48,12 @@ void onResponse() {
 }
 
 void sendGroupData() {
-  if (GROUP_SIZE == 0) return;
+  int msrPerGroup = measurementsPerGroup;
+  if (msrPerGroup == 0) msrPerGroup = GROUP_SIZE;
 
-  // Use configurable worstCount
   int actualWorstCount = worstCount;
-  if (actualWorstCount > GROUP_SIZE) {
-    actualWorstCount = GROUP_SIZE;
+  if (actualWorstCount > msrPerGroup) {
+    actualWorstCount = msrPerGroup;
   }
   if (actualWorstCount < 1) {
     actualWorstCount = 1;
@@ -64,7 +65,7 @@ void sendGroupData() {
   }
   
   // Find N worst latency values
-  for (int i = 0; i < GROUP_SIZE; i++) {
+  for (int i = 0; i < msrPerGroup; i++) {
     unsigned long currentLatency = currentGroupLatency[i];
     
     for (int j = 0; j < actualWorstCount; j++) {
@@ -91,18 +92,18 @@ void sendGroupData() {
   
   // Calculate mean latency for jitter
   unsigned long sumAllLatency = 0;
-  for (int i = 0; i < GROUP_SIZE; i++) {
+  for (int i = 0; i < msrPerGroup; i++) {
     sumAllLatency += currentGroupLatency[i];
   }
-  float meanLatency = (float)sumAllLatency / GROUP_SIZE;
+  float meanLatency = (float)sumAllLatency / msrPerGroup;
   
   // Calculate RMS jitter (standard deviation)
   float sumSquaredDiff = 0;
-  for (int i = 0; i < GROUP_SIZE; i++) {
+  for (int i = 0; i < msrPerGroup; i++) {
     float diff = currentGroupLatency[i] - meanLatency;
     sumSquaredDiff += diff * diff;
   }
-  float rmsJitter = sqrt(sumSquaredDiff / GROUP_SIZE);
+  float rmsJitter = sqrt(sumSquaredDiff / msrPerGroup);
   
   // Form JSON
   StaticJsonDocument<1024> doc;  // Increased size for variable worst count
@@ -124,7 +125,7 @@ void sendGroupData() {
   
   JsonObject params = doc.createNestedObject("parameters");
   params["interval_us"] = measurementIntervalUs;
-  params["measurements_per_group"] = GROUP_SIZE;
+  params["measurements_per_group"] = msrPerGroup;
   params["max_groups"] = maxGroups;
   
   serializeJson(doc, Serial);

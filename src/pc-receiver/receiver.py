@@ -43,10 +43,22 @@ class ArduinoCollector:
         self.is_collecting = False
 
         # Measurement parameters
-        self.worst_count = config_dict.get('worst-count', config.DEFAULT_WORST_COUNT)
-        self.measurement_interval_us = config_dict.get('measurement-interval-us', 
+        self.measurements_per_group = int(
+            config_dict.get('measurements-per-group',
+                          config.DEFAULT_MEASUREMENTS_PER_GROUP))
+        self.measurements_per_group = max(200, min(1500, self.measurements_per_group))
+
+        self.measurement_interval_us = config_dict.get('measurement-interval-us',
                                                        config.DEFAULT_MEASUREMENT_INTERVAL_US)
-        
+
+        # Auto-calculate worst_count: 5% of measurements per group (min 1)
+        self.worst_count = max(1, int(self.measurements_per_group * 0.05))
+
+        # Auto-calculate timeout and check interval from group duration
+        group_duration_us = self.measurement_interval_us * self.measurements_per_group
+        timeout_us = int(config_dict.get('timeout-us', group_duration_us * 2))
+        check_us   = int(config_dict.get('check-interval-us', group_duration_us))
+
         # Target device information
         self.target_board = config_dict.get('target-board', config.DEFAULT_TARGET_BOARD)
         self.target_kernel = config_dict.get('target-kernel', config.DEFAULT_TARGET_KERNEL)
@@ -65,12 +77,12 @@ class ArduinoCollector:
         
         # Setup fall monitor
         self.fall_monitor = FallMonitor(
-            timeout_us=config_dict['timeout-us'],
+            timeout_us=timeout_us,
             on_fall=self._on_fall_detected,
             on_recovery=self._on_recovery_detected
         )
         
-        self.check_interval_us = config_dict['check-interval-us']
+        self.check_interval_us = check_us
         
         # Initialize metrics server for Prometheus
         self.metrics_server = MetricsServer(port=9101)
@@ -81,19 +93,20 @@ class ArduinoCollector:
     
     def _print_init_info(self):
         """Print initialization information."""
-        timeout_us = self.config['timeout-us']
-        check_us = self.config['check-interval-us']
+        timeout_us = self.fall_monitor.timeout_us
+        check_us = self.check_interval_us
         timeout_sec = timeout_us / 1_000_000
         check_sec = check_us / 1_000_000
-        
+
         stress_status = "ON" if self.target_stress == 'on' else "OFF"
-        
+
         print(f"Database initialized: {self.db_path}")
         print(f"  Fall monitoring: timeout {timeout_us:,} µs ({timeout_sec:.1f} sec)")
         print(f"  Check interval: {check_us:,} µs ({check_sec:.1f} sec)")
         print(f"  Target device: {self.target_board} (kernel: {self.target_kernel}) - Stress: {stress_status}")
         print(f"  Measurement parameters:")
-        print(f"    Worst count: {self.worst_count}")
+        print(f"    Measurements per group: {self.measurements_per_group}")
+        print(f"    Worst count (5%): {self.worst_count}")
         print(f"    Measurement interval: {self.measurement_interval_us} µs")
         
         if self.auto_stop_groups:
@@ -306,7 +319,8 @@ class ArduinoCollector:
             "session_id": session_id,
             "groups": self.auto_stop_groups if self.auto_stop_groups else 0,
             "worst_count": self.worst_count,
-            "interval_us": self.measurement_interval_us
+            "interval_us": self.measurement_interval_us,
+            "measurements_per_group": self.measurements_per_group
         }
         
         cmd = f"START {json.dumps(params)}"
@@ -339,7 +353,9 @@ class ArduinoCollector:
         print(f"Measurement started with session ID: {session_id}")
         stress_status = "WITH STRESS" if self.target_stress == 'on' else "NO STRESS"
         print(f"  Target: {self.target_board} (kernel: {self.target_kernel}) - {stress_status}")
-        print(f"  Parameters: worst_count={self.worst_count}, interval={self.measurement_interval_us} µs")
+        print(f"  Measurements per group: {self.measurements_per_group}")
+        print(f"  Worst count (5%): {self.worst_count}")
+        print(f"  Interval: {self.measurement_interval_us} µs")
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
         

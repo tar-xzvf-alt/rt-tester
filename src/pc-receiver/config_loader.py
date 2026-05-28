@@ -76,7 +76,7 @@ def load_config(config_path=None):
         'timeout-us': config.DEFAULT_TIMEOUT_US,
         'check-interval-us': config.DEFAULT_CHECK_INTERVAL_US,
         'auto-stop-groups': config.AUTO_STOP,
-        'worst-count': config.DEFAULT_WORST_COUNT,
+        'measurements-per-group': config.DEFAULT_MEASUREMENTS_PER_GROUP,
         'measurement-interval-us': config.DEFAULT_MEASUREMENT_INTERVAL_US,
         'target-board': config.DEFAULT_TARGET_BOARD,
         'target-kernel': config.DEFAULT_TARGET_KERNEL,
@@ -96,7 +96,7 @@ def load_config(config_path=None):
             
             # Update global parameters
             for key in ['db', 'timeout-us', 'check-interval-us', 'auto-stop-groups',
-                        'worst-count', 'measurement-interval-us',
+                        'measurements-per-group', 'measurement-interval-us',
                         'target-board', 'target-kernel', 'target-stress']:
                 if key in file_config:
                     config_dict[key] = file_config[key]
@@ -124,9 +124,7 @@ def load_config(config_path=None):
             
             print(f"Loaded configuration from: {config_path}")
             print(f"  db = {config_dict['db']}")
-            print(f"  timeout-us = {config_dict['timeout-us']:,} µs ({config_dict['timeout-us']/1_000_000:.1f} sec)")
-            print(f"  check-interval-us = {config_dict['check-interval-us']:,} µs ({config_dict['check-interval-us']/1_000_000:.1f} sec)")
-            print(f"  worst-count = {config_dict['worst-count']}")
+            print(f"  measurements-per-group = {config_dict['measurements-per-group']}")
             print(f"  measurement-interval-us = {config_dict['measurement-interval-us']} µs")
             print(f"  target-board = {config_dict['target-board']}")
             print(f"  target-kernel = {config_dict['target-kernel']}")
@@ -136,13 +134,6 @@ def load_config(config_path=None):
                 print(f"  auto-stop-groups = {config_dict['auto-stop-groups']} groups")
             else:
                 print(f"  auto-stop-groups = disabled")
-            
-            if config_dict['soc']['enabled']:
-                print(f"  SoC monitoring: ENABLED")
-                print(f"    host: {config_dict['soc']['host']}")
-                print(f"    user: {config_dict['soc']['username']}")
-            else:
-                print(f"  SoC monitoring: DISABLED")
             
         except Exception as e:
             print(f"Warning: Error loading config: {e}")

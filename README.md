@@ -27,20 +27,26 @@
 | Параметр | Описание | Значение по умолчанию |
 |----------|----------|---------------------|
 | `db` | Путь к файлу базы данных SQLite | `./arduino_data.db` |
-| `timeout-us` | Таймаут падения системы (мкс) | `2000000` (2 сек) |
-| `check-interval-us` | Интервал проверки падений (мкс) | `2000000` (2 сек) |
-| `auto-stop-groups` | Автоостановка после N групп (0 = бесконечно) | `1000` |
-| `worst-count` | Количество сохраняемых худших задержек (1-25) | `25` |
+| `measurements-per-group` | Количество измерений в группе (200-1500) | `1500` |
 | `measurement-interval-us` | Интервал между измерениями (мкс) | `300` |
+| `auto-stop-groups` | Автоостановка после N групп (0 = бесконечно) | `2500` |
 | `target-board` | Название тестируемой платы | `unknown` |
 | `target-kernel` | Версия ядра на тестируемой плате | `unknown` |
 | `target-stress` | Наличие нагрузки на плате (`on`/`off`) | `off` |
 
-Секция `[soc]` содержит параметры SSH-подключения к тестируемой плате:
-- `host` - IP-адрес или hostname
-- `port` - порт SSH (по умолчанию 22)
-- `username` - имя пользователя
-- `password` - пароль
+**Автоматически рассчитываемые параметры:**
+
+| Параметр | Формула | Пример (1500 × 300 µs) |
+|----------|---------|----------------------|
+| `worst-count` | 5% от `measurements-per-group` (мин. 1) | 75 |
+| `timeout-us` | `group_duration × 2` | 900,000 µs (0.9 сек) |
+| `check-interval-us` | `group_duration` | 450,000 µs (0.45 сек) |
+
+где `group_duration = measurements-per-group × measurement-interval-us`.
+
+Если `timeout-us` или `check-interval-us` **явно указаны** в конфигурации — используются ручные значения вместо авто-расчёта.
+
+Секция `[soc]` больше не используется — метрики CPU/памяти собираются через node_exporter.
 
 Когда Arduino отправляет обработанные данные, скрипт [receiver](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver/receiver.py) парсит JSON, и сохраняет данные в SQLite базу, из которой может быть выгружена для визуализации отдельным скриптом [plot_statistics](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver/plot_statistics.py).
 
