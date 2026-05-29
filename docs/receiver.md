@@ -64,6 +64,15 @@ exit  # завершение сбора
 # График джиттера с наложением загрузки SoC и гистограммой превышений
 ./plot_statistics.py arduino_data.db jitter+soc --session 123456 --limit 250
 
+# Только график латентности (без SoC)
+./plot_statistics.py arduino_data.db latency --session 123456
+
+# Только график джиттера (без SoC)
+./plot_statistics.py arduino_data.db jitter --session 123456
+
+# Сравнение с нормализацией по оси Y ([0,1])
+./plot_statistics.py arduino.db compare 228465 362956 --normalize
+
 # Автоматическое именование файла: sessionid_board_kernel_interval_worstcount_avg_latency_stress.png
 ./plot_statistics.py arduino_data.db all --session 123456
 

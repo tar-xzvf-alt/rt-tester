@@ -574,6 +574,109 @@ def plot_latency_with_soc(db_path: str, session_id: int = None,
 
 
 
+def plot_latency_only(db_path: str, session_id: int = None,
+                       output: str = None, top_n: int = 125,
+                       threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
+    """Plot latency for a single session (avg + max, no SoC overlay)."""
+    latency_stats = get_latency_stats(db_path, session_id, top_n, threshold_us)
+
+    if latency_stats is None or latency_stats.empty:
+        print("No latency data to display")
+        return
+
+    session_info = get_session_info(db_path, session_id, threshold_us) if session_id else None
+
+    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+
+    groups = latency_stats['group_index']
+
+    color = 'tab:blue'
+    ax.set_xlabel('Group Number')
+    ax.set_ylabel('Latency (µs)', color=color)
+    ax.plot(groups, latency_stats['avg_latency_us'], color=color,
+            linewidth=1.5, label='Average Latency')
+    ax.fill_between(groups, latency_stats['avg_latency_us'],
+                    latency_stats['max_latency_us'],
+                    alpha=0.2, color=color, label='Max Latency Range')
+    ax.axhline(y=threshold_us, color='red', linestyle='--',
+               linewidth=1.5, label=f'Threshold: {threshold_us} µs', alpha=0.7)
+
+    overall_avg = latency_stats['avg_latency_us'].mean()
+    ax.axhline(y=overall_avg, color='darkblue', linestyle=':',
+               linewidth=1.5, label=f'Overall Avg: {overall_avg:.1f} µs')
+    ax.tick_params(axis='y', labelcolor=color)
+    ax.grid(True, alpha=0.3)
+
+    title = 'Latency Analysis'
+    if session_info:
+        stress_status = "WITH STRESS" if session_info['target_stress'] == 'on' else "NO STRESS"
+        title = (f"Latency — {session_info['target_board']} / "
+                 f"{session_info['target_kernel']} / {stress_status}")
+
+    ax.set_title(title)
+    ax.legend(loc='upper left')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    plt.tight_layout()
+
+    if not output and session_id:
+        output = generate_plot_filename(db_path, session_id, "latency", threshold_us)
+    if output:
+        plt.savefig(output, dpi=150, bbox_inches='tight')
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
+
+
+def plot_jitter_only(db_path: str, session_id: int = None,
+                     output: str = None, top_n: int = 125,
+                     threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
+    """Plot jitter for a single session (no SoC overlay)."""
+    latency_stats = get_latency_stats(db_path, session_id, top_n, threshold_us)
+
+    if latency_stats is None or latency_stats.empty:
+        print("No jitter data to display")
+        return
+
+    session_info = get_session_info(db_path, session_id, threshold_us) if session_id else None
+
+    fig, ax = plt.subplots(1, 1, figsize=(14, 6))
+
+    groups = latency_stats['group_index']
+    color = 'tab:green'
+
+    ax.set_xlabel('Group Number')
+    ax.set_ylabel('Jitter (µs)', color=color)
+    ax.plot(groups, latency_stats['jitter_us'], color=color,
+            linewidth=1.5, label='RMS Jitter')
+    ax.tick_params(axis='y', labelcolor=color)
+    ax.grid(True, alpha=0.3)
+
+    overall_jit = latency_stats['jitter_us'].mean()
+    ax.axhline(y=overall_jit, color='darkgreen', linestyle=':',
+               linewidth=1.5, label=f'Overall Avg Jitter: {overall_jit:.1f} µs')
+
+    title = 'Jitter Analysis'
+    if session_info:
+        stress_status = "WITH STRESS" if session_info['target_stress'] == 'on' else "NO STRESS"
+        title = (f"Jitter — {session_info['target_board']} / "
+                 f"{session_info['target_kernel']} / {stress_status}")
+
+    ax.set_title(title)
+    ax.legend(loc='upper left')
+    ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+
+    plt.tight_layout()
+
+    if not output and session_id:
+        output = generate_plot_filename(db_path, session_id, "jitter", threshold_us)
+    if output:
+        plt.savefig(output, dpi=150, bbox_inches='tight')
+        print(f"Plot saved to {output}")
+    else:
+        plt.show()
+
+
 def plot_jitter_with_soc(db_path: str, session_id: int = None, 
                          output: str = None,
                          threshold_us: int = DEFAULT_THRESHOLD_US) -> None:
@@ -833,8 +936,9 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
 def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
                          output: str = None, top_n: int = 125,
                          threshold_us: int = DEFAULT_THRESHOLD_US,
-                         mode: str = "combined") -> None:
-    """Compare latency and jitter between two sessions with real µs values."""
+                         mode: str = "combined",
+                         normalize: bool = False) -> None:
+    """Compare latency and jitter between two sessions."""
     df1 = get_latency_stats(db_path, session_id_1, top_n, threshold_us)
     df2 = get_latency_stats(db_path, session_id_2, top_n, threshold_us)
 
@@ -851,15 +955,35 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
     def board_label(info, sid):
         board = info.get('target_board', '?') if info else '?'
         kernel = info.get('target_kernel', '?') if info else '?'
-        stress = info.get('target_stress', 'off') if info else 'off'
-        payload = info.get('target_payload', 'off') if info else 'off'
-        return f"[{sid}] {board} / {kernel} / stress={stress} payload={payload}"
+        return f"[{sid}] {board} / {kernel}"
 
     label1 = board_label(info1, session_id_1)
     label2 = board_label(info2, session_id_2)
 
     show_latency = mode in ("combined", "latency", "overlay")
     show_jitter  = mode in ("combined", "jitter", "overlay")
+
+    # Save original ranges for legend before normalization
+    max1_range = (df1['max_latency_us'].min(), df1['max_latency_us'].max())
+    max2_range = (df2['max_latency_us'].min(), df2['max_latency_us'].max())
+    jit1_range = (df1['jitter_us'].min(), df1['jitter_us'].max())
+    jit2_range = (df2['jitter_us'].min(), df2['jitter_us'].max())
+
+    # In combined mode, normalize both graphs to [0,1] for visual comparability
+    do_normalize = normalize
+    if do_normalize:
+        def scale(s):
+            mn, mx = s.min(), s.max()
+            return (s - mn) / (mx - mn) if mx > mn else s
+        df1 = df1.copy()
+        df2 = df2.copy()
+        df1['max_latency_us'] = scale(df1['max_latency_us'])
+        df2['max_latency_us'] = scale(df2['max_latency_us'])
+        df1['jitter_us'] = scale(df1['jitter_us'])
+        df2['jitter_us'] = scale(df2['jitter_us'])
+        ylabel = 'Normalized'
+    else:
+        ylabel = 'µs'
 
     if mode == "combined":
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
@@ -868,46 +992,61 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
 
     if show_latency:
         if mode == "overlay":
-            ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8)
-            ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8)
+            ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8,
+                    label=f'{label1} max  ({max1_range[0]:.0f}–{max1_range[1]:.0f} µs)')
+            ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8,
+                    label=f'{label2} max  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)')
         else:
             ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8)
             ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8)
             ax1.set_title('Max Latency Comparison')
-            ax1.set_ylabel('Max latency (µs)')
-            ax1.legend([f'{label1}  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
-                        f'{label2}  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)'],
+            ax1.set_ylabel(f'Max latency ({ylabel})')
+            ax1.legend([f'{label1}  ({max1_range[0]:.0f}–{max1_range[1]:.0f} µs)',
+                        f'{label2}  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)'],
                        fontsize=8, loc='upper right')
 
     if show_jitter:
         if mode == "overlay":
-            ax1.plot(df1['group_index'], df1['jitter_us'], 'b--', linewidth=1, alpha=0.7)
-            ax1.plot(df2['group_index'], df2['jitter_us'], 'r--', linewidth=1, alpha=0.7)
+            ax1.plot(df1['group_index'], df1['jitter_us'], 'b--', linewidth=1, alpha=0.7,
+                     label=f'{label1} rms  ({jit1_range[0]:.0f}–{jit1_range[1]:.0f} µs)')
+            ax1.plot(df2['group_index'], df2['jitter_us'], 'r--', linewidth=1, alpha=0.7,
+                     label=f'{label2} rms  ({jit2_range[0]:.0f}–{jit2_range[1]:.0f} µs)')
             ax1.set_title('Max Latency & Jitter Comparison')
-            ax1.set_ylabel('µs')
-            ax1.legend([f'{label1} max  ({df1["max_latency_us"].min():.0f}–{df1["max_latency_us"].max():.0f} µs)',
-                        f'{label2} max  ({df2["max_latency_us"].min():.0f}–{df2["max_latency_us"].max():.0f} µs)',
-                        f'{label1} rms  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
-                        f'{label2} rms  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
-                       fontsize=8, loc='upper right')
+            ax1.set_ylabel(f'µs')
+            lines, labels = ax1.get_legend_handles_labels()
+            ax1.legend(lines, labels, fontsize=8, loc='upper right')
         elif mode == "combined":
             ax2.plot(df1['group_index'], df1['jitter_us'], 'b-', linewidth=1, alpha=0.8)
             ax2.plot(df2['group_index'], df2['jitter_us'], 'r-', linewidth=1, alpha=0.8)
             ax2.set_title('Jitter Comparison')
-            ax2.set_ylabel('Jitter (µs)')
-            ax2.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
-                        f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
+            ax2.set_ylabel(f'Jitter ({ylabel})')
+            ax2.legend([f'{label1}  ({jit1_range[0]:.0f}–{jit1_range[1]:.0f} µs)',
+                        f'{label2}  ({jit2_range[0]:.0f}–{jit2_range[1]:.0f} µs)'],
                        fontsize=8, loc='upper right')
         else:
             ax1.plot(df1['group_index'], df1['jitter_us'], 'b-', linewidth=1, alpha=0.8)
             ax1.plot(df2['group_index'], df2['jitter_us'], 'r-', linewidth=1, alpha=0.8)
             ax1.set_title('Jitter Comparison')
-            ax1.set_ylabel('Jitter (µs)')
-            ax1.legend([f'{label1}  ({df1["jitter_us"].min():.0f}–{df1["jitter_us"].max():.0f} µs)',
-                        f'{label2}  ({df2["jitter_us"].min():.0f}–{df2["jitter_us"].max():.0f} µs)'],
-                       fontsize=8, loc='upper right')
+            ax1.set_ylabel(f'Jitter ({ylabel})')
+            ax1.legend([f'{label1}  ({jit1_range[0]:.0f}–{jit1_range[1]:.0f} µs)',
+                        f'{label2}  ({jit2_range[0]:.0f}–{jit2_range[1]:.0f} µs)'],
+                        fontsize=8, loc='upper right')
+
+    # Use same Y-axis range for combined/overlay modes (real µs, uniform scale)
+    if mode in ("combined", "overlay") and not normalize:
+        max_y = 0
+        for df in [df1, df2]:
+            for col in ['max_latency_us', 'jitter_us']:
+                if col in df.columns:
+                    max_y = max(max_y, df[col].max())
+        ax1.set_ylim(0, max_y * 1.05)
+        if mode == "combined":
+            ax2.set_ylim(0, max_y * 1.05)
 
     plt.tight_layout()
+    if not output:
+        suffix = "_normalized" if normalize else ""
+        output = f"compare_{session_id_1}_{session_id_2}_{mode}{suffix}.png"
     if output:
         plt.savefig(output, dpi=150, bbox_inches='tight')
         print(f"Plot saved to {output}")
@@ -937,7 +1076,10 @@ def main():
     # Latency + SoC
     parser_lat_soc = subparsers.add_parser('latency+soc', help='Latency with SoC overlay and exceeds')
     
-    # Jitter + SoC
+    parser_lat = subparsers.add_parser('latency', help='Latency plot only (no SoC overlay)')
+    
+    parser_jit = subparsers.add_parser('jitter', help='Jitter plot only (no SoC overlay)')
+    
     parser_jit_soc = subparsers.add_parser('jitter+soc', help='Jitter with SoC overlay and exceeds')
     
     # Legacy commands
@@ -951,6 +1093,8 @@ def main():
     parser_comp.add_argument('session_id_2', type=int, help='Second session ID')
     parser_comp.add_argument('--mode', choices=['combined', 'latency', 'jitter', 'overlay'], default='combined',
                             help='What to compare: combined (default), latency only, jitter only, or overlay (both on one graph)')
+    parser_comp.add_argument('--normalize', action='store_true',
+                            help='Normalize Y-axis to [0,1] for visual comparison of different scales')
     
     args = parser.parse_args()
     
@@ -971,18 +1115,27 @@ def main():
         elif args.command == 'latency+soc':
             plot_latency_with_soc(args.db, args.session, args.output, args.top, args.limit)
         
+        elif args.command == 'latency':
+            plot_latency_only(args.db, args.session, args.output, args.top, args.limit)
+        
+        elif args.command == 'jitter':
+            plot_jitter_only(args.db, args.session, args.output, args.top, args.limit)
+        
         elif args.command == 'jitter+soc':
             plot_jitter_with_soc(args.db, args.session, args.output, args.limit)
         
         elif args.command == 'compare':
             plot_session_compare(args.db, args.session_id_1, args.session_id_2,
-                                args.output, args.top, args.limit, args.mode)
+                                args.output, args.top, args.limit, args.mode,
+                                args.normalize)
         
         else:
             print("Please specify a command. Available commands:")
             print("  all          - comprehensive view (4 plots: latency, jitter, exceeds, SoC)")
             print("  latency+soc  - latency with SoC overlay and exceeds")
+            print("  latency      - latency plot only (no SoC)")
             print("  jitter+soc   - jitter with SoC overlay and exceeds")
+            print("  jitter       - jitter plot only (no SoC)")
             print("  sessions     - list all sessions with target info and exceed counts")
             print("  details      - show detailed session information")
             print("  compare      - compare latency/jitter between two sessions")
