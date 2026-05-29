@@ -299,7 +299,7 @@ def plot_comprehensive_analysis(db_path: str, session_id: int = None,
     title = f'Latency Analysis (top-{top_n} worst per group)'
     if session_info:
         stress_status = "WITH STRESS" if session_info['target_stress'] == 'on' else "NO STRESS"
-        title += f'\nSession {session_id} | Board: {session_info["target_board"]} | Kernel: {session_info["target_kernel"]} | {stress_status}'
+        title += f'\nBoard: {session_info["target_board"]} | Kernel: {session_info["target_kernel"]}'
         title += f'\nInterval: {session_info["interval_us"]} µs | Measurements/group: {session_info["measurements_per_group"]}'
     
     ax1.set_title(title, fontsize=10)
@@ -528,7 +528,7 @@ def plot_latency_with_soc(db_path: str, session_id: int = None,
     title = f'Latency vs SoC Load'
     if session_info:
         stress_status = "WITH STRESS" if session_info['target_stress'] == 'on' else "NO STRESS"
-        title += f'\nSession {session_id} | Board: {session_info["target_board"]} | Kernel: {session_info["target_kernel"]} | {stress_status}'
+        title += f'\nBoard: {session_info["target_board"]} | Kernel: {session_info["target_kernel"]}'
         title += f' | Interval: {session_info["interval_us"]} µs'
     
     ax1.set_title(title)
@@ -609,9 +609,7 @@ def plot_latency_only(db_path: str, session_id: int = None,
 
     title = 'Latency Analysis'
     if session_info:
-        stress_status = "WITH STRESS" if session_info['target_stress'] == 'on' else "NO STRESS"
-        title = (f"Latency — {session_info['target_board']} / "
-                 f"{session_info['target_kernel']} / {stress_status}")
+        title = f"{session_info['target_board']} / {session_info['target_kernel']} — Latency"
 
     ax.set_title(title)
     ax.legend(loc='upper left')
@@ -658,9 +656,7 @@ def plot_jitter_only(db_path: str, session_id: int = None,
 
     title = 'Jitter Analysis'
     if session_info:
-        stress_status = "WITH STRESS" if session_info['target_stress'] == 'on' else "NO STRESS"
-        title = (f"Jitter — {session_info['target_board']} / "
-                 f"{session_info['target_kernel']} / {stress_status}")
+        title = f"{session_info['target_board']} / {session_info['target_kernel']} — Jitter"
 
     ax.set_title(title)
     ax.legend(loc='upper left')
@@ -743,7 +739,7 @@ def plot_jitter_with_soc(db_path: str, session_id: int = None,
     title = f'Jitter vs SoC Load'
     if session_info:
         stress_status = "WITH STRESS" if session_info['target_stress'] == 'on' else "NO STRESS"
-        title += f'\nSession {session_id} | Board: {session_info["target_board"]} | Kernel: {session_info["target_kernel"]} | {stress_status}'
+        title += f'\nBoard: {session_info["target_board"]} | Kernel: {session_info["target_kernel"]}'
     
     ax1.set_title(title)
     
@@ -891,16 +887,16 @@ def show_session_details(db_path: str, session_id: int, threshold_us: int = DEFA
         print(f"Session {session_id} not found")
         return
     
-    stress_status = "WITH STRESS" if info['target_stress'] == 'on' else "NO STRESS"
-    payload_status = "WITH PAYLOAD" if info.get('target_payload') == 'on' else "NO PAYLOAD"
+    stress_status = "on" if info['target_stress'] == 'on' else "off"
+    payload_status = "on" if info.get('target_payload') == 'on' else "off"
     
     print("\n" + "="*80)
     print(f"SESSION DETAILS: {session_id}")
     print("="*80)
     print(f"Target Board:  {info['target_board']}")
     print(f"Target Kernel: {info['target_kernel']}")
-    print(f"Stress State:  {stress_status}")
-    print(f"Payload State: {payload_status}")
+    print(f"Stress:  {stress_status}")
+    print(f"Payload: {payload_status}")
     print(f"Start Time:    {info['start_time']}")
     print(f"End Time:      {info['end_time']}")
     print(f"Duration:      {info['groups_count']} groups")
@@ -997,12 +993,26 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
             ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8,
                     label=f'{label2} max  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)')
         else:
-            ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8)
-            ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8)
-            ax1.set_title('Max Latency Comparison')
-            ax1.set_ylabel(f'Max latency ({ylabel})')
+            ax1.plot(df1['group_index'], df1['avg_latency_us'], 'b-', linewidth=1.5, alpha=0.8)
+            ax1.fill_between(df1['group_index'], df1['min_latency_us'],
+                             df1['max_latency_us'], alpha=0.15, color='blue')
+            ax1.axhline(y=df1['avg_latency_us'].mean(), color='darkblue', linestyle=':',
+                        linewidth=1, alpha=0.6)
+
+            ax1.plot(df2['group_index'], df2['avg_latency_us'], 'r-', linewidth=1.5, alpha=0.8)
+            ax1.fill_between(df2['group_index'], df2['min_latency_us'],
+                             df2['max_latency_us'], alpha=0.15, color='red')
+            ax1.axhline(y=df2['avg_latency_us'].mean(), color='darkred', linestyle=':',
+                        linewidth=1, alpha=0.6)
+
+            ax1.axhline(y=threshold_us, color='red', linestyle='--',
+                        linewidth=1, alpha=0.7, label=f'Threshold: {threshold_us} µs')
+
+            ax1.set_title('Latency Comparison')
+            ax1.set_ylabel(f'Latency ({ylabel})')
             ax1.legend([f'{label1}  ({max1_range[0]:.0f}–{max1_range[1]:.0f} µs)',
-                        f'{label2}  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)'],
+                        f'{label2}  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)',
+                        f'Threshold: {threshold_us} µs'],
                        fontsize=8, loc='upper right')
 
     if show_jitter:
@@ -1036,7 +1046,7 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
     if mode in ("combined", "overlay") and not normalize:
         max_y = 0
         for df in [df1, df2]:
-            for col in ['max_latency_us', 'jitter_us']:
+            for col in ['max_latency_us', 'avg_latency_us', 'jitter_us']:
                 if col in df.columns:
                     max_y = max(max_y, df[col].max())
         ax1.set_ylim(0, max_y * 1.05)
