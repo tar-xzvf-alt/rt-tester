@@ -207,7 +207,7 @@
   ],
   "refresh": "5s",
   "schemaVersion": 38,
-  "style": "dark",
+  "style": "light",
   "tags": ["rt-tester", "latency", "soc"],
   "templating": {
     "list": [
@@ -215,13 +215,13 @@
         "current": {"selected": false, "text": "radxa", "value": "radxa"},
         "definition": "label_values(arduino_latency_avg, board)",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Board",
         "multi": false,
         "name": "board",
         "options": [],
         "query": {"queryType": ""},
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "type": "query"
@@ -229,21 +229,22 @@
       {
         "current": {"selected": false, "text": "", "value": ""},
         "definition": "label_values(arduino_latency_avg{board=\"$board\"}, session_id)",
+        "sort": 3,
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Session",
-        "multi": false,
+        "multi": true,
         "name": "session_id",
         "options": [],
         "query": {"queryType": ""},
-        "refresh": 1,
+        "refresh": 2,
         "regex": "",
         "skipUrlSync": false,
         "type": "query"
       }
     ]
   },
-  "time": {"from": "now-1h", "to": "now"},
+  "time": {"from": "now-7d", "to": "now"},
   "timepicker": {},
   "timezone": "",
   "title": "RT Latency Tester Dashboard",
