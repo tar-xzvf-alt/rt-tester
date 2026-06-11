@@ -31,7 +31,7 @@
 
 - [Код для ПК](src/pc-receiver)
 - [Код для Arduino](src/arduino-meter)
-- [Код на одноплатнике (SoC)](src/socs-investigation)
+- [Код на одноплатнике (SoC)](https://altlinux.space/besogon1238/rt-handler)
 - [rt-supervisor (Ethernet round-trip testing)](https://altlinux.space/besogon1238/rt-supervisor)
 
 ## Пример конфигурационного файла
