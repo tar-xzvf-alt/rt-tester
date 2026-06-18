@@ -41,6 +41,8 @@ class ArduinoCollector:
         self.last_group_index = 0
         self.start_command_time_us = 0
         self.is_collecting = False
+        self.exit_on_stop = False
+        self.stop_received = False
 
         # Measurement parameters
         self.measurements_per_group = int(
@@ -54,10 +56,12 @@ class ArduinoCollector:
         # Auto-calculate worst_count: 5% of measurements per group (min 1)
         self.worst_count = max(1, int(self.measurements_per_group * 0.05))
 
-        # Auto-calculate timeout and check interval from group duration
+        # Auto-calculate timeout and check interval from group duration.
+        # A group at 1500 samples and 5000 us interval arrives every 7.5 sec,
+        # so the old fixed 2 sec default produced false fall events.
         group_duration_us = self.measurement_interval_us * self.measurements_per_group
-        timeout_us = int(config_dict.get('timeout-us', group_duration_us * 3))
-        check_us   = int(config_dict.get('check-interval-us', group_duration_us*3))
+        timeout_us = int(config_dict.get('timeout-us') or group_duration_us * 3)
+        check_us = int(config_dict.get('check-interval-us') or group_duration_us)
 
         # Target device information
         self.target_board = config_dict.get('target-board', config.DEFAULT_TARGET_BOARD)
@@ -164,11 +168,14 @@ class ArduinoCollector:
     def connect(self) -> bool:
         """Connect to Arduino."""
         self.ser = serial_comm.connect_to_arduino(self.port, self.baudrate)
-        
+
+        if self.ser is None:
+            return False
+
         # Guarantee that measurement is stopped
         self.send_command("STOP")
 
-        return self.ser is not None
+        return True
 
 
     def send_command(self, command: str) -> None:
@@ -263,11 +270,16 @@ class ArduinoCollector:
                 duration_us = (time.time_ns() // 1000) - self.start_command_time_us
                 self.session_logger.info(f"Session ended. Total groups: {self.groups_received}")
                 self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
+
+            if self.exit_on_stop:
+                self.stop_received = True
+                self.running = False
     
 
-    def run(self):
+    def run(self, auto_start: bool = False, exit_on_stop: bool = False):
         """Main execution loop."""
         self.running = True
+        self.exit_on_stop = exit_on_stop
         self.start_time = time.time()
         
         self._print_welcome()
@@ -280,12 +292,37 @@ class ArduinoCollector:
         monitor_thread = threading.Thread(target=self._monitor_loop)
         monitor_thread.daemon = True
         monitor_thread.start()
+
+        if auto_start:
+            self._cmd_start()
+
+        if exit_on_stop:
+            try:
+                while self.running and not self.stop_received:
+                    time.sleep(0.1)
+            except KeyboardInterrupt:
+                print("\n\nUser interrupt")
+            finally:
+                self.running = False
+                if self.ser:
+                    self.ser.close()
+                print("Connection closed")
+                print(f"Data saved to {self.db_path}")
+            return
         
         # Command loop
         try:
             while self.running:
                 cmd = input("\n> ").strip().lower()
                 self._handle_command(cmd)
+        except EOFError:
+            if self.is_collecting:
+                print("\nstdin closed; waiting for Arduino stop")
+                self.exit_on_stop = True
+                while self.running and not self.stop_received:
+                    time.sleep(0.1)
+            else:
+                print("\nstdin closed")
         except KeyboardInterrupt:
             print("\n\nUser interrupt")
         finally:
@@ -352,6 +389,7 @@ class ArduinoCollector:
         self.groups_received = 0
         self.last_group_index = -1
         self.auto_stop_triggered = False
+        self.stop_received = False
         self.fall_monitor.reset()
         
         # Update metrics server with new session
@@ -462,10 +500,20 @@ class ArduinoCollector:
     def _handle_status_message(self, msg: dict) -> None:
         """Handle status messages from Arduino."""
         status = msg.get('status')
+        msg_session_id = msg.get('session_id')
         
         if status == 'stopped':
+            if not self.is_collecting:
+                print(f"\nArduino is stopped")
+                return
+
+            if msg_session_id != self.current_session_id:
+                print(f"\nIgnoring stale Arduino stop for session {msg_session_id}")
+                return
+
             print(f"\nMeasurement stopped by Arduino")
             self.is_collecting = False
+            self.stop_received = True
             
             duration_us = (time.time_ns() // 1000) - self.start_command_time_us
             
@@ -481,11 +529,19 @@ class ArduinoCollector:
             if self.session_logger:
                 self.session_logger.info(f"Session ended. Total groups: {self.groups_received}")
                 self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
+
+            if self.exit_on_stop:
+                self.running = False
         
         elif status == 'auto_stopped':
+            if msg_session_id != self.current_session_id:
+                print(f"\nIgnoring stale Arduino auto-stop for session {msg_session_id}")
+                return
+
             groups = msg.get('groups_collected', 0)
             print(f"\nArduino auto-stopped after {groups} groups")
             self.is_collecting = False
+            self.stop_received = True
             
             duration_us = (time.time_ns() // 1000) - self.start_command_time_us
             
@@ -501,6 +557,9 @@ class ArduinoCollector:
             if self.session_logger:
                 self.session_logger.info(f"Session auto-stopped. Total groups: {groups}")
                 self.session_logger.info(f"Session duration: {duration_us / 1_000_000:.3f} sec")
+
+            if self.exit_on_stop:
+                self.running = False
         
     def _show_status(self) -> None:
         """Show extended status with fall information."""
@@ -594,8 +653,15 @@ def main():
     parser.add_argument('--port', help='Arduino COM port (overrides config)')
     parser.add_argument('--baud', type=int, default=config.DEFAULT_BAUDRATE, 
                        help=f'Baud rate (default: {config.DEFAULT_BAUDRATE})')
+    parser.add_argument('--start', action='store_true',
+                       help='Start measurement immediately after connecting')
+    parser.add_argument('--exit-on-stop', action='store_true',
+                       help='Exit when Arduino reports stopped/auto_stopped')
     
     args = parser.parse_args()
+
+    if args.exit_on_stop and not args.start:
+        parser.error('--exit-on-stop requires --start')
     
     config_dict = load_config(args.params)
     
@@ -608,7 +674,7 @@ def main():
     if not collector.connect():
         sys.exit(1)
     
-    collector.run()
+    collector.run(auto_start=args.start, exit_on_stop=args.exit_on_stop)
 
 
 if __name__ == "__main__":

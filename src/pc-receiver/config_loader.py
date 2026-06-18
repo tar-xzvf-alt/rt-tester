@@ -42,7 +42,7 @@ def parse_config_file(config_path):
             if '=' in line:
                 key, value = line.split('=', 1)
                 key = key.strip()
-                value = value.strip()
+                value = value.split('#', 1)[0].strip()
                 
                 # Convert value based on content
                 if value.isdigit():
@@ -73,8 +73,8 @@ def load_config(config_path=None):
     # Default values
     config_dict = {
         'db': config.DEFAULT_DB_PATH,
-        'timeout-us': config.DEFAULT_TIMEOUT_US,
-        'check-interval-us': config.DEFAULT_CHECK_INTERVAL_US,
+        'timeout-us': None,
+        'check-interval-us': None,
         'auto-stop-groups': config.AUTO_STOP,
         'measurements-per-group': config.DEFAULT_MEASUREMENTS_PER_GROUP,
         'measurement-interval-us': config.DEFAULT_MEASUREMENT_INTERVAL_US,
@@ -104,7 +104,7 @@ def load_config(config_path=None):
                     config_dict[key] = file_config[key]
             
             # Validate stress value
-            stress = config_dict['target-stress'].lower()
+            stress = str(config_dict['target-stress']).lower()
             if stress not in ['on', 'off', 'yes', 'no', 'true', 'false', '1', '0']:
                 print(f"Warning: Invalid stress value '{config_dict['target-stress']}', using 'off'")
                 config_dict['target-stress'] = 'off'
@@ -114,6 +114,17 @@ def load_config(config_path=None):
                     config_dict['target-stress'] = 'on'
                 else:
                     config_dict['target-stress'] = 'off'
+
+            # Validate payload value
+            payload = str(config_dict['target-payload']).lower()
+            if payload not in ['on', 'off', 'yes', 'no', 'true', 'false', '1', '0']:
+                print(f"Warning: Invalid payload value '{config_dict['target-payload']}', using 'off'")
+                config_dict['target-payload'] = 'off'
+            else:
+                if payload in ['on', 'yes', 'true', '1']:
+                    config_dict['target-payload'] = 'on'
+                else:
+                    config_dict['target-payload'] = 'off'
             
             # Update soc section if present
             if 'soc' in file_config:
