@@ -6,4 +6,10 @@ rt-tester.code-workspace
 /logs/
 src/pc-receiver/measurement.conf
 arduino.db
-src/pc-receiver/measurement.conf
+
+# Generated local plots and board dumps from ad-hoc experiments.
+/*.png
+/brcmfmac*.txt
+/rk3566-*.dtb
+/rk3566-*.dts
+/rk3566-*.dtsi
