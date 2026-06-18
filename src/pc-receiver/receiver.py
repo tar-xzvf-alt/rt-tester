@@ -657,13 +657,21 @@ def main():
                        help='Start measurement immediately after connecting')
     parser.add_argument('--exit-on-stop', action='store_true',
                        help='Exit when Arduino reports stopped/auto_stopped')
+    parser.add_argument('--groups', type=int,
+                       help='Override auto-stop group count from config')
     
     args = parser.parse_args()
 
     if args.exit_on_stop and not args.start:
         parser.error('--exit-on-stop requires --start')
+
+    if args.groups is not None and args.groups < 1:
+        parser.error('--groups must be >= 1')
     
     config_dict = load_config(args.params)
+
+    if args.groups is not None:
+        config_dict['auto-stop-groups'] = args.groups
     
     collector = ArduinoCollector(
         config_dict=config_dict,

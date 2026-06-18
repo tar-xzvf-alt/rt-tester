@@ -46,6 +46,19 @@ stop  # остановка сессии сбора N
 exit  # завершение сбора
 ```
 
+Неинтерактивный запуск с автостартом и выходом после остановки Arduino:
+
+```bash
+./receiver.py --params /path/to/params.conf --start --exit-on-stop
+```
+
+Количество групп можно переопределить из командной строки без правки
+конфигурационного файла:
+
+```bash
+./receiver.py --params /path/to/params.conf --groups 3 --start --exit-on-stop
+```
+
 ## Анализ данных (plot_statistics)
 
 ```bash
