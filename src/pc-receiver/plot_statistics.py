@@ -988,32 +988,39 @@ def plot_session_compare(db_path: str, session_id_1: int, session_id_2: int,
 
     if show_latency:
         if mode == "overlay":
-            ax1.plot(df1['group_index'], df1['max_latency_us'], 'b-', linewidth=1, alpha=0.8,
+            # Session 1: avg = lighter, max = darker blue
+            ax1.plot(df1['group_index'], df1['max_latency_us'], color='darkblue', linewidth=1, alpha=0.5,
                     label=f'{label1} max  ({max1_range[0]:.0f}–{max1_range[1]:.0f} µs)')
-            ax1.plot(df2['group_index'], df2['max_latency_us'], 'r-', linewidth=1, alpha=0.8,
+            ax1.plot(df1['group_index'], df1['avg_latency_us'], color='#7eb8da', linewidth=1.5, alpha=0.9,
+                    label=f'{label1} avg')
+            # Session 2: avg = lighter, max = darker red
+            ax1.plot(df2['group_index'], df2['max_latency_us'], color='darkred', linewidth=1, alpha=0.5,
                     label=f'{label2} max  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)')
+            ax1.plot(df2['group_index'], df2['avg_latency_us'], color='#e88482', linewidth=1.5, alpha=0.9,
+                    label=f'{label2} avg')
         else:
-            ax1.plot(df1['group_index'], df1['avg_latency_us'], 'b-', linewidth=1.5, alpha=0.8)
+            # Session 1: avg = lighter, max = darker blue
+            ax1.plot(df1['group_index'], df1['max_latency_us'], color='darkblue', linewidth=1, alpha=0.5,
+                    label=f'{label1} max  ({max1_range[0]:.0f}–{max1_range[1]:.0f} µs)')
+            ax1.plot(df1['group_index'], df1['avg_latency_us'], color='#7eb8da', linewidth=1.5, alpha=0.9,
+                    label=f'{label1} avg')
             ax1.fill_between(df1['group_index'], df1['min_latency_us'],
-                             df1['max_latency_us'], alpha=0.15, color='blue')
-            ax1.axhline(y=df1['avg_latency_us'].mean(), color='darkblue', linestyle=':',
-                        linewidth=1, alpha=0.6)
+                             df1['max_latency_us'], alpha=0.1, color='blue')
 
-            ax1.plot(df2['group_index'], df2['avg_latency_us'], 'r-', linewidth=1.5, alpha=0.8)
+            # Session 2: avg = lighter, max = darker red
+            ax1.plot(df2['group_index'], df2['max_latency_us'], color='darkred', linewidth=1, alpha=0.5,
+                    label=f'{label2} max  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)')
+            ax1.plot(df2['group_index'], df2['avg_latency_us'], color='#e88482', linewidth=1.5, alpha=0.9,
+                    label=f'{label2} avg')
             ax1.fill_between(df2['group_index'], df2['min_latency_us'],
-                             df2['max_latency_us'], alpha=0.15, color='red')
-            ax1.axhline(y=df2['avg_latency_us'].mean(), color='darkred', linestyle=':',
-                        linewidth=1, alpha=0.6)
+                             df2['max_latency_us'], alpha=0.1, color='red')
 
             ax1.axhline(y=threshold_us, color='red', linestyle='--',
                         linewidth=1, alpha=0.7, label=f'Threshold: {threshold_us} µs')
 
             ax1.set_title('Latency Comparison')
             ax1.set_ylabel(f'Latency ({ylabel})')
-            ax1.legend([f'{label1}  ({max1_range[0]:.0f}–{max1_range[1]:.0f} µs)',
-                        f'{label2}  ({max2_range[0]:.0f}–{max2_range[1]:.0f} µs)',
-                        f'Threshold: {threshold_us} µs'],
-                       fontsize=8, loc='upper right')
+            ax1.legend(fontsize=8, loc='upper right')
 
     if show_jitter:
         if mode == "overlay":
