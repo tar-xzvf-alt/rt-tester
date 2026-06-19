@@ -1,0 +1,29 @@
+global:
+  scrape_interval: 500ms
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'rt-tester-trace'
+
+scrape_configs:
+  - job_name: 'arduino_latency'
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['localhost:9101']
+        labels:
+          source: 'pc-receiver'
+
+  - job_name: 'rt_trace_rockpi'
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['10.43.0.2:9201']
+        labels:
+          board: 'rockpi'
+          source: 'rt-trace-exporter'
+
+  - job_name: 'rt_trace_visionfive'
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['10.43.0.1:9201']
+        labels:
+          board: 'visionfive'
+          source: 'rt-trace-exporter'

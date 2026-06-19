@@ -75,6 +75,17 @@ Trace-метрики, собранные Prometheus из `rt-supervisor` exporte
 Импорт заполняет таблицу `trace_group_metrics` с ключом
 `session_id/group_index/host/stage`.
 
+Краткую сводку по сохранённой trace-сессии можно вывести так:
+
+```bash
+./trace_summary.py arduino_data.db --session-id 123456
+```
+
+Для Prometheus на ПК без маршрута в сеть `10.43.0.0/24` используйте SSH tunnels
+и пример конфига `prometheus/trace-prometheus-local-tunnel.yml`. Для Prometheus,
+который видит RockPI/VisionFive напрямую, используйте
+`prometheus/trace-prometheus.yml`.
+
 ## Анализ данных (plot_statistics)
 
 ```bash
