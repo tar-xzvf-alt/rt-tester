@@ -219,6 +219,22 @@ def init_database(db_path: str) -> None:
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS trace_group_metrics (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id INTEGER,
+                group_index INTEGER,
+                host TEXT,
+                stage TEXT,
+                count INTEGER,
+                min_us REAL,
+                avg_us REAL,
+                max_us REAL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                UNIQUE(session_id, group_index, host, stage)
+            )
+        ''')
         
         # Indexes for performance
         cursor.execute('''
@@ -244,6 +260,11 @@ def init_database(db_path: str) -> None:
         cursor.execute('''
             CREATE INDEX IF NOT EXISTS idx_soc_session 
             ON soc_metrics(session_id)
+        ''')
+
+        cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_trace_group_metrics_session
+            ON trace_group_metrics(session_id, group_index)
         ''')
         
         # Version tracking table
@@ -372,6 +393,30 @@ def save_group_data(db_path: str, data: dict, current_time_us: int,
             ''', (group_id, latency, rank))
     
     return group_id
+
+
+def save_trace_group_metric(db_path: str, metric: dict) -> None:
+    """
+    Save one Prometheus-imported trace stage aggregate.
+    """
+    db = get_db_manager(db_path)
+
+    with db.transaction() as conn:
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT OR REPLACE INTO trace_group_metrics
+            (session_id, group_index, host, stage, count, min_us, avg_us, max_us)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            int(metric['session_id']),
+            int(metric['group_index']),
+            metric['host'],
+            metric['stage'],
+            int(metric.get('count', 0)),
+            float(metric.get('min_us', 0)),
+            float(metric.get('avg_us', 0)),
+            float(metric.get('max_us', 0)),
+        ))
 
 
 def save_event(db_path: str, session_id: int, event_type: str, 

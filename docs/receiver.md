@@ -59,6 +59,22 @@ exit  # завершение сбора
 ./receiver.py --params /path/to/params.conf --groups 3 --start --exit-on-stop
 ```
 
+Для внешней синхронизации с trace-системой можно задать session ID явно:
+
+```bash
+./receiver.py --params /path/to/params.conf --session-id 123456 --groups 3 --start --exit-on-stop
+```
+
+Trace-метрики, собранные Prometheus из `rt-supervisor` exporters, импортируются
+в SQLite отдельно:
+
+```bash
+./import_trace_metrics.py arduino_data.db 123456 --prometheus-url http://localhost:9090
+```
+
+Импорт заполняет таблицу `trace_group_metrics` с ключом
+`session_id/group_index/host/stage`.
+
 ## Анализ данных (plot_statistics)
 
 ```bash

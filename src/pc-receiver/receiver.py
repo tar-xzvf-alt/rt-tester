@@ -38,6 +38,7 @@ class ArduinoCollector:
         self.groups_received = 0
         self.start_time = None
         self.current_session_id = None
+        self.fixed_session_id = config_dict.get('session-id')
         self.last_group_index = 0
         self.start_command_time_us = 0
         self.is_collecting = False
@@ -368,7 +369,7 @@ class ArduinoCollector:
     
     def _cmd_start(self) -> None:
         """Handle start command."""
-        session_id = random.randint(100000, 999999)
+        session_id = self.fixed_session_id or random.randint(100000, 999999)
         
         # Form command for Arduino
         params = {
@@ -659,6 +660,8 @@ def main():
                        help='Exit when Arduino reports stopped/auto_stopped')
     parser.add_argument('--groups', type=int,
                        help='Override auto-stop group count from config')
+    parser.add_argument('--session-id', type=int,
+                       help='Use a fixed session ID instead of a random one')
     
     args = parser.parse_args()
 
@@ -667,11 +670,17 @@ def main():
 
     if args.groups is not None and args.groups < 1:
         parser.error('--groups must be >= 1')
+
+    if args.session_id is not None and args.session_id < 1:
+        parser.error('--session-id must be >= 1')
     
     config_dict = load_config(args.params)
 
     if args.groups is not None:
         config_dict['auto-stop-groups'] = args.groups
+
+    if args.session_id is not None:
+        config_dict['session-id'] = args.session_id
     
     collector = ArduinoCollector(
         config_dict=config_dict,
