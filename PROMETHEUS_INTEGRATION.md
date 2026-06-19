@@ -77,6 +77,49 @@ cd prometheus-*
 3. Add Prometheus datasource: http://localhost:9090
 4. Import dashboard: `grafana/rt-tester-dashboard.json`
 
+### Trace Grafana Dashboard
+
+The trace feature branch also includes a provisioned Grafana dashboard for the
+supervised raw-Ethernet trace metrics:
+
+```text
+grafana/dashboards/rt-trace-stages.json
+grafana/provisioning/datasources/trace-prometheus.yml
+grafana/provisioning/dashboards/trace-dashboards.yml
+```
+
+The datasource is `RT Trace Prometheus` and points to the local trace Prometheus:
+
+```text
+http://127.0.0.1:9091
+```
+
+The dashboard is `RT Trace Stage Breakdown`. It combines Arduino latency metrics
+from `receiver.py :9101` with trace stage metrics from the RockPI/VisionFive
+trace exporters:
+
+- `Average Latency`
+- `Maximum Latency`
+- `Average Trace Stage Duration`
+- `Maximum Trace Stage Duration`
+
+When using the stand helpers, start it with:
+
+```bash
+cd /home/taranev/work_repos/beremiz-stand
+scripts/start_trace_prometheus_local.sh
+scripts/start_trace_grafana_local.sh
+```
+
+Then run a trace measurement and open:
+
+```text
+http://127.0.0.1:3001/d/rt-trace-stages
+```
+
+The dashboard has variables for `session_id`, `board`, `host`, and `stage`.
+Choose the `session_id` printed by the receiver/smoke script.
+
 ## Metric Names
 
 ### SoC Metrics (from C exporter on port 9100)

@@ -1,0 +1,12 @@
+apiVersion: 1
+
+providers:
+  - name: RT Trace Dashboards
+    orgId: 1
+    folder: RT Trace
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 5
+    allowUiUpdates: true
+    options:
+      path: /home/taranev/work_repos/rt/rt-tester/grafana/dashboards
