@@ -8,7 +8,7 @@ scrape_configs:
   - job_name: 'radxa_node'
     scrape_interval: 500ms
     static_configs:
-      - targets: ['192.168.0.73:9100']
+      - targets: ['192.168.144.133:9100']
         labels:
           board: 'lichee'
           source: 'node_exporter'
@@ -19,3 +19,19 @@ scrape_configs:
       - targets: ['localhost:9101']
         labels:
           source: 'pc-receiver'
+
+  - job_name: 'rt_trace_rockpi'
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['10.43.0.2:9201']
+        labels:
+          board: 'rockpi'
+          source: 'rt-trace-exporter'
+
+  - job_name: 'rt_trace_visionfive'
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['10.43.0.1:9201']
+        labels:
+          board: 'visionfive'
+          source: 'rt-trace-exporter'
