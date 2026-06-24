@@ -20,7 +20,7 @@ def latest_session(conn):
     return row[0] if row else None
 
 
-def print_summary(db_path, session_id):
+def print_summary(db_path, session_id, host=None):
     with sqlite3.connect(db_path) as conn:
         if session_id is None:
             session_id = latest_session(conn)
@@ -28,17 +28,30 @@ def print_summary(db_path, session_id):
                 raise SystemExit('No trace metrics found')
 
         cur = conn.cursor()
-        cur.execute(
-            """
-            SELECT host, stage, COUNT(*) AS groups,
-                   AVG(avg_us), MIN(min_us), MAX(max_us), SUM(count)
-            FROM trace_group_metrics
-            WHERE session_id = ?
-            GROUP BY host, stage
-            ORDER BY host, stage
-            """,
-            (session_id,),
-        )
+        if host:
+            cur.execute(
+                """
+                SELECT host, stage, COUNT(*) AS groups,
+                       AVG(avg_us), MIN(min_us), MAX(max_us), SUM(count)
+                FROM trace_group_metrics
+                WHERE session_id = ? AND host = ?
+                GROUP BY host, stage
+                ORDER BY host, stage
+                """,
+                (session_id, host),
+            )
+        else:
+            cur.execute(
+                """
+                SELECT host, stage, COUNT(*) AS groups,
+                       AVG(avg_us), MIN(min_us), MAX(max_us), SUM(count)
+                FROM trace_group_metrics
+                WHERE session_id = ?
+                GROUP BY host, stage
+                ORDER BY host, stage
+                """,
+                (session_id,),
+            )
         rows = cur.fetchall()
 
     if not rows:
@@ -61,9 +74,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('db', help='SQLite database path')
     parser.add_argument('--session-id', type=int, help='Session ID to summarize')
+    parser.add_argument('--host', help='filter by host (e.g. visionfive, rockpi)')
     args = parser.parse_args()
 
-    print_summary(args.db, args.session_id)
+    print_summary(args.db, args.session_id, args.host)
 
 
 if __name__ == '__main__':
