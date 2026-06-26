@@ -237,6 +237,39 @@
           "color": {
             "mode": "palette-classic"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -259,22 +292,20 @@
       },
       "id": 3,
       "options": {
-        "displayMode": "gradient",
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
+        "legend": {
           "calcs": [
-            "mean"
+            "mean",
+            "max"
           ],
-          "fields": "",
-          "values": false
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.3.6",
       "targets": [
@@ -284,14 +315,14 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "avg by (host, stage) (rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=~\"$stage\", stat=\"avg\"})",
-          "legendFormat": "{{host}} / {{stage}}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=~\"$stage\", stat=\"avg\"}",
+          "legendFormat": "{{stage}}",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Average Trace Stage Duration",
-      "type": "bargauge"
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -304,6 +335,39 @@
           "color": {
             "mode": "palette-classic"
           },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -311,14 +375,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 1000
-              },
-              {
-                "color": "red",
-                "value": 5000
               }
             ]
           },
@@ -334,22 +390,20 @@
       },
       "id": 4,
       "options": {
-        "displayMode": "gradient",
-        "maxVizHeight": 300,
-        "minVizHeight": 16,
-        "minVizWidth": 8,
-        "namePlacement": "auto",
-        "orientation": "horizontal",
-        "reduceOptions": {
+        "legend": {
           "calcs": [
+            "mean",
             "max"
           ],
-          "fields": "",
-          "values": false
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true,
-        "sizing": "auto",
-        "valueMode": "color"
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
       },
       "pluginVersion": "12.3.6",
       "targets": [
@@ -359,14 +413,14 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "max by (host, stage) (rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=~\"$stage\", stat=\"max\"})",
-          "legendFormat": "{{host}} / {{stage}}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=~\"$stage\", stat=\"max\"}",
+          "legendFormat": "{{stage}}",
           "range": true,
           "refId": "A"
         }
       ],
       "title": "Maximum Trace Stage Duration",
-      "type": "bargauge"
+      "type": "timeseries"
     }
   ],
   "refresh": "5s",
