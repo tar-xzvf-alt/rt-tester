@@ -81,10 +81,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 0
+        "y": 0,
+        "w": 24,
+        "h": 8
       },
       "id": 1,
       "options": {
@@ -187,10 +187,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
       },
       "id": 2,
       "options": {
@@ -285,10 +285,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 0
+        "y": 16,
+        "w": 24,
+        "h": 8
       },
       "id": 3,
       "options": {
@@ -315,7 +315,7 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_recv\"}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_recv\", stat=~\"$stat\"}",
           "legendFormat": "{{stat}}",
           "range": true,
           "refId": "A"
@@ -383,10 +383,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 0
+        "y": 24,
+        "w": 24,
+        "h": 8
       },
       "id": 4,
       "options": {
@@ -413,7 +413,7 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_input\"}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_input\", stat=~\"$stat\"}",
           "legendFormat": "{{stat}}",
           "range": true,
           "refId": "A"
@@ -481,10 +481,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 0
+        "y": 32,
+        "w": 24,
+        "h": 8
       },
       "id": 5,
       "options": {
@@ -511,7 +511,7 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"runtime_wait\"}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"runtime_wait\", stat=~\"$stat\"}",
           "legendFormat": "{{stat}}",
           "range": true,
           "refId": "A"
@@ -579,10 +579,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 0
+        "y": 40,
+        "w": 24,
+        "h": 8
       },
       "id": 6,
       "options": {
@@ -609,7 +609,7 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_output\"}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_output\", stat=~\"$stat\"}",
           "legendFormat": "{{stat}}",
           "range": true,
           "refId": "A"
@@ -677,10 +677,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
         "x": 0,
-        "y": 0
+        "y": 48,
+        "w": 24,
+        "h": 8
       },
       "id": 7,
       "options": {
@@ -707,7 +707,7 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_send\"}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_send\", stat=~\"$stat\"}",
           "legendFormat": "{{stat}}",
           "range": true,
           "refId": "A"
@@ -804,6 +804,18 @@
         "skipUrlSync": false,
         "sort": 1,
         "type": "query"
+      },
+      {
+        "current": {
+          "text": "avg",
+          "value": "avg"
+        },
+        "name": "stat",
+        "query": "avg,max",
+        "type": "custom",
+        "label": "Stat",
+        "multi": false,
+        "includeAll": false
       }
     ]
   },
