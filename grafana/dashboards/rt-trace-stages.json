@@ -231,7 +231,7 @@
         "type": "prometheus",
         "uid": "rt-trace-prometheus"
       },
-      "description": "Average duration per trace stage. This uses group-level summaries, not per-pulse samples.",
+      "description": "Average Arduino latency per group for the selected trace session.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -285,10 +285,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
         "x": 0,
-        "y": 8
+        "y": 0
       },
       "id": 3,
       "options": {
@@ -315,13 +315,13 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=~\"$stage\", stat=\"avg\"}",
-          "legendFormat": "{{stage}}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_recv\"}",
+          "legendFormat": "{{stat}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Average Trace Stage Duration",
+      "title": "ethernet_recv",
       "type": "timeseries"
     },
     {
@@ -329,7 +329,7 @@
         "type": "prometheus",
         "uid": "rt-trace-prometheus"
       },
-      "description": "Maximum duration per trace stage across exported group summaries.",
+      "description": "Average Arduino latency per group for the selected trace session.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -383,10 +383,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 8
+        "x": 0,
+        "y": 0
       },
       "id": 4,
       "options": {
@@ -413,13 +413,307 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=~\"$stage\", stat=\"max\"}",
-          "legendFormat": "{{stage}}",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_input\"}",
+          "legendFormat": "{{stat}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Maximum Trace Stage Duration",
+      "title": "shmem_input",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "rt-trace-prometheus"
+      },
+      "description": "Average Arduino latency per group for the selected trace session.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 5,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "rt-trace-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"runtime_wait\"}",
+          "legendFormat": "{{stat}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "runtime_wait",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "rt-trace-prometheus"
+      },
+      "description": "Average Arduino latency per group for the selected trace session.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "rt-trace-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_output\"}",
+          "legendFormat": "{{stat}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "shmem_output",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "rt-trace-prometheus"
+      },
+      "description": "Average Arduino latency per group for the selected trace session.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "rt-trace-prometheus"
+          },
+          "editorMode": "code",
+          "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_send\"}",
+          "legendFormat": "{{stat}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "ethernet_send",
       "type": "timeseries"
     }
   ],
