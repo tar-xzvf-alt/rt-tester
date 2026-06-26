@@ -111,7 +111,7 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "arduino_latency_avg{session_id=\"$session_id\", board=~\"$board\"}",
+          "expr": "arduino_latency_avg{session_id=\"$session_id\"}",
           "legendFormat": "avg latency / group {{group}}",
           "range": true,
           "refId": "A"
@@ -217,7 +217,7 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "arduino_latency_max{session_id=\"$session_id\", board=~\"$board\"}",
+          "expr": "arduino_latency_max{session_id=\"$session_id\"}",
           "legendFormat": "max latency / group {{group}}",
           "range": true,
           "refId": "A"
@@ -399,34 +399,6 @@
         "regex": "",
         "skipUrlSync": false,
         "sort": 2,
-        "type": "query"
-      },
-      {
-        "current": {
-          "selected": true,
-          "text": "All",
-          "value": "$__all"
-        },
-        "allValue": ".*",
-        "datasource": {
-          "type": "prometheus",
-          "uid": "rt-trace-prometheus"
-        },
-        "definition": "label_values(arduino_latency_avg{session_id=\"$session_id\"}, board)",
-        "hide": 0,
-        "includeAll": true,
-        "label": "Board",
-        "multi": true,
-        "name": "board",
-        "options": [],
-        "query": {
-          "query": "label_values(arduino_latency_avg{session_id=\"$session_id\"}, board)",
-          "refId": "StandardVariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "skipUrlSync": false,
-        "sort": 1,
         "type": "query"
       },
       {
