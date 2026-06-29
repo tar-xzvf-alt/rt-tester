@@ -27,8 +27,8 @@ This guide explains how to set up Prometheus and Grafana for monitoring RT laten
 
 **Compilation:**
 ```bash
-# Install libmicrohttpd (on target device)
-apt-get install libmicrohttpd-dev
+# Install libmicrohttpd (on target device, legacy C exporter only)
+apt-get install libmicrohttpd-devel
 
 # Compile
 gcc -pthread -o soc-monitor main.c gpio_handler_*.c metrics_collector.c utils.c log_writer.c prometheus_exporter.c -lgpiod -lrt -lmicrohttpd

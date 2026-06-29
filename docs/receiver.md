@@ -4,6 +4,20 @@
 
 Код на Python управляет измерениями задержек между Arduino Mega и одноплатником. Подключается к Arduino через последовательный порт, отправляет команды управления и принимает обработанные данные в формате JSON. Программа работает в интерактивном режиме с консольным управлением. Метрики CPU/памяти собираются через Prometheus (node_exporter) и сохраняются в SQLite базу.
 
+## Зависимости
+
+На ALT Linux для сбора данных, импорта trace-метрик и построения графиков:
+
+```bash
+apt-get install python3 python3-module-serial python3-module-requests \
+    python3-module-pandas python3-module-numpy python3-module-matplotlib \
+    python3-module-paramiko prometheus openssh-clients rsync
+```
+
+`sqlite3` используется через стандартный модуль Python. `paramiko` нужен только
+для legacy SSH SoC monitor tooling; основной сбор SoC-метрик идёт через
+Prometheus/node_exporter.
+
 После запуска код автоматически ищет подключенную Arduino Mega по доступным COM-портам или запрашивает порт вручную. Установив соединение, программа переходит в режим командной строки, где пользователь может управлять измерениями: запускать сбор данных, останавливать сбор и проверять статус.
 
 ## Конфигурационный файл

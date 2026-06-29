@@ -25,6 +25,13 @@
 
 ## Сборка
 
+Зависимости на ALT Linux:
+
+```bash
+apt-get install gcc make glibc-devel libgpiod-devel pkg-config \
+    prometheus-node_exporter stress-ng openssh-server
+```
+
 ```bash
 make BOARD=lichee  # или radxa, repkapi4, rockpi4, ...
 ```

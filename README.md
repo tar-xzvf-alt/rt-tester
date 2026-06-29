@@ -27,6 +27,32 @@
 | Prometheus + Grafana + зависимости | [docs/prometheus.md](docs/prometheus.md) |
 | Методика испытаний | [docs/methodology.md](docs/methodology.md) |
 
+## Зависимости на ALT Linux
+
+ПК для `src/pc-receiver/receiver.py`, импорта trace-метрик и построения графиков:
+
+```bash
+apt-get install python3 python3-module-serial python3-module-requests \
+    python3-module-pandas python3-module-numpy python3-module-matplotlib \
+    python3-module-paramiko prometheus grafana openssh-clients rsync
+```
+
+Одноплатник для standalone SoC monitor из `src/socs-investigation/`:
+
+```bash
+apt-get install gcc make glibc-devel libgpiod-devel pkg-config \
+    prometheus-node_exporter stress-ng openssh-server
+```
+
+Arduino Mega firmware:
+
+```bash
+apt-get install arduino-core avr-gcc
+```
+
+Для raw-Ethernet supervisor/controller стенда см. пакетные наборы в
+`../rt-supervisor/docs/altlinux-packages.md`.
+
 ## Ссылки на код
 
 - [Код для ПК](src/pc-receiver)
