@@ -51,8 +51,8 @@ class ArduinoCollector:
                           config.DEFAULT_MEASUREMENTS_PER_GROUP))
         self.measurements_per_group = max(200, min(1500, self.measurements_per_group))
 
-        self.measurement_interval_us = config_dict.get('measurement-interval-us',
-                                                       config.DEFAULT_MEASUREMENT_INTERVAL_US)
+        self.measurement_interval_us = int(config_dict.get(
+            'measurement-interval-us', config.DEFAULT_MEASUREMENT_INTERVAL_US))
 
         # Auto-calculate worst_count: 5% of measurements per group (min 1)
         self.worst_count = max(1, int(self.measurements_per_group * 0.05))
@@ -380,10 +380,8 @@ class ArduinoCollector:
             "measurements_per_group": self.measurements_per_group
         }
         
-        cmd = f"START {json.dumps(params)}"
-        self.send_command(cmd)
-        
-        # Save session information
+        # Set local session state before sending START so the read thread can
+        # validate the immediate Arduino "started" echo without a race.
         self.current_session_id = session_id
         self.start_command_time_us = time.time_ns() // 1000
         self.is_collecting = True
@@ -395,7 +393,7 @@ class ArduinoCollector:
         
         # Update metrics server with new session
         self.metrics_server.update_session(str(session_id))
-        
+
         # Save session start event with target info
         db.save_session_start(
             self.db_path, 
@@ -430,6 +428,9 @@ class ArduinoCollector:
             self.session_logger.info(f"Auto-stop groups: {self.auto_stop_groups}")
             self.session_logger.info(f"Worst count: {self.worst_count}")
             self.session_logger.info(f"Measurement interval: {self.measurement_interval_us} µs")
+
+        cmd = f"START {json.dumps(params)}"
+        self.send_command(cmd)
 
 
     def _cmd_stop(self) -> None:
@@ -502,6 +503,53 @@ class ArduinoCollector:
         """Handle status messages from Arduino."""
         status = msg.get('status')
         msg_session_id = msg.get('session_id')
+
+        if status == 'started':
+            if msg_session_id != self.current_session_id:
+                print(f"\nIgnoring stale Arduino start for session {msg_session_id}")
+                return
+
+            actual_interval = msg.get('interval_us')
+            actual_mpg = msg.get('measurements_per_group')
+            actual_worst = msg.get('worst_count')
+            print("\nArduino confirmed measurement start")
+            print(f"  interval_us: {actual_interval}")
+            print(f"  measurements_per_group: {actual_mpg}")
+            print(f"  worst_count: {actual_worst}")
+
+            mismatches = []
+            if actual_interval != self.measurement_interval_us:
+                mismatches.append(
+                    f"interval_us expected {self.measurement_interval_us}, "
+                    f"got {actual_interval}"
+                )
+            if actual_mpg != self.measurements_per_group:
+                mismatches.append(
+                    f"measurements_per_group expected "
+                    f"{self.measurements_per_group}, got {actual_mpg}"
+                )
+            if actual_worst != self.worst_count:
+                mismatches.append(
+                    f"worst_count expected {self.worst_count}, "
+                    f"got {actual_worst}"
+                )
+
+            if mismatches:
+                print("warning: Arduino applied different measurement parameters")
+                for mismatch in mismatches:
+                    print(f"  {mismatch}")
+
+            if self.session_logger:
+                self.session_logger.info(
+                    f"Arduino started: interval_us={actual_interval}, "
+                    f"measurements_per_group={actual_mpg}, "
+                    f"worst_count={actual_worst}"
+                )
+                for mismatch in mismatches:
+                    self.session_logger.warning(
+                        f"Arduino parameter mismatch: {mismatch}"
+                    )
+            return
         
         if status == 'stopped':
             if not self.is_collecting:

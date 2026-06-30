@@ -27,6 +27,20 @@
 | Prometheus + Grafana + зависимости | [docs/prometheus.md](docs/prometheus.md) |
 | Методика испытаний | [docs/methodology.md](docs/methodology.md) |
 
+## Стандартный запуск стенда
+
+Для стенда, где `rockpi` запускает Beremiz + `alt-rt-supervisor`, а
+`visionfive2` запускает GPIO/controller side:
+
+```bash
+scripts/run_stand_measurement.py \
+    --config configs/stands/rockpi-plc-visionfive2-controller.conf
+```
+
+Скрипт проверяет сеть и preflight, запускает процессы на платах, receiver,
+локальные Prometheus и Grafana, сохраняет SQLite БД и печатает ссылку на
+дашборд с текущим `session_id`. Подробнее: [docs/prometheus.md](docs/prometheus.md).
+
 ## Зависимости на ALT Linux
 
 ПК для `src/pc-receiver/receiver.py`, импорта trace-метрик и построения графиков:

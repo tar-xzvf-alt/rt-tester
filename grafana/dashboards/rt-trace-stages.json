@@ -305,7 +305,8 @@
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xField": "group_index"
       },
       "pluginVersion": "12.3.6",
       "targets": [
@@ -316,13 +317,39 @@
           },
           "editorMode": "code",
           "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_recv\", stat=~\"$stat\"}",
+          "format": "table",
+          "instant": true,
           "legendFormat": "{{stat}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "group_index"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "desc": false,
+                "field": "group_index"
+              }
+            ]
+          }
+        }
+      ],
       "title": "ethernet_recv",
-      "type": "timeseries"
+      "type": "trend"
     },
     {
       "datasource": {
@@ -403,7 +430,8 @@
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xField": "group_index"
       },
       "pluginVersion": "12.3.6",
       "targets": [
@@ -414,13 +442,39 @@
           },
           "editorMode": "code",
           "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_input\", stat=~\"$stat\"}",
+          "format": "table",
+          "instant": true,
           "legendFormat": "{{stat}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "group_index"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "desc": false,
+                "field": "group_index"
+              }
+            ]
+          }
+        }
+      ],
       "title": "shmem_input",
-      "type": "timeseries"
+      "type": "trend"
     },
     {
       "datasource": {
@@ -501,7 +555,8 @@
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xField": "group_index"
       },
       "pluginVersion": "12.3.6",
       "targets": [
@@ -512,13 +567,39 @@
           },
           "editorMode": "code",
           "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"runtime_wait\", stat=~\"$stat\"}",
+          "format": "table",
+          "instant": true,
           "legendFormat": "{{stat}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "group_index"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "desc": false,
+                "field": "group_index"
+              }
+            ]
+          }
+        }
+      ],
       "title": "runtime_wait",
-      "type": "timeseries"
+      "type": "trend"
     },
     {
       "datasource": {
@@ -599,7 +680,8 @@
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xField": "group_index"
       },
       "pluginVersion": "12.3.6",
       "targets": [
@@ -610,13 +692,39 @@
           },
           "editorMode": "code",
           "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"shmem_output\", stat=~\"$stat\"}",
+          "format": "table",
+          "instant": true,
           "legendFormat": "{{stat}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "group_index"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "desc": false,
+                "field": "group_index"
+              }
+            ]
+          }
+        }
+      ],
       "title": "shmem_output",
-      "type": "timeseries"
+      "type": "trend"
     },
     {
       "datasource": {
@@ -697,7 +805,8 @@
           "hideZeros": false,
           "mode": "multi",
           "sort": "none"
-        }
+        },
+        "xField": "group_index"
       },
       "pluginVersion": "12.3.6",
       "targets": [
@@ -708,13 +817,39 @@
           },
           "editorMode": "code",
           "expr": "rt_trace_stage_us{session_id=\"$session_id\", host=~\"$host\", stage=\"ethernet_send\", stat=~\"$stat\"}",
+          "format": "table",
+          "instant": true,
           "legendFormat": "{{stat}}",
-          "range": true,
+          "range": false,
           "refId": "A"
         }
       ],
+      "transformations": [
+        {
+          "id": "convertFieldType",
+          "options": {
+            "conversions": [
+              {
+                "destinationType": "number",
+                "targetField": "group_index"
+              }
+            ]
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "desc": false,
+                "field": "group_index"
+              }
+            ]
+          }
+        }
+      ],
       "title": "ethernet_send",
-      "type": "timeseries"
+      "type": "trend"
     }
   ],
   "refresh": "5s",

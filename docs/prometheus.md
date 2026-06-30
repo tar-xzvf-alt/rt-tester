@@ -1,5 +1,89 @@
 # Prometheus и Grafana
 
+## Стандартный запуск измерения
+
+Основной пользовательский путь для raw-Ethernet стенда — один конфиг и одна
+команда из корня `rt-tester`:
+
+```bash
+scripts/run_stand_measurement.py \
+    --config configs/stands/rockpi-plc-visionfive2-controller.conf
+```
+
+Этот конфиг описывает текущую роль плат:
+
+```text
+rockpi      = Beremiz runtime + alt-rt-supervisor
+visionfive2 = GPIO controller side
+```
+
+Скрипт выполняет полный цикл:
+
+1. проверяет сеть ПК через `rt-supervisor/scripts/check_pc_network.sh`;
+2. запускает `preflight_stand.sh` на `rockpi` и `visionfive2`;
+3. стартует trace exporters на обеих платах;
+4. стартует локальный Prometheus на `127.0.0.1:9091`;
+5. стартует локальную Grafana на `127.0.0.1:3001` с provisioning из `grafana/`;
+6. запускает `alt-rt-supervisor` + Beremiz на `rockpi`;
+7. запускает `controller-emu -b visionfive2` на `visionfive2`;
+8. запускает `receiver.py --start --exit-on-stop`;
+9. после auto-stop импортирует trace metrics в SQLite и печатает ссылку Grafana.
+
+Полезные опции:
+
+```bash
+# Короткий smoke на 10 групп
+scripts/run_stand_measurement.py \
+    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+    --groups 10
+
+# Проверить команды без запуска стенда
+scripts/run_stand_measurement.py \
+    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+    --dry-run
+
+# Пересобрать удаленные деревья перед запуском
+scripts/run_stand_measurement.py \
+    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+    --build
+```
+
+После завершения measurement target-процессы (`alt-rt-supervisor`, Beremiz,
+`controller-emu`) останавливаются автоматически. Prometheus, Grafana и remote
+trace exporters остаются запущенными, чтобы Grafana продолжала видеть результаты.
+Остановить их можно так:
+
+```bash
+scripts/run_stand_measurement.py \
+    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+    --stop-observability
+```
+
+Скрипт печатает итоговые URL, например:
+
+```text
+Prometheus: http://127.0.0.1:9091
+Grafana: http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=1782751117
+```
+
+Если measurement завершился, но в SQLite появились события кроме `start`/`stop`,
+в логах target-процессов есть `ERR`/`WARN`/CRC/timeout, trace group count не
+совпадает с receiver group count или trace-метрики противоречат Arduino latency,
+скрипт печатает
+`Measurement completed with anomalies` и завершает работу с кодом `2`. При этом
+БД, Prometheus и ссылка Grafana остаются доступными для разбора причины.
+
+Сообщение `Arduino latency contradicts imported trace metrics` означает, что
+один обязательный trace stage уже дольше максимальной задержки, измеренной
+Arduino. Обычно это указывает на неверную проводку, прямой loopback/crosstalk
+между Arduino `D7` и `D20` или отсутствие общего GND.
+
+Сообщение `trace group count does not match receiver groups` означает, что
+controller/supervisor увидели больше или меньше GPIO/Ethernet cycles, чем
+Arduino/receiver сохранили как measurement groups. Частая причина — лишние edges
+на controller GPIO input или trace, стартовавший до фактического measurement
+window Arduino.
+
 ## Зависимости
 
 ### ПК (receiver + Prometheus + Grafana)

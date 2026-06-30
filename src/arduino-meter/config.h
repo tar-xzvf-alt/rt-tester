@@ -7,6 +7,6 @@ const int GROUP_SIZE = 1500;
 
 // Default values (will be overridden by START command)
 const int DEFAULT_WORST_COUNT = 75;
-const unsigned int DEFAULT_MEASUREMENT_INTERVAL_US = 300;
+const unsigned long DEFAULT_MEASUREMENT_INTERVAL_US = 10000UL;
 
 #endif

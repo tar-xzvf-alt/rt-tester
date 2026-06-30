@@ -84,7 +84,9 @@ void checkSerialCommands() {
         unsigned long new_session_id = doc["session_id"].as<unsigned long>();
         int groups = doc["groups"] | 0;
         int worst_cnt = doc["worst_count"] | DEFAULT_WORST_COUNT;
-        unsigned long interval_us = doc["interval_us"] | DEFAULT_MEASUREMENT_INTERVAL_US;
+        unsigned long interval_us = doc["interval_us"].is<unsigned long>()
+          ? doc["interval_us"].as<unsigned long>()
+          : DEFAULT_MEASUREMENT_INTERVAL_US;
         int msr_per_group = doc["measurements_per_group"] | GROUP_SIZE;
         
         // Validate parameters
