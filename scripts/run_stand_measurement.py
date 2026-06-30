@@ -208,6 +208,10 @@ def transport_env(cfg: configparser.ConfigParser) -> str:
         items.append(
             f"RT_PACKET_BATCH_GAP_US={q(cfg.get('transport', 'packet-batch-gap-us'))}"
         )
+    if cfg.has_option("transport", "payload-size"):
+        items.append(
+            f"RT_TRANSPORT_PAYLOAD_SIZE={q(cfg.get('transport', 'payload-size'))}"
+        )
     return " ".join(items)
 
 

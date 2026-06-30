@@ -84,6 +84,11 @@ Arduino/receiver сохранили как measurement groups. Частая пр
 на controller GPIO input или trace, стартовавший до фактического measurement
 window Arduino.
 
+В `[transport]` stand config параметр `payload-size = 64` передаётся как
+`RT_TRANSPORT_PAYLOAD_SIZE=64`. BETH v2 использует только начало 96 KiB
+supervisor slot, поэтому компактный raw-Ethernet payload уменьшает число
+Ethernet frames на cycle и предотвращает `packet sequence gap` на текущем стенде.
+
 ## Зависимости
 
 ### ПК (receiver + Prometheus + Grafana)
