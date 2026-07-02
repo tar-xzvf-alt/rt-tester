@@ -504,6 +504,8 @@ def check_latency_trace_consistency(db_path: str, session_id: int) -> bool:
     path_stages = (
         "gpio_to_send",
         "request_send",
+        "response_wait",
+        "retry_wait",
         "ethernet_recv",
         "runtime_wait",
         "ethernet_send",
