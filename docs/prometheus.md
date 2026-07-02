@@ -84,10 +84,10 @@ Arduino/receiver сохранили как measurement groups. Частая пр
 на controller GPIO input или trace, стартовавший до фактического measurement
 window Arduino.
 
-В `[transport]` stand config параметр `payload-size = 64` передаётся как
-`RT_TRANSPORT_PAYLOAD_SIZE=64`. BETH v2 использует только начало 96 KiB
-supervisor slot, поэтому компактный raw-Ethernet payload уменьшает число
-Ethernet frames на cycle и предотвращает `packet sequence gap` на текущем стенде.
+По умолчанию stand config передаёт полный 96 KiB supervisor slot. Опциональный
+параметр `[transport] payload-size` прокидывается как
+`RT_TRANSPORT_PAYLOAD_SIZE` и может использоваться только для специальных
+compact-payload экспериментов.
 
 ## Зависимости
 
