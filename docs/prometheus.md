@@ -88,6 +88,15 @@ window Arduino.
 параметр `[transport] payload-size` прокидывается как
 `RT_TRANSPORT_PAYLOAD_SIZE` и может использоваться только для специальных
 compact-payload экспериментов.
+Параметр `[transport] response-timeout-ms` прокидывается как
+`RT_RESPONSE_TIMEOUT_MS` и задаёт controller-side timeout ожидания response перед
+retry.
+
+Target preflight настраивает `net.core.rmem_max` и `net.core.wmem_max` минимум на
+4 MiB, чтобы raw-socket buffers для full 96 KiB payload не были silently capped.
+Если в supervisor log появляются `packet sequence gap`, controller-side
+`retry_no_response` обычно означает потерю request frame до supervisor и retry
+всего request/response cycle.
 
 ## Зависимости
 

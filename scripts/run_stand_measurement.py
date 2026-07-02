@@ -212,6 +212,10 @@ def transport_env(cfg: configparser.ConfigParser) -> str:
         items.append(
             f"RT_TRANSPORT_PAYLOAD_SIZE={q(cfg.get('transport', 'payload-size'))}"
         )
+    if cfg.has_option("transport", "response-timeout-ms"):
+        items.append(
+            f"RT_RESPONSE_TIMEOUT_MS={q(cfg.get('transport', 'response-timeout-ms'))}"
+        )
     return " ".join(items)
 
 
@@ -506,6 +510,8 @@ def check_latency_trace_consistency(db_path: str, session_id: int) -> bool:
         "request_send",
         "response_wait",
         "retry_wait",
+        "retry_no_response",
+        "retry_partial_response",
         "ethernet_recv",
         "runtime_wait",
         "ethernet_send",
