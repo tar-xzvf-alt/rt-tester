@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import json
 import os
 import shlex
 import shutil
@@ -477,6 +478,156 @@ def stop_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> Non
     ssh(host, command, dry_run=dry_run, check=False)
 
 
+def collect_network_snapshot(cfg: configparser.ConfigParser, section: str,
+                             *, dry_run: bool) -> dict[str, object] | None:
+    host = require(cfg, section, "host")
+    iface = require(cfg, section, "iface")
+    if dry_run:
+        print(f"would collect network counters from {section} {host}:{iface}")
+        return None
+
+    script = f"""
+import json
+import subprocess
+
+iface = {iface!r}
+snapshot = {{"iface": iface, "dev": {{}}, "softnet": {{}}, "ethtool": {{}}}}
+
+keys = [
+    "rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
+    "rx_frame", "rx_compressed", "rx_multicast", "tx_bytes",
+    "tx_packets", "tx_errs", "tx_drop", "tx_fifo", "tx_colls",
+    "tx_carrier", "tx_compressed",
+]
+try:
+    with open("/proc/net/dev", "r", encoding="utf-8") as dev_file:
+        for line in dev_file:
+            if line.strip().startswith(iface + ":"):
+                parts = line.replace(":", " ").split()
+                snapshot["dev"] = {{
+                    key: int(value) for key, value in zip(keys, parts[1:])
+                }}
+                break
+except OSError:
+    pass
+
+softnet = {{"processed": 0, "dropped": 0, "time_squeeze": 0}}
+try:
+    with open("/proc/net/softnet_stat", "r", encoding="utf-8") as stat_file:
+        for line in stat_file:
+            fields = line.split()
+            if len(fields) >= 3:
+                softnet["processed"] += int(fields[0], 16)
+                softnet["dropped"] += int(fields[1], 16)
+                softnet["time_squeeze"] += int(fields[2], 16)
+    snapshot["softnet"] = softnet
+except OSError:
+    pass
+
+try:
+    proc = subprocess.run(["ethtool", "-S", iface], text=True,
+                          stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+                          check=False)
+    if proc.returncode == 0:
+        for line in proc.stdout.splitlines():
+            if ":" not in line:
+                continue
+            key, value = line.strip().split(":", 1)
+            value = value.strip()
+            if value.isdigit():
+                snapshot["ethtool"][key] = int(value)
+except (OSError, ValueError):
+    pass
+
+print(json.dumps(snapshot, sort_keys=True))
+"""
+    result = ssh(host, "python3 - <<'PY'\n" + script + "PY",
+                 capture=True, check=False)
+    if result.returncode != 0 or not result.stdout.strip():
+        print(f"warning: failed to collect network counters from {section}")
+        if result.stdout:
+            print(result.stdout.strip())
+        return None
+    try:
+        snapshot = json.loads(result.stdout.strip().splitlines()[-1])
+    except json.JSONDecodeError:
+        print(f"warning: invalid network counter snapshot from {section}")
+        print(result.stdout.strip())
+        return None
+    snapshot["section"] = section
+    snapshot["host"] = host
+    return snapshot
+
+
+def collect_network_snapshots(cfg: configparser.ConfigParser, *, dry_run: bool
+                              ) -> dict[str, dict[str, object]]:
+    snapshots: dict[str, dict[str, object]] = {}
+    for section in ("supervisor", "controller"):
+        snapshot = collect_network_snapshot(cfg, section, dry_run=dry_run)
+        if snapshot is not None:
+            snapshots[section] = snapshot
+    return snapshots
+
+
+def counter_delta(before: dict[str, int], after: dict[str, int]) -> dict[str, int]:
+    delta: dict[str, int] = {}
+    for key in sorted(set(before) | set(after)):
+        delta[key] = int(after.get(key, 0)) - int(before.get(key, 0))
+    return delta
+
+
+def print_network_delta(before: dict[str, dict[str, object]] | None,
+                        after: dict[str, dict[str, object]] | None) -> bool:
+    if not before or not after:
+        return True
+
+    ok = True
+    anomaly_names = (
+        "err", "drop", "crc", "overflow", "underflow", "missed", "lost",
+        "fifo", "coll", "carrier", "squeeze",
+    )
+    print("Network counter delta:")
+    for section in ("supervisor", "controller"):
+        if section not in before or section not in after:
+            continue
+        current = after[section]
+        dev_delta = counter_delta(
+            before[section].get("dev", {}), current.get("dev", {}))
+        softnet_delta = counter_delta(
+            before[section].get("softnet", {}), current.get("softnet", {}))
+        ethtool_delta = counter_delta(
+            before[section].get("ethtool", {}), current.get("ethtool", {}))
+
+        print(
+            f"  {section} {current.get('host')} {current.get('iface')}: "
+            f"rx_packets={dev_delta.get('rx_packets', 0)} "
+            f"tx_packets={dev_delta.get('tx_packets', 0)} "
+            f"rx_bytes={dev_delta.get('rx_bytes', 0)} "
+            f"tx_bytes={dev_delta.get('tx_bytes', 0)}"
+        )
+
+        anomalies = {
+            f"dev.{key}": value for key, value in dev_delta.items()
+            if value and any(name in key for name in anomaly_names)
+        }
+        anomalies.update({
+            f"softnet.{key}": value for key, value in softnet_delta.items()
+            if value and key in ("dropped", "time_squeeze")
+        })
+        anomalies.update({
+            f"ethtool.{key}": value for key, value in ethtool_delta.items()
+            if value and any(name in key for name in anomaly_names)
+        })
+
+        if anomalies:
+            ok = False
+            for key, value in sorted(anomalies.items()):
+                print(f"    {key}: +{value}")
+        else:
+            print("    no network error/drop counter growth")
+    return ok
+
+
 def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     supervisor_host = require(cfg, "supervisor", "host")
     supervisor_pid = require(cfg, "supervisor", "pid-path")
@@ -749,13 +900,18 @@ def run_measurement(args: argparse.Namespace) -> None:
     write_receiver_config(receiver_config, cfg, db_path, groups)
     print(f"Receiver config: {receiver_config}")
 
+    network_before = None
+    network_after = None
     try:
         start_runtime_stress(cfg, dry_run=args.dry_run)
         start_supervisor(cfg, dry_run=args.dry_run)
         start_controller(cfg, session_id, dry_run=args.dry_run)
+        network_before = collect_network_snapshots(cfg, dry_run=args.dry_run)
         run_receiver(cfg, session_id, receiver_config, groups,
                      dry_run=args.dry_run)
     finally:
+        if network_before is not None:
+            network_after = collect_network_snapshots(cfg, dry_run=args.dry_run)
         if not args.keep_targets:
             stop_targets(cfg, dry_run=args.dry_run)
 
@@ -768,12 +924,13 @@ def run_measurement(args: argparse.Namespace) -> None:
         db_ok = check_latency_trace_consistency(db_path, session_id) and db_ok
     print_trace_counts(cfg, dry_run=args.dry_run)
     logs_ok = print_target_log_summary(cfg, dry_run=args.dry_run)
+    network_ok = print_network_delta(network_before, network_after)
 
     if prometheus_url:
         print(f"Prometheus: {prometheus_url}")
     if grafana_url:
         print(f"Grafana: {grafana_url}?var-session_id={session_id}")
-    if db_ok and logs_ok:
+    if db_ok and logs_ok and network_ok:
         print("Measurement completed successfully")
     else:
         print("Measurement completed with anomalies")
