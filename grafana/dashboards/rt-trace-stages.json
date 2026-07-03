@@ -2031,7 +2031,7 @@
           "type": "prometheus",
           "uid": "rt-trace-prometheus"
         },
-        "definition": "label_values(rt_trace_stage_us, session_id)",
+        "definition": "label_values(rt_trace_stage_latest_us, session_id)",
         "hide": 0,
         "includeAll": false,
         "label": "Session",
@@ -2039,7 +2039,7 @@
         "name": "session_id",
         "options": [],
         "query": {
-          "query": "label_values(rt_trace_stage_us, session_id)",
+          "query": "label_values(rt_trace_stage_latest_us, session_id)",
           "refId": "StandardVariableQuery"
         },
         "refresh": 1,

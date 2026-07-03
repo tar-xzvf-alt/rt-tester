@@ -94,6 +94,11 @@ trace-разбиением одного и того же запуска:
 `rt_trace_stage_us` и `rt_trace_stage_count` остаются доступны для импорта в
 SQLite и post-hoc анализа по `group_index`.
 
+Для проверки Grafana не используйте одногрупповые smoke runs: receiver может
+завершиться сразу после первой группы, и Prometheus не всегда успевает scrape
+`arduino_latency_*` после появления group metrics. Для dashboard smoke используйте
+минимум несколько групп, обычно `--groups 10`.
+
 Runtime-board load берется из `runtime_node_exporter`. По умолчанию runner
 строит target из `[supervisor] host` как `<supervisor-ip>:9100`. Если
 `node_exporter` слушает на другом адресе, задайте в `[observability]`:
