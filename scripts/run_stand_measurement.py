@@ -57,6 +57,10 @@ def optional(cfg: configparser.ConfigParser, section: str, key: str,
     return default
 
 
+def config_bool(value: str) -> bool:
+    return value.strip().lower() in ("1", "on", "true", "yes")
+
+
 def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
         check: bool = True, capture: bool = False) -> subprocess.CompletedProcess[str]:
     printable = " ".join(q(part) for part in cmd)
@@ -115,6 +119,10 @@ def write_receiver_config(path: Path, cfg: configparser.ConfigParser,
 def clamped_measurements_per_group(cfg: configparser.ConfigParser) -> int:
     value = int(require(cfg, "measurement", "measurements-per-group"))
     return max(1, min(1500, value))
+
+
+def runtime_stress_enabled(cfg: configparser.ConfigParser) -> bool:
+    return config_bool(optional(cfg, "measurement", "target-stress", "off"))
 
 
 def write_prometheus_config(path: Path, cfg: configparser.ConfigParser) -> None:
@@ -333,6 +341,11 @@ def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
         ssh(host, f"cd {q(repo)} && scripts/preflight_stand.sh {q(stand_config)}",
             dry_run=dry_run)
 
+    if runtime_stress_enabled(cfg):
+        supervisor_host = require(cfg, "supervisor", "host")
+        ssh(supervisor_host, "command -v stress-ng >/dev/null",
+            dry_run=dry_run)
+
 
 def build_remote(cfg: configparser.ConfigParser, section: str, *, dry_run: bool) -> None:
     host = require(cfg, section, "host")
@@ -424,6 +437,46 @@ def start_controller(cfg: configparser.ConfigParser, session_id: int,
     ssh(host, command, dry_run=dry_run)
 
 
+def start_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    if not runtime_stress_enabled(cfg):
+        print("Runtime stress: off")
+        return
+
+    host = require(cfg, "supervisor", "host")
+    stress_cmd = optional(
+        cfg, "stress", "runtime-command",
+        "stress-ng --cpu 0 --vm 0 --vm-bytes 85% --timeout 0",
+    )
+    pid_path = optional(cfg, "stress", "runtime-pid", "/tmp/rt-runtime-stress.pid")
+    log_path = optional(cfg, "stress", "runtime-log", "/tmp/rt-runtime-stress.log")
+    command = (
+        f"if [ -f {q(pid_path)} ]; then "
+        f"old=$(cat {q(pid_path)} 2>/dev/null || true); "
+        f"if [ -n \"$old\" ]; then kill $old 2>/dev/null || true; fi; "
+        f"rm -f {q(pid_path)}; fi; "
+        f": > {q(log_path)}; "
+        f"{stress_cmd} > {q(log_path)} 2>&1 & "
+        f"echo $! > {q(pid_path)}"
+    )
+    print(f"Runtime stress: on ({stress_cmd})")
+    ssh(host, command, dry_run=dry_run)
+
+
+def stop_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    if not runtime_stress_enabled(cfg):
+        return
+
+    host = require(cfg, "supervisor", "host")
+    pid_path = optional(cfg, "stress", "runtime-pid", "/tmp/rt-runtime-stress.pid")
+    command = (
+        f"if [ -f {q(pid_path)} ]; then "
+        f"pid=$(cat {q(pid_path)} 2>/dev/null || true); "
+        f"if [ -n \"$pid\" ]; then kill $pid 2>/dev/null || true; fi; "
+        f"rm -f {q(pid_path)}; fi"
+    )
+    ssh(host, command, dry_run=dry_run, check=False)
+
+
 def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     supervisor_host = require(cfg, "supervisor", "host")
     supervisor_pid = require(cfg, "supervisor", "pid-path")
@@ -437,6 +490,7 @@ def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
         f"kill $(cat {q(controller_pid)}) 2>/dev/null || true; sleep 1; "
         f"pkill -KILL -x controller-emu 2>/dev/null || true",
         dry_run=dry_run, check=False)
+    stop_runtime_stress(cfg, dry_run=dry_run)
 
 
 def run_receiver(cfg: configparser.ConfigParser, session_id: int,
@@ -696,6 +750,7 @@ def run_measurement(args: argparse.Namespace) -> None:
     print(f"Receiver config: {receiver_config}")
 
     try:
+        start_runtime_stress(cfg, dry_run=args.dry_run)
         start_supervisor(cfg, dry_run=args.dry_run)
         start_controller(cfg, session_id, dry_run=args.dry_run)
         run_receiver(cfg, session_id, receiver_config, groups,
