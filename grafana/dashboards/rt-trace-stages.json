@@ -85,7 +85,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 12,
+        "w": 24,
         "h": 8
       },
       "id": 19,
@@ -138,7 +138,7 @@
         "type": "prometheus",
         "uid": "rt-trace-prometheus"
       },
-      "description": "Runtime-board network RX/TX load from node_exporter on the supervised Beremiz/runtime board. RX and TX are normalized by link speed and shown as percent.",
+      "description": "Runtime-board network RX/TX throughput from node_exporter on the supervised Beremiz/runtime board.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -187,16 +187,15 @@
               }
             ]
           },
-          "unit": "percent",
-          "min": 0,
-          "max": 100
+          "unit": "Bps",
+          "min": 0
         },
         "overrides": []
       },
       "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
+        "x": 0,
+        "y": 8,
+        "w": 24,
         "h": 8
       },
       "id": 28,
@@ -224,8 +223,8 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "100 * sum by (instance) (rate(node_network_receive_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval])) / sum by (instance) (node_network_speed_bytes{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"})",
-          "legendFormat": "Network RX %",
+          "expr": "sum by (instance) (rate(node_network_receive_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval]))",
+          "legendFormat": "Network RX",
           "range": true,
           "refId": "A"
         },
@@ -235,8 +234,8 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "100 * sum by (instance) (rate(node_network_transmit_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval])) / sum by (instance) (node_network_speed_bytes{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"})",
-          "legendFormat": "Network TX %",
+          "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval]))",
+          "legendFormat": "Network TX",
           "range": true,
           "refId": "B"
         }
@@ -304,7 +303,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 8,
+        "y": 16,
         "w": 24,
         "h": 8
       },
@@ -410,7 +409,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 16,
+        "y": 24,
         "w": 24,
         "h": 8
       },
@@ -508,7 +507,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 24,
+        "y": 32,
         "w": 24,
         "h": 8
       },
@@ -606,7 +605,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 32,
+        "y": 40,
         "w": 24,
         "h": 8
       },
@@ -704,7 +703,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 48,
         "w": 24,
         "h": 8
       },
@@ -802,7 +801,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 48,
+        "y": 56,
         "w": 24,
         "h": 8
       },
@@ -900,7 +899,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 56,
+        "y": 64,
         "w": 24,
         "h": 8
       },
@@ -998,7 +997,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 64,
+        "y": 72,
         "w": 24,
         "h": 8
       },
@@ -1096,7 +1095,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 72,
+        "y": 80,
         "w": 24,
         "h": 8
       },
@@ -1194,7 +1193,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 80,
+        "y": 88,
         "w": 24,
         "h": 8
       },
@@ -1292,7 +1291,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 88,
+        "y": 96,
         "w": 24,
         "h": 8
       },
@@ -1390,7 +1389,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 96,
+        "y": 104,
         "w": 24,
         "h": 8
       },
@@ -1488,7 +1487,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 104,
+        "y": 112,
         "w": 24,
         "h": 8
       },
@@ -1586,7 +1585,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 112,
+        "y": 120,
         "w": 24,
         "h": 8
       },
@@ -1684,7 +1683,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 120,
+        "y": 128,
         "w": 24,
         "h": 8
       },
@@ -1782,7 +1781,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 128,
+        "y": 136,
         "w": 24,
         "h": 8
       },
@@ -1880,7 +1879,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 136,
+        "y": 144,
         "w": 24,
         "h": 8
       },
@@ -1978,7 +1977,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 144,
+        "y": 152,
         "w": 24,
         "h": 8
       },
