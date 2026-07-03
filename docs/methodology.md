@@ -6,7 +6,7 @@
 1. Запуск `controller-emu` + `alt-rt-supervisor` на одноплатнике (через `cmake --build Build --target run` в rt-supervisor)
 2. (Опциональный) Нагрузка системы с помощью stress-ng
 3. Конфигурация настроечного файла:
-   - `measurements-per-group` — количество измерений в группе (200-1500)
+   - `measurements-per-group` — количество измерений в группе (1-1500)
    - `measurement-interval-us` — интервал между импульсами
    - `auto-stop-groups` — количество групп до автоостановки
    - `worst-count` рассчитывается автоматически (5% от группы)

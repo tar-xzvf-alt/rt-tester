@@ -48,8 +48,8 @@ class ArduinoCollector:
         # Measurement parameters
         self.measurements_per_group = int(
             config_dict.get('measurements-per-group',
-                          config.DEFAULT_MEASUREMENTS_PER_GROUP))
-        self.measurements_per_group = max(200, min(1500, self.measurements_per_group))
+                            config.DEFAULT_MEASUREMENTS_PER_GROUP))
+        self.measurements_per_group = max(1, min(1500, self.measurements_per_group))
 
         self.measurement_interval_us = int(config_dict.get(
             'measurement-interval-us', config.DEFAULT_MEASUREMENT_INTERVAL_US))
@@ -228,6 +228,15 @@ class ArduinoCollector:
             if group_id:
                 self.groups_received += 1
                 self.last_group_index = group_index
+                if self.auto_stop_groups:
+                    progress = (self.groups_received / self.auto_stop_groups) * 100
+                    print(
+                        f"Group {self.groups_received}/{self.auto_stop_groups} "
+                        f"stored (index {group_index}, {progress:.1f}%)",
+                        flush=True,
+                    )
+                else:
+                    print(f"Group {group_index} stored", flush=True)
 
                 # Save CPU/memory from node_exporter to SQLite
                 if node_metrics['cpu_percent'] is not None:

@@ -66,6 +66,42 @@ Prometheus: http://127.0.0.1:9091
 Grafana: http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=1782751117
 ```
 
+## Просмотр latency и trace breakdown в Grafana
+
+Основной dashboard для stand runs:
+
+```text
+http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=<session_id>
+```
+
+Он называется `RT Trace Stage Breakdown` и показывает Arduino latency вместе с
+trace-разбиением одного и того же запуска:
+
+- самый верх dashboard — нагрузка runtime-платы (`rockpi`): CPU %, memory %,
+  network RX/TX bytes/s из `node_exporter`;
+- далее — end-to-end latency от Arduino/receiver;
+- середина — обычные controller/supervisor stages без retry;
+- низ dashboard — все `retry_*` панели.
+
+Все панели рисуются как time series по одному wall-clock времени Prometheus.
+Линии ступенчатые: значение группы держится на графике до появления следующей
+группы. Это специально сделано одинаково для Arduino latency и trace stages,
+чтобы временные интервалы на оси X совпадали.
+
+Для live dashboard используются метрики `rt_trace_stage_latest_us` и
+`rt_trace_stage_latest_count`: они показывают последний завершенный trace group
+для выбранного `session_id`. Исторические group-level метрики
+`rt_trace_stage_us` и `rt_trace_stage_count` остаются доступны для импорта в
+SQLite и post-hoc анализа по `group_index`.
+
+Runtime-board load берется из `runtime_node_exporter`. По умолчанию runner
+строит target из `[supervisor] host` как `<supervisor-ip>:9100`. Если
+`node_exporter` слушает на другом адресе, задайте в `[observability]`:
+
+```ini
+runtime-node-exporter-target = 10.43.0.2:9100
+```
+
 Если measurement завершился, но в SQLite появились события кроме `start`/`stop`,
 в логах target-процессов есть `ERR`/`WARN`/CRC/timeout, trace group count не
 совпадает с receiver group count или trace-метрики противоречат Arduino latency,
@@ -94,9 +130,10 @@ retry.
 
 Target preflight настраивает `net.core.rmem_max` и `net.core.wmem_max` минимум на
 4 MiB, чтобы raw-socket buffers для full 96 KiB payload не были silently capped.
-Если в supervisor log появляются `packet sequence gap`, controller-side
-`retry_no_response` обычно означает потерю request frame до supervisor и retry
-всего request/response cycle.
+Если в логах появляются `requested retransmit`, это transport-level
+восстановление отдельных raw-Ethernet frames. Если появляются `retry_*` stages,
+это уже controller-side retry всего request/response cycle после истечения
+`RT_RESPONSE_TIMEOUT_MS`.
 
 ## Зависимости
 

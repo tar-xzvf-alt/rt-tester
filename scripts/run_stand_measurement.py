@@ -114,7 +114,7 @@ def write_receiver_config(path: Path, cfg: configparser.ConfigParser,
 
 def clamped_measurements_per_group(cfg: configparser.ConfigParser) -> int:
     value = int(require(cfg, "measurement", "measurements-per-group"))
-    return max(200, min(1500, value))
+    return max(1, min(1500, value))
 
 
 def write_prometheus_config(path: Path, cfg: configparser.ConfigParser) -> None:
@@ -123,6 +123,10 @@ def write_prometheus_config(path: Path, cfg: configparser.ConfigParser) -> None:
     controller_target = require(cfg, "controller", "trace-target")
     supervisor_board = require(cfg, "supervisor", "board")
     controller_board = require(cfg, "controller", "board")
+    supervisor_host = require(cfg, "supervisor", "host").split("@")[-1]
+    runtime_node_target = optional(cfg, "observability",
+                                   "runtime-node-exporter-target",
+                                   f"{supervisor_host}:9100")
     content = f"""global:
   scrape_interval: 500ms
   evaluation_interval: 15s
@@ -154,6 +158,15 @@ scrape_configs:
           board: '{controller_board}'
           role: 'controller'
           source: 'rt-trace-exporter'
+
+  - job_name: 'runtime_node_exporter'
+    scrape_interval: 1s
+    static_configs:
+      - targets: ['{runtime_node_target}']
+        labels:
+          board: '{supervisor_board}'
+          role: 'runtime'
+          source: 'node-exporter'
 """
     path.write_text(content, encoding="utf-8")
 
@@ -429,7 +442,7 @@ def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
 def run_receiver(cfg: configparser.ConfigParser, session_id: int,
                  receiver_config: Path, groups: int, *, dry_run: bool) -> None:
     cmd = [
-        "python3", "receiver.py",
+        "python3", "-u", "receiver.py",
         "--params", str(receiver_config),
         "--session-id", str(session_id),
         "--groups", str(groups),
@@ -653,6 +666,11 @@ def run_measurement(args: argparse.Namespace) -> None:
     print(f"Stand: {stand_name}")
     print(f"Session ID: {session_id}")
     print(f"Groups: {groups}")
+    measurements_per_group = clamped_measurements_per_group(cfg)
+    interval_us = int(require(cfg, "measurement", "measurement-interval-us"))
+    duration_s = groups * measurements_per_group * interval_us / 1_000_000
+    print(f"Measurements per group: {measurements_per_group}")
+    print(f"Expected measurement time: {duration_s:.1f}s")
     sys.stdout.flush()
 
     if args.stop_observability:

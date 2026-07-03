@@ -20,7 +20,7 @@ extern volatile unsigned long lastMeasurementTime;
 // Measurement parameters (configurable via START command)
 extern volatile int worstCount;                       // Number of worst latencies to report
 extern volatile unsigned long measurementIntervalUs;  // Interval between measurements
-extern volatile int measurementsPerGroup;             // Measurements per group (200-1500)
+extern volatile int measurementsPerGroup;             // Measurements per group (1-GROUP_SIZE)
 
 // For direct port access
 extern volatile uint8_t* portOutputRegisterPin7;

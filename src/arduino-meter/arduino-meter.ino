@@ -18,7 +18,7 @@ void loop() {
     // Check if group limit reached
     if (maxGroups > 0 && groupIndex >= maxGroups) {
       collectingData = false;
-      
+
       StaticJsonDocument<64> doc;
       doc["status"] = "auto_stopped";
       doc["session_id"] = sessionId;
@@ -29,6 +29,25 @@ void loop() {
       return;
     }
     
+    // If group is complete - send statistics before scheduling a new pulse.
+    if (measurementInGroup >= measurementsPerGroup) {
+      sendGroupData();
+      groupIndex++;
+      measurementInGroup = 0;
+      sendingInGroup = 0;
+      // Optional progress output
+      if (groupIndex % 10 == 0) {
+        Serial.print(F("{\"progress\":\""));
+        Serial.print(groupIndex);
+        if (maxGroups > 0) {
+          Serial.print(F("/"));
+          Serial.print(maxGroups);
+        }
+        Serial.println(F("\"}"));
+      }
+      return;
+    }
+
     // Timer-based measurement with configurable interval
     unsigned long now = micros();
     if ((now - lastMeasurementTime >= measurementIntervalUs)&&(measurementInGroup==sendingInGroup)||((now - lastMeasurementTime >= measurementIntervalUs*2))) {
@@ -45,25 +64,6 @@ void loop() {
         *portOutputRegisterPin7 |= pin7Mask;
       } else {
         *portOutputRegisterPin7 &= ~pin7Mask;
-      }
-
-      // If group is complete - send statistics
-      if (measurementInGroup >= measurementsPerGroup) {
-        sendGroupData();
-        groupIndex++;
-        measurementInGroup = 0;
-        sendingInGroup = 0;
-        
-        // Optional progress output
-        if (groupIndex % 10 == 0) {
-          Serial.print(F("{\"progress\":\""));
-          Serial.print(groupIndex);
-          if (maxGroups > 0) {
-            Serial.print(F("/"));
-            Serial.print(maxGroups);
-          }
-          Serial.println(F("\"}"));
-        }
       }
     }
   }
@@ -92,7 +92,7 @@ void checkSerialCommands() {
         // Validate parameters
         if (worst_cnt < 1) worst_cnt = 1;
         if (interval_us < 10) interval_us = 10;
-        if (msr_per_group < 200) msr_per_group = 200;
+        if (msr_per_group < 1) msr_per_group = 1;
         if (msr_per_group > GROUP_SIZE) msr_per_group = GROUP_SIZE;
         
         if (new_session_id != 0) {
