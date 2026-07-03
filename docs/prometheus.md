@@ -10,28 +10,29 @@ scripts/run_stand_measurement.py \
     --config configs/stands/rockpi-plc-visionfive2-controller.conf
 ```
 
-Этот конфиг описывает текущую роль плат:
+Этот конфиг описывает роли плат:
 
 ```text
-rockpi      = Beremiz runtime + alt-rt-supervisor
-visionfive2 = GPIO controller side
+runtime/supervisor board = Beremiz runtime + alt-rt-supervisor
+controller board         = GPIO controller side
 ```
 
 ## Pipeline работы стенда
 
 `run_stand_measurement.py` выполняет полный цикл стенда:
 
-1. Проверяет сеть ПК через `rt-supervisor/scripts/check_pc_network.sh`.
-   ПК должен видеть `visionfive2` напрямую и `rockpi` через маршрут
-   `10.43.0.0/24 via 10.42.0.211`.
+1. Проверяет сеть ПК через command из `[pc] network-check`, если он задан.
+   Конкретная топология сети задается выбранным stand config и network-check
+   helper, а не runner code.
 2. Запускает target preflight по SSH: `rt-supervisor/scripts/preflight_stand.sh`
-   на `rockpi` и `rt-controller/scripts/preflight_stand.sh` на `visionfive2`.
+   на runtime/supervisor board и `rt-controller/scripts/preflight_stand.sh` на
+   controller board.
    Эти проверки валидируют stand config, интерфейс, clock sanity, socket buffers,
    а controller side дополнительно проверяет GPIO/libgpiod. Если
    `[measurement] target-stress = on`, runner также проверяет наличие `stress-ng`
    на runtime-плате.
-3. При `--build` пересобирает remote trees: `/root/rt-supervisor` на `rockpi` и
-   `/root/rt-controller` на `visionfive2`.
+3. При `--build` пересобирает remote trees из `[supervisor] repo` и
+   `[controller] repo` с board names из config.
 4. Стартует trace exporters на обеих платах. Они читают JSONL trace files и
    отдают Prometheus metrics на `:9201`.
 5. Стартует локальный Prometheus на `127.0.0.1:9091`. Он scrape-ит PC receiver,
@@ -41,12 +42,12 @@ visionfive2 = GPIO controller side
    runtime-плате. По умолчанию используется
    `stress-ng --cpu 0 --vm 0 --vm-bytes 85% --timeout 0`; команду, pidfile и log
    можно переопределить в секции `[stress]`.
-8. Запускает `alt-rt-supervisor` на `rockpi`. Supervisor открывает raw Ethernet
-   `end0`, создает `/dev/shm/shmem_input` и `/dev/shm/shmem_output`, затем через
-   `-r` стартует Beremiz runtime wrapper.
-9. Запускает `controller-emu -b visionfive2` на `visionfive2`. Controller слушает
+8. Запускает `alt-rt-supervisor` на runtime/supervisor board. Supervisor открывает
+   raw Ethernet interface из `[supervisor] iface`, создает `/dev/shm/shmem_input`
+   и `/dev/shm/shmem_output`, затем через `-r` стартует runtime wrapper.
+9. Запускает `controller-emu -b BOARD` на controller board. Controller слушает
    GPIO input от Arduino, формирует BETH request, добавляет trace metadata и
-   отправляет full `96 KiB` raw-Ethernet request на `rockpi`.
+   отправляет full `96 KiB` raw-Ethernet request на runtime/supervisor board.
 10. Запускает `receiver.py --start --exit-on-stop` на ПК. Receiver командует
    Arduino по serial, пишет SQLite DB и отдает `arduino_latency_*` metrics на
    `127.0.0.1:9101`.
@@ -58,6 +59,14 @@ visionfive2 = GPIO controller side
     импортирует
     trace metrics из Prometheus в SQLite, проверяет group alignment/log anomalies
     и печатает ссылку Grafana с текущим `session_id`.
+
+Example stand `configs/stands/rockpi-plc-visionfive2-controller.conf` задает
+такую текущую лабораторную топологию:
+
+```text
+rockpi      = Beremiz runtime + alt-rt-supervisor
+visionfive2 = GPIO controller side
+```
 
 Полезные опции:
 
@@ -107,7 +116,7 @@ http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=<session_id>
 Он называется `RT Trace Stage Breakdown` и показывает Arduino latency вместе с
 trace-разбиением одного и того же запуска:
 
-- самый верх dashboard — нагрузка runtime-платы (`rockpi`) на CPU/memory %;
+- самый верх dashboard — нагрузка runtime-платы на CPU/memory %;
 - сразу под ней — network RX/TX throughput из `node_exporter` в bytes/sec;
 - далее — end-to-end latency от Arduino/receiver;
 - середина — обычные controller/supervisor stages без retry;

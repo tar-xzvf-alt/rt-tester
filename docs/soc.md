@@ -8,7 +8,7 @@
 ## Архитектура программы
 
 - `gpio_handler_thread` — обработчик GPIO-событий (реагирует на фронты от Arduino)
-- Для Ethernet round-trip тестирования используется `controller-emu` из проекта [rt-supervisor](https://altlinux.space/besogon1238/rt-supervisor) (ветка `polygon`)
+- Для Ethernet round-trip тестирования используется `controller-emu` из проекта [rt-controller](https://altlinux.space/besogon1238/rt-controller).
 
 ## Конфигурация GPIO (различается для разных плат)
 

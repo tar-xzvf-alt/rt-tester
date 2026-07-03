@@ -29,8 +29,9 @@
 
 ## Стандартный запуск стенда
 
-Для стенда, где `rockpi` запускает Beremiz + `alt-rt-supervisor`, а
-`visionfive2` запускает GPIO/controller side:
+Raw-Ethernet стенд описывается одним config file: runtime/supervisor board,
+controller board, remote paths, transport settings, measurement parameters and
+observability paths. Текущий пример конфигурации:
 
 ```bash
 scripts/run_stand_measurement.py \

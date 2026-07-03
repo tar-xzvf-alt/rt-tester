@@ -74,7 +74,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('db', help='SQLite database path')
     parser.add_argument('--session-id', type=int, help='Session ID to summarize')
-    parser.add_argument('--host', help='filter by host (e.g. visionfive, rockpi)')
+    parser.add_argument('--host', help='filter by trace host label')
     args = parser.parse_args()
 
     print_summary(args.db, args.session_id, args.host)
