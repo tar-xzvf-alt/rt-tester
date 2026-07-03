@@ -27,7 +27,7 @@
         "type": "prometheus",
         "uid": "rt-trace-prometheus"
       },
-      "description": "Runtime-board load from node_exporter on the supervised Beremiz/runtime board. CPU and memory use the left percent axis; network RX/TX use the right bytes/sec axis.",
+      "description": "Runtime-board load from node_exporter on the supervised Beremiz/runtime board. CPU, memory, and network RX/TX are all normalized to percent and share the same Y axis.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -76,30 +76,11 @@
               }
             ]
           },
-          "unit": "percent"
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byRegexp",
-              "options": "Network .*"
-            },
-            "properties": [
-              {
-                "id": "unit",
-                "value": "Bps"
-              },
-              {
-                "id": "custom.axisPlacement",
-                "value": "right"
-              },
-              {
-                "id": "custom.axisLabel",
-                "value": "Network"
-              }
-            ]
-          }
-        ]
+        "overrides": []
       },
       "gridPos": {
         "x": 0,
@@ -154,8 +135,8 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(node_network_receive_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval]))",
-          "legendFormat": "Network RX",
+          "expr": "100 * sum by (instance) (rate(node_network_receive_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval])) / sum by (instance) (node_network_speed_bytes{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"})",
+          "legendFormat": "Network RX %",
           "range": true,
           "refId": "C"
         },
@@ -165,8 +146,8 @@
             "uid": "rt-trace-prometheus"
           },
           "editorMode": "code",
-          "expr": "sum by (instance) (rate(node_network_transmit_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval]))",
-          "legendFormat": "Network TX",
+          "expr": "100 * sum by (instance) (rate(node_network_transmit_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval])) / sum by (instance) (node_network_speed_bytes{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"})",
+          "legendFormat": "Network TX %",
           "range": true,
           "refId": "D"
         }
