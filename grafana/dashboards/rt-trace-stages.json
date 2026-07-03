@@ -27,7 +27,7 @@
         "type": "prometheus",
         "uid": "rt-trace-prometheus"
       },
-      "description": "Runtime-board load from node_exporter on the supervised Beremiz/runtime board. CPU, memory, and network RX/TX are all normalized to percent and share the same Y axis.",
+      "description": "Runtime-board CPU and memory load from node_exporter on the supervised Beremiz/runtime board.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -85,7 +85,7 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 24,
+        "w": 12,
         "h": 8
       },
       "id": 19,
@@ -128,7 +128,96 @@
           "legendFormat": "Memory %",
           "range": true,
           "refId": "B"
+        }
+      ],
+      "title": "Runtime CPU And Memory",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "rt-trace-prometheus"
+      },
+      "description": "Runtime-board network RX/TX load from node_exporter on the supervised Beremiz/runtime board. RX and TX are normalized by link speed and shown as percent.",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "percent",
+          "min": 0,
+          "max": 100
         },
+        "overrides": []
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 0,
+        "w": 12,
+        "h": 8
+      },
+      "id": 28,
+      "options": {
+        "legend": {
+          "calcs": [
+            "mean",
+            "max"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "12.3.6",
+      "targets": [
         {
           "datasource": {
             "type": "prometheus",
@@ -138,7 +227,7 @@
           "expr": "100 * sum by (instance) (rate(node_network_receive_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval])) / sum by (instance) (node_network_speed_bytes{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"})",
           "legendFormat": "Network RX %",
           "range": true,
-          "refId": "C"
+          "refId": "A"
         },
         {
           "datasource": {
@@ -149,10 +238,10 @@
           "expr": "100 * sum by (instance) (rate(node_network_transmit_bytes_total{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"}[$__rate_interval])) / sum by (instance) (node_network_speed_bytes{job=\"runtime_node_exporter\",device!~\"lo|veth.*|docker.*|br-.*\"})",
           "legendFormat": "Network TX %",
           "range": true,
-          "refId": "D"
+          "refId": "B"
         }
       ],
-      "title": "Runtime Board Load",
+      "title": "Runtime Network Load",
       "type": "timeseries"
     },
     {

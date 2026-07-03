@@ -77,8 +77,8 @@ http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=<session_id>
 Он называется `RT Trace Stage Breakdown` и показывает Arduino latency вместе с
 trace-разбиением одного и того же запуска:
 
-- самый верх dashboard — нагрузка runtime-платы (`rockpi`): CPU %, memory %,
-  network RX/TX % из `node_exporter`;
+- самый верх dashboard — две панели нагрузки runtime-платы (`rockpi`):
+  CPU/memory % и network RX/TX % из `node_exporter`;
 - далее — end-to-end latency от Arduino/receiver;
 - середина — обычные controller/supervisor stages без retry;
 - низ dashboard — все `retry_*` панели.
@@ -102,8 +102,8 @@ Runtime-board load берется из `runtime_node_exporter`. По умолч�
 runtime-node-exporter-target = 10.43.0.2:9100
 ```
 
-Network RX/TX нормализуются через `node_network_speed_bytes`, поэтому график
-использует ту же процентную ось, что CPU и memory.
+Network RX/TX нормализуются через `node_network_speed_bytes` и вынесены в
+отдельную процентную панель, чтобы не смешивать сетевую нагрузку с CPU/memory.
 
 Если measurement завершился, но в SQLite появились события кроме `start`/`stop`,
 в логах target-процессов есть `ERR`/`WARN`/CRC/timeout, trace group count не
