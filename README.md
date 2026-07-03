@@ -24,7 +24,7 @@
 | ПК (receiver, plot_statistics, merge, конфигурация, БД) | [docs/receiver.md](docs/receiver.md) |
 | Arduino (прошивка, параметры, JSON формат) | [docs/arduino.md](docs/arduino.md) |
 | Одноплатник/SoC (GPIO-таблица, сборка, controller-emu) | [docs/soc.md](docs/soc.md) |
-| Prometheus + Grafana + зависимости | [docs/prometheus.md](docs/prometheus.md) |
+| Stand pipeline, Prometheus + Grafana + зависимости | [docs/prometheus.md](docs/prometheus.md) |
 | Методика испытаний | [docs/methodology.md](docs/methodology.md) |
 
 ## Стандартный запуск стенда
@@ -73,6 +73,7 @@ apt-get install arduino-core avr-gcc
 - [Код для Arduino](src/arduino-meter)
 - [Код на одноплатнике (SoC)](https://altlinux.space/besogon1238/rt-handler)
 - [rt-supervisor (Ethernet round-trip testing)](https://altlinux.space/besogon1238/rt-supervisor)
+- [rt-controller (GPIO/controller side)](https://altlinux.space/besogon1238/rt-controller)
 
 ## Пример конфигурационного файла
 

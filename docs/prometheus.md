@@ -17,17 +17,40 @@ rockpi      = Beremiz runtime + alt-rt-supervisor
 visionfive2 = GPIO controller side
 ```
 
-Скрипт выполняет полный цикл:
+## Pipeline работы стенда
 
-1. проверяет сеть ПК через `rt-supervisor/scripts/check_pc_network.sh`;
-2. запускает `preflight_stand.sh` на `rockpi` и `visionfive2`;
-3. стартует trace exporters на обеих платах;
-4. стартует локальный Prometheus на `127.0.0.1:9091`;
-5. стартует локальную Grafana на `127.0.0.1:3001` с provisioning из `grafana/`;
-6. запускает `alt-rt-supervisor` + Beremiz на `rockpi`;
-7. запускает `controller-emu -b visionfive2` на `visionfive2`;
-8. запускает `receiver.py --start --exit-on-stop`;
-9. после auto-stop импортирует trace metrics в SQLite и печатает ссылку Grafana.
+`run_stand_measurement.py` выполняет полный цикл стенда:
+
+1. Проверяет сеть ПК через `rt-supervisor/scripts/check_pc_network.sh`.
+   ПК должен видеть `visionfive2` напрямую и `rockpi` через маршрут
+   `10.43.0.0/24 via 10.42.0.211`.
+2. Запускает target preflight по SSH: `rt-supervisor/scripts/preflight_stand.sh`
+   на `rockpi` и `rt-controller/scripts/preflight_stand.sh` на `visionfive2`.
+   Эти проверки валидируют stand config, интерфейс, clock sanity, socket buffers,
+   а controller side дополнительно проверяет GPIO/libgpiod.
+3. При `--build` пересобирает remote trees: `/root/rt-supervisor` на `rockpi` и
+   `/root/rt-controller` на `visionfive2`.
+4. Стартует trace exporters на обеих платах. Они читают JSONL trace files и
+   отдают Prometheus metrics на `:9201`.
+5. Стартует локальный Prometheus на `127.0.0.1:9091`. Он scrape-ит PC receiver,
+   оба trace exporters и `node_exporter` runtime-платы.
+6. Стартует локальную Grafana на `127.0.0.1:3001` с provisioning из `grafana/`.
+7. Запускает `alt-rt-supervisor` на `rockpi`. Supervisor открывает raw Ethernet
+   `end0`, создает `/dev/shm/shmem_input` и `/dev/shm/shmem_output`, затем через
+   `-r` стартует Beremiz runtime wrapper.
+8. Запускает `controller-emu -b visionfive2` на `visionfive2`. Controller слушает
+   GPIO input от Arduino, формирует BETH request, добавляет trace metadata и
+   отправляет full `96 KiB` raw-Ethernet request на `rockpi`.
+9. Запускает `receiver.py --start --exit-on-stop` на ПК. Receiver командует
+   Arduino по serial, пишет SQLite DB и отдает `arduino_latency_*` metrics на
+   `127.0.0.1:9101`.
+10. Во время measurement Arduino генерирует GPIO pulse, `controller-emu` отправляет
+    raw-Ethernet request, `alt-rt-supervisor` передает payload в Beremiz через
+    shared memory/futex, получает response и возвращает его controller-у, а
+    controller выставляет GPIO output обратно на Arduino.
+11. После Arduino auto-stop runner останавливает target processes, импортирует
+    trace metrics из Prometheus в SQLite, проверяет group alignment/log anomalies
+    и печатает ссылку Grafana с текущим `session_id`.
 
 Полезные опции:
 
