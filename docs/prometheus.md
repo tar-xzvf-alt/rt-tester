@@ -24,38 +24,41 @@ controller board         = GPIO controller side
 1. Проверяет сеть ПК через command из `[pc] network-check`, если он задан.
    Конкретная топология сети задается выбранным stand config и network-check
    helper, а не runner code.
-2. Запускает target preflight по SSH: `rt-supervisor/scripts/preflight_stand.sh`
+2. Синхронизирует часы runtime и controller boards с текущего ПК через
+   `date -u -s`. Это нужно для trace metrics с explicit timestamps. Если время
+   обслуживается отдельно, шаг можно отключить через `--skip-time-sync`.
+3. Запускает target preflight по SSH: `rt-supervisor/scripts/preflight_stand.sh`
    на runtime/supervisor board и `rt-controller/scripts/preflight_stand.sh` на
    controller board.
    Эти проверки валидируют stand config, интерфейс, clock sanity, socket buffers,
    а controller side дополнительно проверяет GPIO/libgpiod. Если
    `[measurement] target-stress = on`, runner также проверяет наличие `stress-ng`
    на runtime-плате.
-3. При `--build` пересобирает remote trees из `[supervisor] repo` и
+4. При `--build` пересобирает remote trees из `[supervisor] repo` и
    `[controller] repo` с board names из config.
-4. Стартует trace exporters на обеих платах. Они читают JSONL trace files и
+5. Стартует trace exporters на обеих платах. Они читают JSONL trace files и
    отдают Prometheus metrics на `:9201`.
-5. Стартует локальный Prometheus на `127.0.0.1:9091`. Он scrape-ит PC receiver,
+6. Стартует локальный Prometheus на `127.0.0.1:9091`. Он scrape-ит PC receiver,
    оба trace exporters и `node_exporter` runtime-платы.
-6. Стартует локальную Grafana на `127.0.0.1:3001` с provisioning из `grafana/`.
-7. Если `[measurement] target-stress = on`, запускает CPU+memory нагрузку на
+7. Стартует локальную Grafana на `127.0.0.1:3001` с provisioning из `grafana/`.
+8. Если `[measurement] target-stress = on`, запускает CPU+memory нагрузку на
    runtime-плате. По умолчанию используется
    `stress-ng --cpu 0 --vm 0 --vm-bytes 85% --timeout 0`; команду, pidfile и log
    можно переопределить в секции `[stress]`.
-8. Запускает `alt-rt-supervisor` на runtime/supervisor board. Supervisor открывает
+9. Запускает `alt-rt-supervisor` на runtime/supervisor board. Supervisor открывает
    raw Ethernet interface из `[supervisor] iface`, создает `/dev/shm/shmem_input`
    и `/dev/shm/shmem_output`, затем через `-r` стартует runtime wrapper.
-9. Запускает `controller-emu -b BOARD` на controller board. Controller слушает
+10. Запускает `controller-emu -b BOARD` на controller board. Controller слушает
    GPIO input от Arduino, формирует BETH request, добавляет trace metadata и
    отправляет full `96 KiB` raw-Ethernet request на runtime/supervisor board.
-10. Запускает `receiver.py --start --exit-on-stop` на ПК. Receiver командует
+11. Запускает `receiver.py --start --exit-on-stop` на ПК. Receiver командует
    Arduino по serial, пишет SQLite DB и отдает `arduino_latency_*` metrics на
    `127.0.0.1:9101`.
-11. Во время measurement Arduino генерирует GPIO pulse, `controller-emu` отправляет
+12. Во время measurement Arduino генерирует GPIO pulse, `controller-emu` отправляет
     raw-Ethernet request, `alt-rt-supervisor` передает payload в Beremiz через
     shared memory/futex, получает response и возвращает его controller-у, а
     controller выставляет GPIO output обратно на Arduino.
-12. После Arduino auto-stop runner останавливает target processes и runtime stress,
+13. После Arduino auto-stop runner останавливает target processes и runtime stress,
     импортирует
     trace metrics из Prometheus в SQLite, проверяет group alignment/log anomalies
     и печатает ссылку Grafana с текущим `session_id`.

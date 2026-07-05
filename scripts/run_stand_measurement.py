@@ -325,7 +325,7 @@ def stop_observability(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
 
 
 def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
-                        skip_network: bool) -> None:
+                        skip_network: bool, skip_time_sync: bool) -> None:
     for command in ("ssh", "python3"):
         if not shutil.which(command):
             die(f"missing local command: {command}")
@@ -333,6 +333,9 @@ def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
     network_check = optional(cfg, "pc", "network-check", "")
     if network_check and not skip_network:
         run([network_check], dry_run=dry_run)
+
+    if not skip_time_sync:
+        sync_target_clocks(cfg, dry_run=dry_run)
 
     for section in ("supervisor", "controller"):
         host = require(cfg, section, "host")
@@ -346,6 +349,19 @@ def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
         supervisor_host = require(cfg, "supervisor", "host")
         ssh(supervisor_host, "command -v stress-ng >/dev/null",
             dry_run=dry_run)
+
+
+def sync_target_clocks(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    timestamp = int(time.time())
+    seen: set[str] = set()
+    for section in ("supervisor", "controller"):
+        host = require(cfg, section, "host")
+        if host in seen:
+            continue
+        seen.add(host)
+        ssh(host, f"date -u -s '@{timestamp}' >/dev/null",
+            dry_run=dry_run)
+        print(f"{host} time synchronized")
 
 
 def build_remote(cfg: configparser.ConfigParser, section: str, *, dry_run: bool) -> None:
@@ -883,7 +899,8 @@ def run_measurement(args: argparse.Namespace) -> None:
         return
 
     check_prerequisites(cfg, dry_run=args.dry_run,
-                        skip_network=args.skip_pc_network_check)
+                        skip_network=args.skip_pc_network_check,
+                        skip_time_sync=args.skip_time_sync)
 
     if args.build:
         build_remote(cfg, "supervisor", dry_run=args.dry_run)
@@ -960,6 +977,8 @@ def main() -> None:
                         help="do not start local Grafana")
     parser.add_argument("--skip-pc-network-check", action="store_true",
                         help="skip PC-side network check")
+    parser.add_argument("--skip-time-sync", action="store_true",
+                        help="do not set target board clocks from this host")
     parser.add_argument("--stop-observability", action="store_true",
                         help="stop Prometheus and remote trace exporters from config")
     parser.add_argument("--dry-run", action="store_true",
