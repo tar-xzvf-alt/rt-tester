@@ -82,6 +82,11 @@ scripts/run_stand_measurement.py \
     --config configs/stands/rockpi-plc-visionfive2-controller.conf \
     --groups 10
 
+# Такой же smoke с CPU+memory stress-ng на runtime-плате
+scripts/run_stand_measurement.py \
+    --config configs/stands/rockpi-plc-visionfive2-controller-stress.conf \
+    --groups 10
+
 # Проверить команды без запуска стенда
 scripts/run_stand_measurement.py \
     --config configs/stands/rockpi-plc-visionfive2-controller.conf \
