@@ -188,6 +188,10 @@ compact-payload экспериментов.
 Параметр `[transport] response-timeout-ms` прокидывается как
 `RT_RESPONSE_TIMEOUT_MS` и задаёт controller-side timeout ожидания response перед
 retry.
+Параметры `[transport] retransmit-timeout-ms` и
+`[transport] gap-nack-retries` прокидываются как `RT_RETRANSMIT_TIMEOUT_MS` и
+`RT_GAP_NACK_RETRIES`; они задают интервал между NACK повторами и число NACK
+попыток перед abandon incomplete raw-Ethernet session.
 
 Target preflight настраивает `net.core.rmem_max` и `net.core.wmem_max` минимум на
 4 MiB, чтобы raw-socket buffers для full 96 KiB payload не были silently capped.

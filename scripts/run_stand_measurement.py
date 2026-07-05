@@ -238,6 +238,14 @@ def transport_env(cfg: configparser.ConfigParser) -> str:
         items.append(
             f"RT_RESPONSE_TIMEOUT_MS={q(cfg.get('transport', 'response-timeout-ms'))}"
         )
+    if cfg.has_option("transport", "retransmit-timeout-ms"):
+        items.append(
+            f"RT_RETRANSMIT_TIMEOUT_MS={q(cfg.get('transport', 'retransmit-timeout-ms'))}"
+        )
+    if cfg.has_option("transport", "gap-nack-retries"):
+        items.append(
+            f"RT_GAP_NACK_RETRIES={q(cfg.get('transport', 'gap-nack-retries'))}"
+        )
     return " ".join(items)
 
 
