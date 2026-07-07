@@ -420,6 +420,7 @@ def start_supervisor(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
         env += " "
     command = (
         f"pkill -x alt-rt-supervis 2>/dev/null || true; "
+        f"pkill -x runtime 2>/dev/null || true; "
         f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true; "
         f"rm -f /dev/shm/shmem_input /dev/shm/shmem_output; "
         f": > {q(trace_path)}; : > {q(log_path)}; "
@@ -659,6 +660,7 @@ def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     controller_pid = require(cfg, "controller", "pid-path")
     ssh(supervisor_host,
         f"kill $(cat {q(supervisor_pid)}) 2>/dev/null || true; "
+        f"sleep 1; pkill -KILL -x runtime 2>/dev/null || true; "
         f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true",
         dry_run=dry_run, check=False)
     ssh(controller_host,
