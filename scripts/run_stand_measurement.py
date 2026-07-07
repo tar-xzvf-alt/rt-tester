@@ -372,6 +372,95 @@ def sync_target_clocks(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
         print(f"{host} time synchronized")
 
 
+def stop_local_receivers(*, dry_run: bool) -> None:
+    matches: list[tuple[int, str]] = []
+    for proc in Path("/proc").iterdir():
+        if not proc.name.isdigit():
+            continue
+        try:
+            raw = (proc / "cmdline").read_bytes()
+        except OSError:
+            continue
+        if not raw:
+            continue
+        argv = [part.decode(errors="replace") for part in raw.split(b"\0") if part]
+        if any(Path(arg).name == "receiver.py" for arg in argv):
+            matches.append((int(proc.name), " ".join(argv)))
+
+    if not matches:
+        return
+    for pid, cmdline in matches:
+        print(f"Stopping stale receiver.py pid={pid}: {cmdline}")
+        if not dry_run:
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except ProcessLookupError:
+                pass
+
+    if dry_run:
+        return
+
+    deadline = time.monotonic() + 3.0
+    alive = {pid for pid, _ in matches}
+    while alive and time.monotonic() < deadline:
+        for pid in list(alive):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                alive.discard(pid)
+        if alive:
+            time.sleep(0.1)
+
+    for pid in alive:
+        print(f"Killing stale receiver.py pid={pid}")
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+
+
+def cleanup_before_run(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    stop_local_receivers(dry_run=dry_run)
+
+    supervisor_host = require(cfg, "supervisor", "host")
+    supervisor_pid = require(cfg, "supervisor", "pid-path")
+    supervisor_trace_pid = require(cfg, "supervisor", "trace-exporter-pid")
+    stress_pid = optional(cfg, "stress", "runtime-pid", "/tmp/rt-runtime-stress.pid")
+    supervisor_cmd = (
+        f"if [ -f {q(supervisor_pid)} ]; then "
+        f"kill $(cat {q(supervisor_pid)}) 2>/dev/null || true; "
+        f"rm -f {q(supervisor_pid)}; fi; "
+        f"pkill -x alt-rt-supervis 2>/dev/null || true; "
+        f"pkill -KILL -x runtime 2>/dev/null || true; "
+        f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true; "
+        f"if [ -f {q(stress_pid)} ]; then "
+        f"kill $(cat {q(stress_pid)}) 2>/dev/null || true; "
+        f"rm -f {q(stress_pid)}; fi; "
+        f"pkill -x stress-ng 2>/dev/null || true; "
+        f"if [ -f {q(supervisor_trace_pid)} ]; then "
+        f"kill $(cat {q(supervisor_trace_pid)}) 2>/dev/null || true; "
+        f"rm -f {q(supervisor_trace_pid)}; fi; "
+        f"pkill -f '[t]race_exporter.py' 2>/dev/null || true; "
+        f"rm -f /dev/shm/shmem_input /dev/shm/shmem_output"
+    )
+    ssh(supervisor_host, supervisor_cmd, dry_run=dry_run, check=False)
+
+    controller_host = require(cfg, "controller", "host")
+    controller_pid = require(cfg, "controller", "pid-path")
+    controller_trace_pid = require(cfg, "controller", "trace-exporter-pid")
+    controller_cmd = (
+        f"if [ -f {q(controller_pid)} ]; then "
+        f"kill $(cat {q(controller_pid)}) 2>/dev/null || true; "
+        f"rm -f {q(controller_pid)}; fi; "
+        f"pkill -KILL -x controller-emu 2>/dev/null || true; "
+        f"if [ -f {q(controller_trace_pid)} ]; then "
+        f"kill $(cat {q(controller_trace_pid)}) 2>/dev/null || true; "
+        f"rm -f {q(controller_trace_pid)}; fi; "
+        f"pkill -f '[t]race_exporter.py' 2>/dev/null || true"
+    )
+    ssh(controller_host, controller_cmd, dry_run=dry_run, check=False)
+
+
 def build_remote(cfg: configparser.ConfigParser, section: str, *, dry_run: bool) -> None:
     host = require(cfg, section, "host")
     repo = require(cfg, section, "repo")
@@ -480,6 +569,7 @@ def start_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> No
         f"old=$(cat {q(pid_path)} 2>/dev/null || true); "
         f"if [ -n \"$old\" ]; then kill $old 2>/dev/null || true; fi; "
         f"rm -f {q(pid_path)}; fi; "
+        f"pkill -x stress-ng 2>/dev/null || true; "
         f": > {q(log_path)}; "
         f"{stress_cmd} > {q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}"
@@ -498,7 +588,8 @@ def stop_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> Non
         f"if [ -f {q(pid_path)} ]; then "
         f"pid=$(cat {q(pid_path)} 2>/dev/null || true); "
         f"if [ -n \"$pid\" ]; then kill $pid 2>/dev/null || true; fi; "
-        f"rm -f {q(pid_path)}; fi"
+        f"rm -f {q(pid_path)}; fi; "
+        f"pkill -x stress-ng 2>/dev/null || true"
     )
     ssh(host, command, dry_run=dry_run, check=False)
 
@@ -915,6 +1006,8 @@ def run_measurement(args: argparse.Namespace) -> None:
     if args.build:
         build_remote(cfg, "supervisor", dry_run=args.dry_run)
         build_remote(cfg, "controller", dry_run=args.dry_run)
+
+    cleanup_before_run(cfg, dry_run=args.dry_run)
 
     start_trace_exporter(cfg, "supervisor", dry_run=args.dry_run)
     start_trace_exporter(cfg, "controller", dry_run=args.dry_run)
