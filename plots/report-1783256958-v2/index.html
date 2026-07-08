@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang='en'>
+<head>
+<title>Session 1783256958 — Report</title>
+<style>
+body { font-family: sans-serif; max-width: 960px; margin: 2em auto; padding: 0 1em; background: #fafafa; color: #333; }
+h1 { border-bottom: 2px solid #ddd; padding-bottom: 0.3em; }
+img { max-width: 100%; border: 1px solid #ccc; border-radius: 4px; margin: 1em 0; }
+.summary { background: #fff; border: 1px solid #ddd; border-radius: 4px; padding: 1em; margin: 1em 0; }
+.pass { color: #090; } .warn { color: #960; } .fail { color: #c00; }
+table { border-collapse: collapse; margin: 1em 0; }
+th, td { border: 1px solid #ddd; padding: 0.4em 0.8em; text-align: right; }
+th { background: #eee; }
+</style>
+</head>
+<body>
+<h1>Session 1783256958 — Report</h1>
+<p>**Board:** rockpi4-supervised-visionfive2-controller  </p>
+<p>**Kernel:** rockpi-6.12.90-rt-alt1  </p>
+<p>**Stress:** OFF  </p>
+<p>**Payload:** ON  </p>
+<p>**Interval:** 100000 µs  </p>
+<p>**Measurements/group:** 100  </p>
+<p>**Worst count/group:** 5  </p>
+<h2>Performance</h2>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+</table>
+<p>|---|---:|</p>
+<table>
+<tr><th>Groups</th><th>100</th></tr>
+<tr><td>Average Jitter</td><td>1869.4 µs</td></tr>
+<tr><td>Falls</td><td>0</td></tr>
+<tr><td>Min Latency (per-group avg)</td><td>16596.0 µs</td></tr>
+<tr><td>Max Latency (per-group avg)</td><td>33181.6 µs</td></tr>
+<tr><td>Overall Latency (global avg)</td><td>18780.1 µs</td></tr>
+<tr><td>Global Max Latency</td><td>38796.0 µs</td></tr>
+</table>
+<h2>Threshold Exceedances</h2>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+</table>
+<p>|---|---:|</p>
+<table>
+<tr><th>Threshold</th><th>75 µs</th></tr>
+<tr><td>Total exceeds</td><td>500</td></tr>
+<tr><td>Groups with exceeds</td><td>100</td></tr>
+<tr><td>Maximum exceed</td><td>38796 µs</td></tr>
+</table>
+<h2>SoC Metrics</h2>
+<table>
+<tr><th>Metric</th><th>Value</th></tr>
+</table>
+<p>|---|---:|</p>
+<table>
+<tr><th>Average CPU</th><th>12.6%</th></tr>
+<tr><td>Max CPU</td><td>22.0%</td></tr>
+<tr><td>Average Memory</td><td>2.9%</td></tr>
+<tr><td>Max Memory</td><td>2.9%</td></tr>
+</table>
+<h2>Data Integrity</h2>
+<p class='pass'>- ✅ groups: 100 (0..99)</p>
+<p class='pass'>- ✅ latencies: 500</p>
+<p class='pass'>- ✅ trace: 1000 rows, 2 hosts, 10 stages</p>
+<p class='pass'>- ✅ events: {'start': 1, 'stop': 1}</p>
+<p class='pass'>- ✅ soc_metrics: 100 rows</p>
+<h2>Trace Sources</h2>
+<p>- **rockpi**: 500 measurements</p>
+<p>- **visionfive**: 500 measurements</p>
+<h2>Graphs</h2>
+<img src='session_1783256958_all.png' alt='session_1783256958_all.png' title='session_1783256958_all.png'>
+<img src='session_1783256958_latency_soc.png' alt='session_1783256958_latency_soc.png' title='session_1783256958_latency_soc.png'>
+<img src='session_1783256958_jitter_soc.png' alt='session_1783256958_jitter_soc.png' title='session_1783256958_jitter_soc.png'>
+<img src='session_1783256958_trace.png' alt='session_1783256958_trace.png' title='session_1783256958_trace.png'>
+<img src='session_1783256958_events.png' alt='session_1783256958_events.png' title='session_1783256958_events.png'>
+</body>
+</html>

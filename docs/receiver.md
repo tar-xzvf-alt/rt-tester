@@ -137,7 +137,40 @@ Trace-метрики, собранные Prometheus из `rt-supervisor` exporte
 ./plot_statistics.py arduino.db compare 228465 362956 --mode latency
 ./plot_statistics.py arduino.db compare 228465 362956 --mode jitter --output jitter_only.png
 ./plot_statistics.py arduino.db compare 228465 362956 --mode overlay  # оба на одном графике
+
+# Последняя сессия в базе (с фильтром по stress)
+./plot_statistics.py arduino_data.db latest
+./plot_statistics.py arduino_data.db latest --stress on
+./plot_statistics.py arduino_data.db latest --stress off
+
+# Проверка целостности данных сессии (авто-определение последней)
+./plot_statistics.py arduino_data.db validate
+./plot_statistics.py arduino_data.db validate --session 123456
+
+# График breakdown trace-стадий (столбцы stacked)
+./plot_statistics.py arduino_data.db trace --session 123456
+./plot_statistics.py arduino_data.db trace --session 123456 --output trace_breakdown.png
+
+# Временная линия событий (fall/recovery/start/stop)
+./plot_statistics.py arduino_data.db events --session 123456
+./plot_statistics.py arduino_data.db events --session 123456 --output events.png
+
+# Полный отчёт по сессии (все графики + Markdown-сводка + HTML)
+./plot_statistics.py arduino_data.db report --session 123456
+./plot_statistics.py arduino_data.db report --session 123456 --output-dir ./report/session_123456
+./plot_statistics.py arduino_data.db report  # последняя сессия
+./plot_statistics.py arduino_data.db report --stress on  # последняя seссия со stress
+./plot_statistics.py arduino_data.db report --limit 250 --top 125
 ```
+
+Отчёт генерирует в `--output-dir`:
+- `session_<id>_all.png` — комплексный график (latency, jitter, exceeds, SoC)
+- `session_<id>_latency_soc.png` — latency + SoC overlay
+- `session_<id>_jitter_soc.png` — jitter + SoC overlay
+- `session_<id>_trace.png` — breakdown trace-стадий stacked по host
+- `session_<id>_events.png` — временная линия событий
+- `session_<id>_summary.md` — Markdown-сводка
+- `index.html` — HTML-страница со всеми графиками
 
 ## Объединение баз данных
 
