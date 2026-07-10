@@ -33,11 +33,10 @@
 
 ## Код для Radxa
 
-[Код для Radxa](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
+[Код для Radxa](https://altlinux.space/besogon1238/rt-handler)
 
 Собрать код для Radxa:
 
 ```
 make BOARD=radxa
 ```
-    

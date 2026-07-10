@@ -33,11 +33,10 @@
 
 ## Код для MangoPI
 
-[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
+[Код для MangoPI](https://altlinux.space/besogon1238/rt-handler)
 
 Собрать код для Lichee:
 
 ```
 make BOARD=mangopi
 ```
-

@@ -36,11 +36,10 @@
 
 ## Код для БВЦ АРМ
 
-[Код для БВЦ](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
+[Код для БВЦ](https://altlinux.space/besogon1238/rt-handler)
 
 Собрать код для БВЦ:
 
 ```
 make BOARD=bvc_arm
 ```
-

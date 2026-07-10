@@ -33,11 +33,10 @@
 
 ## Код для Lichee
 
-[Код для Lichee](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
+[Код для Lichee](https://altlinux.space/besogon1238/rt-handler)
 
 Собрать код для Lichee:
 
 ```
 make BOARD=lichee
 ```
-

@@ -1,0 +1,122 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [],
+  "liveNow": false,
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "rt-gpio-prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 1000}, {"color": "red", "value": 5000}]}, "unit": "us"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [
+        {"expr": "arduino_latency_avg{board=~\"$board\",session_id=\"$session_id\"}", "legendFormat": "avg", "refId": "A"},
+        {"expr": "arduino_latency_max{board=~\"$board\",session_id=\"$session_id\"}", "legendFormat": "max", "refId": "B"},
+        {"expr": "arduino_latency_min{board=~\"$board\",session_id=\"$session_id\"}", "legendFormat": "min", "refId": "C"}
+      ],
+      "title": "Arduino Latency",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "rt-gpio-prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 500}, {"color": "red", "value": 2000}]}, "unit": "us"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 8},
+      "id": 2,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [
+        {"expr": "arduino_jitter{board=~\"$board\",session_id=\"$session_id\"}", "legendFormat": "jitter", "refId": "A"}
+      ],
+      "title": "Arduino Jitter",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "rt-gpio-prometheus"},
+      "fieldConfig": {
+        "defaults": {"color": {"mode": "palette-classic"}, "mappings": [], "unit": "percent"},
+        "overrides": []
+      },
+      "gridPos": {"h": 8, "w": 24, "x": 0, "y": 16},
+      "id": 3,
+      "options": {"legend": {"calcs": ["lastNotNull", "max"], "displayMode": "table", "placement": "bottom"}, "tooltip": {"mode": "single", "sort": "none"}},
+      "targets": [
+        {"expr": "100 * (1 - avg by (instance) (rate(node_cpu_seconds_total{job=\"runtime_node_exporter\",mode=\"idle\"}[$__rate_interval])))", "legendFormat": "CPU {{instance}}", "refId": "A"},
+        {"expr": "100 * (1 - (node_memory_MemAvailable_bytes{job=\"runtime_node_exporter\"} / node_memory_MemTotal_bytes{job=\"runtime_node_exporter\"}))", "legendFormat": "Memory {{instance}}", "refId": "B"},
+        {"expr": "soc_cpu_percent{board=~\"$board\",session_id=\"$session_id\"}", "legendFormat": "sampled CPU", "refId": "C"},
+        {"expr": "soc_memory_percent{board=~\"$board\",session_id=\"$session_id\"}", "legendFormat": "sampled memory", "refId": "D"}
+      ],
+      "title": "Target CPU / Memory",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "1s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": ["rt-tester", "standalone-gpio"],
+  "templating": {
+    "list": [
+      {
+        "current": {},
+        "datasource": {"type": "prometheus", "uid": "rt-gpio-prometheus"},
+        "definition": "label_values(arduino_latency_avg, board)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Board",
+        "multi": false,
+        "name": "board",
+        "options": [],
+        "query": {"query": "label_values(arduino_latency_avg, board)", "refId": "StandardVariableQuery"},
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {},
+        "datasource": {"type": "prometheus", "uid": "rt-gpio-prometheus"},
+        "definition": "label_values(arduino_latency_avg{board=~\"$board\"}, session_id)",
+        "hide": 0,
+        "includeAll": false,
+        "label": "Session ID",
+        "multi": false,
+        "name": "session_id",
+        "options": [],
+        "query": {"query": "label_values(arduino_latency_avg{board=~\"$board\"}, session_id)", "refId": "StandardVariableQuery"},
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": {"from": "now-15m", "to": "now"},
+  "timepicker": {},
+  "timezone": "",
+  "title": "RT Standalone GPIO",
+  "uid": "rt-standalone-gpio",
+  "version": 1,
+  "weekStart": ""
+}

@@ -33,11 +33,10 @@
 
 ## Код для RepkaPI4
 
-[Код для RepkaPI4](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
+[Код для RepkaPI4](https://altlinux.space/besogon1238/rt-handler)
 
 Собрать код для RepkaPI4:
 
 ```
 make BOARD=repkapi4
 ```
-

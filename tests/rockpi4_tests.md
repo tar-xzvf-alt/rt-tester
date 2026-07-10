@@ -33,11 +33,10 @@
 
 ## Код для RockPI4
 
-[Код для RockPI4](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
+[Код для RockPI4](https://altlinux.space/besogon1238/rt-handler)
 
 Собрать код для RockPI4:
 
 ```
 make BOARD=rockpi4
 ```
-

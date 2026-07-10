@@ -48,6 +48,8 @@ Prometheus/node_exporter.
 Если `timeout-us` или `check-interval-us` **явно указаны** в конфигурации — используются ручные значения вместо авто-расчёта.
 
 Секция `[soc]` больше не используется — метрики CPU/памяти собираются через node_exporter.
+Файл `/var/log/soc_metrics.log`, который может писать legacy `rt-handler`, новым
+standalone GPIO runner-ом не читается и не импортируется в SQLite.
 
 ## Сбор данных
 

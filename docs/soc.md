@@ -1,9 +1,14 @@
 # Код на одноплатнике (SoC)
 
-Код на C работает на тестируемой плате (Radxa/Lichee/Raspberry Pi) и реализует:
-- Ответную логику на импульсы от Arduino
-- Сбор метрик загрузки CPU и памяти
-- Логирование статистики в файл
+Код на C для standalone GPIO режима находится во внешнем репозитории
+[`rt-handler`](https://altlinux.space/besogon1238/rt-handler). Это единственный
+source of truth для обработчика GPIO на одноплатнике; локальная копия
+`src/socs-investigation/` из `rt-tester` удалена.
+
+`rt-handler` работает на тестируемой плате и реализует ответную логику на
+импульсы от Arduino. Метрики CPU/памяти в новых запусках собираются через
+`node_exporter`; текстовый metrics log `rt-handler` считается legacy и не
+используется runner-ом `rt-tester`.
 
 ## Архитектура программы
 
@@ -36,7 +41,8 @@ apt-get install gcc make glibc-devel libgpiod-devel pkg-config \
 make BOARD=lichee  # или radxa, repkapi4, rockpi4, ...
 ```
 
-Конфигурация GPIO для каждой платы хранится в `src/socs-investigation/gpio_config.h`.
+Конфигурация GPIO для каждой платы хранится в `rt-handler/src/gpio_config.h`.
+Для VisionFive 2 текущий build profile в `rt-handler` называется `starfive`.
 
 ## Утилиты для тестирования
 

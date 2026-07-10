@@ -33,11 +33,10 @@
 
 ## Код для Visionfive
 
-[Код для Starfive](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/socs-investigation)
+[Код для VisionFive 2](https://altlinux.space/besogon1238/rt-handler)
 
-Собрать код для Starfive:
+Собрать код для VisionFive 2 текущим profile `rt-handler`:
 
 ```
 make BOARD=starfive
 ```
-

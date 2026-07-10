@@ -169,11 +169,8 @@ avg by (session_id) (arduino_latency_avg{board="radxa"})
 [prometheus]
 url = http://localhost:9090
 
-[soc]
-host = 192.168.1.100
-port = 22
-username = root
-password = root
+# Legacy SSH [soc] configuration is not used by current receiver runs.
+# SoC CPU/memory metrics are collected from node_exporter through Prometheus.
 
 [arduino]
 port = /dev/ttyUSB0
