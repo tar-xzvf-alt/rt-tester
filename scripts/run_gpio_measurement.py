@@ -124,6 +124,9 @@ def clamped_measurements_per_group(cfg: configparser.ConfigParser) -> int:
 def write_receiver_config(path: Path, cfg: configparser.ConfigParser,
                           db_path: str, groups: int) -> None:
     measurement = cfg["measurement"]
+    prometheus_url = optional(
+        cfg, "observability", "prometheus-url",
+        f"http://127.0.0.1:{optional(cfg, 'observability', 'prometheus-port', '9092')}")
     content = "\n".join([
         f"db = {db_path}",
         f"measurements-per-group = {clamped_measurements_per_group(cfg)}",
@@ -133,6 +136,7 @@ def write_receiver_config(path: Path, cfg: configparser.ConfigParser,
         f"target-kernel = {measurement.get('target-kernel')}",
         f"target-stress = {measurement.get('target-stress')}",
         f"target-payload = {measurement.get('target-payload')}",
+        f"prometheus-url = {prometheus_url}",
         "",
     ])
     path.write_text(content, encoding="utf-8")
@@ -171,11 +175,18 @@ scrape_configs:
 
 
 def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | None:
-    port = int(optional(cfg, "observability", "prometheus-port", "9090"))
+    port = int(optional(cfg, "observability", "prometheus-port", "9092"))
     url = f"http://127.0.0.1:{port}"
+    pid_path = Path(require(cfg, "observability", "prometheus-pid"))
     if http_ok(f"{url}/-/healthy"):
-        print(f"Prometheus already healthy: {url}")
-        return url
+        if pid_path.exists():
+            print(f"Restarting managed Prometheus on {url}")
+            stop_prometheus(cfg, dry_run=dry_run)
+            if not dry_run:
+                time.sleep(1)
+        else:
+            print(f"Prometheus already healthy: {url}")
+            return url
 
     binary = optional(cfg, "observability", "prometheus", "prometheus")
     resolved = shutil.which(binary) if "/" not in binary else binary
@@ -186,7 +197,6 @@ def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | 
     config_path = Path(require(cfg, "observability", "prometheus-config"))
     data_path = Path(require(cfg, "observability", "prometheus-data"))
     log_path = Path(require(cfg, "observability", "prometheus-log"))
-    pid_path = Path(require(cfg, "observability", "prometheus-pid"))
     write_prometheus_config(config_path, cfg)
     if dry_run:
         print(f"would start Prometheus on {url}")
@@ -254,9 +264,16 @@ def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool,
         cfg, "observability", "grafana-url",
         f"http://127.0.0.1:{port}/d/rt-standalone-gpio")
     base_url = f"http://127.0.0.1:{port}"
+    pid_path = Path(require(cfg, "observability", "grafana-pid"))
     if http_ok(f"{base_url}/api/health"):
-        print(f"Grafana already healthy: {base_url}")
-        return dashboard_url
+        if pid_path.exists():
+            print(f"Restarting managed Grafana on {base_url}")
+            stop_grafana(cfg, dry_run=dry_run)
+            if not dry_run:
+                time.sleep(1)
+        else:
+            print(f"Grafana already healthy: {base_url}")
+            return dashboard_url
 
     binary = optional(cfg, "observability", "grafana", "grafana-server")
     resolved = shutil.which(binary) if "/" not in binary else binary
@@ -266,7 +283,6 @@ def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool,
 
     data_path = Path(require(cfg, "observability", "grafana-data"))
     log_path = Path(require(cfg, "observability", "grafana-log"))
-    pid_path = Path(require(cfg, "observability", "grafana-pid"))
     provisioning = write_grafana_provisioning(
         data_path / "provisioning", cfg, prometheus_url)
     plugins_path = data_path / "plugins"
@@ -450,12 +466,14 @@ def cleanup_target(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     host = require(cfg, "target", "host")
     pid_path = require(cfg, "target", "pid-path")
     binary = Path(require(cfg, "target", "binary")).name
+    binary_path = require(cfg, "target", "binary")
     stress_pid = optional(cfg, "stress", "pid", "/tmp/rt-gpio-stress.pid")
     command = (
         f"if [ -f {q(pid_path)} ]; then "
         f"kill $(cat {q(pid_path)}) 2>/dev/null || true; "
         f"rm -f {q(pid_path)}; fi; "
         f"pkill -x {q(binary)} 2>/dev/null || true; "
+        f"pkill -f {q(binary_path)} 2>/dev/null || true; "
         f"if [ -f {q(stress_pid)} ]; then "
         f"kill $(cat {q(stress_pid)}) 2>/dev/null || true; "
         f"rm -f {q(stress_pid)}; fi; "
@@ -543,11 +561,15 @@ def print_target_diagnostics(cfg: configparser.ConfigParser,
     if dry_run:
         return
     host = require(cfg, "target", "host")
-    binary = Path(require(cfg, "target", "binary")).name
+    pid_path = require(cfg, "target", "pid-path")
     stdout_log = require(cfg, "target", "stdout-log")
     command = (
         f"echo '== rt-handler process =='; "
-        f"pgrep -a -x {q(binary)} 2>/dev/null || echo 'not running'; "
+        f"if [ -f {q(pid_path)} ]; then "
+        f"pid=$(cat {q(pid_path)} 2>/dev/null || true); "
+        f"if [ -n \"$pid\" ]; then ps -fp \"$pid\" || true; "
+        f"else echo 'empty pidfile'; fi; "
+        f"else echo 'pidfile missing'; fi; "
         f"echo '== node_exporter process =='; "
         f"pgrep -a -x node_exporter 2>/dev/null || echo 'not running'; "
         f"echo '== node_exporter scheduling =='; "
@@ -568,10 +590,10 @@ def print_prometheus_diagnostics(prometheus_url: str | None,
         return
     queries = (
         ("arduino_latency_avg samples",
-         f'count(arduino_latency_avg{{session_id="{session_id}"}})'),
+         f'sum(count_over_time(arduino_latency_avg{{session_id="{session_id}"}}[30m]))'),
         ("soc_cpu_percent samples",
-         f'count(soc_cpu_percent{{session_id="{session_id}"}})'),
-        ("runtime_node_exporter up", 'up{job="runtime_node_exporter"}'),
+         f'sum(count_over_time(soc_cpu_percent{{session_id="{session_id}"}}[30m]))'),
+        ("runtime_node_exporter up", 'max_over_time(up{job="runtime_node_exporter"}[5m])'),
     )
     print("Prometheus diagnostics:")
     for label, query in queries:

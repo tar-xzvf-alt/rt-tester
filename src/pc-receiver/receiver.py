@@ -69,6 +69,7 @@ class ArduinoCollector:
         self.target_kernel = config_dict.get('target-kernel', config.DEFAULT_TARGET_KERNEL)
         self.target_stress = config_dict.get('target-stress', config.DEFAULT_TARGET_STRESS)
         self.target_payload = config_dict.get('target-payload', config.DEFAULT_TARGET_PAYLOAD)
+        self.prometheus_url = config_dict.get('prometheus-url', 'http://localhost:9090')
 
 
         # Auto-stop configuration
@@ -206,7 +207,7 @@ class ArduinoCollector:
             self.metrics_server.add_group(msg)
             
             # Get CPU/memory from node_exporter via Prometheus
-            node_metrics = get_node_exporter_metrics()
+            node_metrics = get_node_exporter_metrics(self.prometheus_url)
             if node_metrics['cpu_percent'] is not None:
                 msg['soc_cpu_percent'] = node_metrics['cpu_percent']
                 msg['soc_memory_percent'] = node_metrics['memory_percent'] if node_metrics['memory_percent'] else 0

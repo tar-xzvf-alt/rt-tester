@@ -96,7 +96,7 @@ scripts/run_gpio_measurement.py \
 4. при `--deploy` копирует внешний `rt-handler` на target;
 5. при `--build` запускает `make BOARD=<board>` на target;
 6. останавливает старые `rt-handler`/`stress-ng` процессы;
-7. стартует Prometheus на `127.0.0.1:9090`, если он не запущен;
+7. стартует Prometheus на `127.0.0.1:9092`, если он не запущен;
 8. стартует Grafana на `127.0.0.1:3002`, если она включена;
 9. стартует `rt-handler` на target;
 10. если `rt-handler` не стартовал, печатает tail его log;
@@ -163,3 +163,6 @@ GPIO line numbers задаются в `rt-handler/src/gpio_config.h`.
 
 Для анализа используются те же команды `plot_statistics.py`, что и для supervised
 запусков.
+
+Сводка свежего baseline и reference supervised-сессий хранится в
+[`standalone-gpio-comparison.md`](standalone-gpio-comparison.md).

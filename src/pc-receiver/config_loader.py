@@ -82,6 +82,7 @@ def load_config(config_path=None):
         'target-kernel': config.DEFAULT_TARGET_KERNEL,
         'target-stress': config.DEFAULT_TARGET_STRESS,
         'target-payload': config.DEFAULT_TARGET_PAYLOAD,
+        'prometheus-url': 'http://localhost:9090',
         'soc': {
             'enabled': False,
             'host': None,
@@ -99,7 +100,7 @@ def load_config(config_path=None):
             for key in ['db', 'timeout-us', 'check-interval-us', 'auto-stop-groups',
                         'measurements-per-group', 'measurement-interval-us',
                         'target-board', 'target-kernel', 'target-stress',
-                        'target-payload']:
+                        'target-payload', 'prometheus-url']:
                 if key in file_config:
                     config_dict[key] = file_config[key]
             
@@ -143,6 +144,7 @@ def load_config(config_path=None):
             print(f"  target-kernel = {config_dict['target-kernel']}")
             print(f"  target-stress = {config_dict['target-stress']}")
             print(f"  target-payload = {config_dict['target-payload']}")
+            print(f"  prometheus-url = {config_dict['prometheus-url']}")
             
             if config_dict['auto-stop-groups']:
                 print(f"  auto-stop-groups = {config_dict['auto-stop-groups']} groups")

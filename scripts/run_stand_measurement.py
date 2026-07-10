@@ -103,6 +103,9 @@ def write_receiver_config(path: Path, cfg: configparser.ConfigParser,
                           db_path: str, groups: int) -> None:
     measurement = cfg["measurement"]
     measurements_per_group = clamped_measurements_per_group(cfg)
+    prometheus_url = optional(
+        cfg, "observability", "prometheus-url",
+        f"http://127.0.0.1:{optional(cfg, 'observability', 'prometheus-port', '9091')}")
     content = "\n".join([
         f"db = {db_path}",
         f"measurements-per-group = {measurements_per_group}",
@@ -112,6 +115,7 @@ def write_receiver_config(path: Path, cfg: configparser.ConfigParser,
         f"target-kernel = {measurement.get('target-kernel')}",
         f"target-stress = {measurement.get('target-stress')}",
         f"target-payload = {measurement.get('target-payload')}",
+        f"prometheus-url = {prometheus_url}",
         "",
     ])
     path.write_text(content, encoding="utf-8")
