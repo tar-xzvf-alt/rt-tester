@@ -476,6 +476,15 @@ def build_remote(cfg: configparser.ConfigParser, section: str, *, dry_run: bool)
         dry_run=dry_run)
 
 
+def stand_binary(cfg: configparser.ConfigParser, section: str, name: str) -> str:
+    binary = optional(cfg, section, "binary", "")
+    if binary:
+        return binary
+    repo = require(cfg, section, "repo")
+    build = require(cfg, section, "build")
+    return f"{repo}/{build}/src/{name}"
+
+
 def start_trace_exporter(cfg: configparser.ConfigParser, section: str,
                          *, dry_run: bool) -> None:
     host = require(cfg, section, "host")
@@ -499,7 +508,6 @@ def start_trace_exporter(cfg: configparser.ConfigParser, section: str,
 def start_supervisor(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     host = require(cfg, "supervisor", "host")
     repo = require(cfg, "supervisor", "repo")
-    build = require(cfg, "supervisor", "build")
     iface = require(cfg, "supervisor", "iface")
     runtime = require(cfg, "supervisor", "runtime")
     timeout_us = require(cfg, "supervisor", "timeout-us")
@@ -507,7 +515,7 @@ def start_supervisor(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     log_path = require(cfg, "supervisor", "log-path")
     pid_path = require(cfg, "supervisor", "pid-path")
     stand_config = require(cfg, "supervisor", "stand-config")
-    binary = f"{repo}/{build}/src/alt-rt-supervisor"
+    binary = stand_binary(cfg, "supervisor", "alt-rt-supervisor")
     env = transport_env(cfg)
     if env:
         env += " "
@@ -530,7 +538,6 @@ def start_controller(cfg: configparser.ConfigParser, session_id: int,
                      *, dry_run: bool) -> None:
     host = require(cfg, "controller", "host")
     repo = require(cfg, "controller", "repo")
-    build = require(cfg, "controller", "build")
     iface = require(cfg, "controller", "iface")
     board = require(cfg, "controller", "board")
     trace_path = require(cfg, "controller", "trace-path")
@@ -538,7 +545,7 @@ def start_controller(cfg: configparser.ConfigParser, session_id: int,
     pid_path = require(cfg, "controller", "pid-path")
     stand_config = require(cfg, "controller", "stand-config")
     measurements_per_group = clamped_measurements_per_group(cfg)
-    binary = f"{repo}/{build}/src/controller-emu"
+    binary = stand_binary(cfg, "controller", "controller-emu")
     env = transport_env(cfg)
     if env:
         env += " "
