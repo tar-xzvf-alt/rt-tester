@@ -380,15 +380,27 @@ def stop_local_receivers(*, dry_run: bool) -> None:
                 pass
 
 
-def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
-    for command in ("ssh", "rsync"):
+def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
+                        need_deploy: bool, need_build: bool) -> None:
+    local_commands = ["ssh"]
+    if need_deploy:
+        local_commands.append("rsync")
+    for command in local_commands:
         if not shutil.which(command):
             die(f"missing local command: {command}")
 
     host = require(cfg, "target", "host")
     ssh(host, "hostname >/dev/null", dry_run=dry_run)
-    ssh(host, "command -v make >/dev/null && command -v cc >/dev/null",
-        dry_run=dry_run)
+    if need_build:
+        ssh(host, "command -v make >/dev/null && command -v cc >/dev/null",
+            dry_run=dry_run)
+    else:
+        binary = require(cfg, "target", "binary")
+        command = (
+            f"case {q(binary)} in */*) test -x {q(binary)} ;; "
+            f"*) command -v {q(binary)} >/dev/null ;; esac"
+        )
+        ssh(host, command, dry_run=dry_run)
     ssh(host, "command -v node_exporter >/dev/null || true", dry_run=dry_run,
         check=False)
 
@@ -457,8 +469,7 @@ def deploy_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
 def build_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     host = require(cfg, "target", "host")
     repo = require(cfg, "target", "repo")
-    board = require(cfg, "target", "board")
-    command = f"cd {q(repo + '/src')} && make BOARD={q(board)}"
+    command = f"cd {q(repo + '/src')} && make"
     ssh(host, command, dry_run=dry_run)
 
 
@@ -484,16 +495,19 @@ def cleanup_target(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
 
 def start_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     host = require(cfg, "target", "host")
-    repo = require(cfg, "target", "repo")
+    board = require(cfg, "target", "board")
     binary = require(cfg, "target", "binary")
     pid_path = require(cfg, "target", "pid-path")
     stdout_log = require(cfg, "target", "stdout-log")
-    metrics_log = optional(cfg, "target", "metrics-log", "/dev/null")
+    workdir = optional(cfg, "target", "workdir", "/")
+    handler_args = optional(cfg, "target", "args", "-b {board}").format(
+        board=q(board),
+    )
     command = (
         f"mkdir -p {q(Path(stdout_log).parent)}; "
         f": > {q(stdout_log)}; "
-        f"cd {q(repo + '/src')} || exit 1; "
-        f"{q(binary)} {q(metrics_log)} >{q(stdout_log)} 2>&1 & "
+        f"cd {q(workdir)} || exit 1; "
+        f"{q(binary)} {handler_args} >{q(stdout_log)} 2>&1 & "
         f"echo $! > {q(pid_path)}; "
         f"sleep 1; "
         f"if ! kill -0 $(cat {q(pid_path)}) 2>/dev/null; then "
@@ -656,7 +670,10 @@ def run_measurement(args: argparse.Namespace) -> None:
         stop_grafana(cfg, dry_run=args.dry_run)
         return
 
-    check_prerequisites(cfg, dry_run=args.dry_run)
+    check_prerequisites(
+        cfg, dry_run=args.dry_run,
+        need_deploy=args.deploy, need_build=args.build,
+    )
     check_arduino(cfg, dry_run=args.dry_run)
     if not args.skip_time_sync:
         sync_target_clock(cfg, dry_run=args.dry_run)
@@ -721,7 +738,7 @@ def main() -> None:
     parser.add_argument("--deploy", action="store_true",
                         help="rsync rt-handler to the target before run")
     parser.add_argument("--build", action="store_true",
-                        help="build rt-handler on the target before run")
+                        help="build source rt-handler on the target before run")
     parser.add_argument("--prepare-only", action="store_true",
                         help="run checks/deploy/build and exit before measurement")
     parser.add_argument("--keep-target", action="store_true",

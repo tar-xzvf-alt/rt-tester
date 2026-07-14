@@ -38,11 +38,14 @@ apt-get install gcc make glibc-devel libgpiod-devel pkg-config \
 ```
 
 ```bash
-make BOARD=lichee  # или radxa, repkapi4, rockpi4, ...
+cd src && make
 ```
 
-Конфигурация GPIO для каждой платы хранится в `rt-handler/src/gpio_config.h`.
-Для VisionFive 2 текущий build profile в `rt-handler` называется `starfive`.
+Board выбирается во время запуска, например `rt-handler -b starfive`, или через
+пакетный service config `/etc/sysconfig/rt-handler`.
+Конфигурация GPIO для каждой платы хранится в `/etc/rt-handler/boards.d/*.conf`
+и во встроенных profiles `rt-handler`.
+Для VisionFive 2 текущий profile в `rt-handler` называется `starfive`.
 
 ## Утилиты для тестирования
 

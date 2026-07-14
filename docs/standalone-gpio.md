@@ -44,25 +44,28 @@ configs/stands/visionfive2-standalone-gpio.conf
 host = root@10.42.0.211
 label = visionfive2
 board = starfive
-rt-handler-local = /home/taranev/work_repos/rt/rt-handler
-repo = /root/rt-handler
-binary = /root/rt-handler/src/starfive-monitor
+binary = /usr/sbin/rt-handler
+args = -b {board}
+workdir = /
 metrics-log = /dev/null
 housekeeping-cpus = 0
 ```
 
-`board = starfive` здесь означает текущий build profile в `rt-handler` для
+`board = starfive` здесь означает runtime profile в `rt-handler` для
 VisionFive 2. User-facing имя стенда и target-board остаются `visionfive2`.
 
 ## Запуск
 
-Синхронизировать `rt-handler`, собрать его на плате и запустить measurement:
+Запустить measurement с установленным RPM-пакетом `rt-handler` на target:
 
 ```bash
 scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf \
-    --deploy --build
+    --config configs/stands/visionfive2-standalone-gpio.conf
 ```
+
+Для source-tree обновления вместо установленного пакета можно оставить в конфиге
+`rt-handler-local`/`repo`, поставить `binary = /root/rt-handler/src/rt-handler`,
+`workdir = /root/rt-handler/src` и запускать с `--deploy --build`.
 
 Короткий smoke:
 
@@ -77,7 +80,7 @@ scripts/run_gpio_measurement.py \
 ```bash
 scripts/run_gpio_measurement.py \
     --config configs/stands/visionfive2-standalone-gpio.conf \
-    --deploy --build --dry-run
+    --dry-run
 ```
 
 Только подготовить target без запуска Arduino measurement:
@@ -85,7 +88,7 @@ scripts/run_gpio_measurement.py \
 ```bash
 scripts/run_gpio_measurement.py \
     --config configs/stands/visionfive2-standalone-gpio.conf \
-    --deploy --build --prepare-only
+    --prepare-only
 ```
 
 После запуска runner:
@@ -94,7 +97,7 @@ scripts/run_gpio_measurement.py \
 2. проверяет, что Arduino serial port доступен;
 3. опционально синхронизирует время target;
 4. при `--deploy` копирует внешний `rt-handler` на target;
-5. при `--build` запускает `make BOARD=<board>` на target;
+5. при `--build` запускает `make` в source tree на target;
 6. останавливает старые `rt-handler`/`stress-ng` процессы;
 7. стартует Prometheus на `127.0.0.1:9092`, если он не запущен;
 8. стартует Grafana на `127.0.0.1:3002`, если она включена;
@@ -150,7 +153,8 @@ Arduino Mega использует тот же физический проток�
 - GPIO output target board -> Arduino pin 20;
 - общий GND обязателен.
 
-GPIO line numbers задаются в `rt-handler/src/gpio_config.h`.
+GPIO line numbers задаются в `/etc/rt-handler/boards.d/*.conf` и во встроенных
+profiles `rt-handler`.
 
 ## Результаты
 

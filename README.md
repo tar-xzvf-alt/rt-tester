@@ -37,8 +37,7 @@ Standalone GPIO стенд использует `rt-handler` как единст
 
 ```bash
 scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf \
-    --deploy --build
+    --config configs/stands/visionfive2-standalone-gpio.conf
 ```
 
 Метрики CPU/памяти собираются через `node_exporter`; логовый формат
@@ -74,9 +73,11 @@ apt-get install python3 python3-module-serial python3-module-requests \
 Одноплатник для standalone GPIO monitor из `rt-handler`:
 
 ```bash
-apt-get install gcc make glibc-devel libgpiod-devel pkg-config \
-    prometheus-node_exporter stress-ng openssh-server
+apt-get install rt-handler prometheus-node_exporter stress-ng openssh-server
 ```
+
+Source deploy/build mode additionally needs `gcc make glibc-devel libgpiod-devel
+pkg-config` on the target.
 
 Arduino Mega firmware:
 
