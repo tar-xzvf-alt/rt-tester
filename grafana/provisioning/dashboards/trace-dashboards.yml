@@ -9,4 +9,4 @@ providers:
     updateIntervalSeconds: 5
     allowUiUpdates: true
     options:
-      path: /home/taranev/work_repos/rt/rt-tester/grafana/dashboards
+      path: /usr/share/rt-tester-tools/grafana/dashboards

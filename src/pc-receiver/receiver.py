@@ -5,6 +5,7 @@ Arduino Data Collection Daemon
 
 import time
 import argparse
+import os
 import sys
 import threading
 from datetime import datetime
@@ -212,7 +213,8 @@ class ArduinoCollector:
                 msg['soc_cpu_percent'] = node_metrics['cpu_percent']
                 msg['soc_memory_percent'] = node_metrics['memory_percent'] if node_metrics['memory_percent'] else 0
             
-            with open('/tmp/metrics_all_groups.log', 'a') as f:
+            os.makedirs(config.STATE_DIR, exist_ok=True)
+            with open(config.METRICS_LOG, 'a') as f:
                 f.write(json.dumps(msg) + '\n')
             
             # Pass target info to database

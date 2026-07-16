@@ -2,6 +2,8 @@
 Configuration constants for Arduino collector.
 """
 
+import os
+
 # Database defaults
 DEFAULT_DB_PATH = "./arduino_data.db"
 
@@ -27,4 +29,10 @@ DEFAULT_TARGET_PAYLOAD = "off"  # on - payload between pulses, off - idle betwee
 AUTO_STOP = 2500
 
 # Logging
-LOG_DIR = "logs"
+STATE_DIR = os.environ.get(
+    "RT_TESTER_STATE_DIR",
+    os.path.join(os.environ.get("XDG_STATE_HOME", os.path.expanduser("~/.local/state")),
+                 "rt-tester"),
+)
+LOG_DIR = os.path.join(STATE_DIR, "logs")
+METRICS_LOG = os.path.join(STATE_DIR, "metrics_all_groups.log")

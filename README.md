@@ -62,6 +62,18 @@ scripts/run_stand_measurement.py \
 
 ## Зависимости на ALT Linux
 
+PC-side measurement tools can be built as a noarch RPM and then invoked from
+any directory:
+
+```bash
+gear-hsh --no-sisyphus-check -v --nprocs=12 /home/taranev/hasher/x86_64_chroot/
+rt-tester-run-stand --help
+rt-tester-run-gpio --help
+```
+
+The package installs its data under `/usr/share/rt-tester-tools`. Runtime logs
+are written under `${XDG_STATE_HOME:-~/.local/state}/rt-tester`.
+
 ПК для `src/pc-receiver/receiver.py`, импорта trace-метрик и построения графиков:
 
 ```bash
