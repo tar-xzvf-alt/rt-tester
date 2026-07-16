@@ -21,14 +21,62 @@
 
 | Компонент | Файл |
 |-----------|------|
-| ПК (receiver, plot_statistics, merge, конфигурация, БД) | [docs/receiver.md](docs/receiver.md) |
+| ПК (receiver, trace import/summary, source-only анализ БД) | [docs/receiver.md](docs/receiver.md) |
 | Arduino (прошивка, параметры, JSON формат) | [docs/arduino.md](docs/arduino.md) |
 | Одноплатник/SoC (`rt-handler`, GPIO, controller-emu) | [docs/soc.md](docs/soc.md) |
 | Standalone GPIO режим (`rt-handler` + receiver) | [docs/standalone-gpio.md](docs/standalone-gpio.md) |
 | Stand pipeline, Prometheus + Grafana + зависимости | [docs/prometheus.md](docs/prometheus.md) |
 | Методика испытаний | [docs/methodology.md](docs/methodology.md) |
 
-## Standalone GPIO запуск
+## Запуск Из Пакета
+
+Пакет `rt-tester-tools` запускается из любого каталога только через wrappers в
+`/usr/bin`; пакетные конфиги нужно указывать полным путем из
+`/usr/share/rt-tester-tools`:
+
+```bash
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf
+
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf
+```
+
+Также устанавливаются команды `rt-tester-receiver`, `rt-tester-import-trace` и
+`rt-tester-trace-summary`. Переменная `RT_TESTER_ROOT` предназначена для
+тестирования wrappers с другим data root; при обычной установке она не нужна.
+
+## Состав Пакета
+
+RPM содержит:
+
+- пять wrappers `/usr/bin/rt-tester-*`;
+- два runner-а, receiver, import/summary trace-утилиты и необходимые им Python-модули в `/usr/share/rt-tester-tools`;
+- четыре stand config из `configs/stands/`;
+- Grafana dashboards и provisioning для двух режимов;
+- `prometheus/trace-prometheus-local-tunnel.yml`;
+- `README.md`, `LICENSE.md` и `docs/*.md` как документацию RPM.
+
+В RPM намеренно не входят Arduino firmware, тестовые результаты и БД, source
+trees `rt-handler`/`rt-supervisor`/`rt-controller`, а также source-only утилиты
+`plot_statistics.py`, `merge_databases.py`, `soc_monitor.py` и
+`promql_metrics.py`. Не входят и альтернативные файлы
+`prometheus/prometheus.yml`, `prometheus/trace-prometheus.yml` и legacy
+`grafana/rt-tester-dashboard.json`. Упоминания этих файлов в установленной
+документации описывают работу из checkout, а не содержимое RPM.
+
+## Пути Runtime-Данных
+
+- SQLite БД из пакетных stand config находятся в `/tmp/rt-tester-*.db`.
+- Локальные pid/log/data/config Prometheus и Grafana находятся в `/tmp`.
+- Target logs, traces и pid-файлы из stand config находятся в `/tmp` на соответствующей плате.
+- Только внутренние логи и `metrics_all_groups.log` receiver хранятся в `${XDG_STATE_HOME:-$HOME/.local/state}/rt-tester`.
+- `RT_TESTER_STATE_DIR` полностью переопределяет state directory только для receiver; runner БД, observability и target paths он не меняет.
+
+`/tmp` не является постоянным хранилищем. Нужные БД и логи следует перенести до
+перезагрузки или задать другие пути в собственной копии конфига.
+
+## Standalone GPIO Запуск
 
 Standalone GPIO стенд использует `rt-handler` как единственный source of truth
 для C-кода на плате. Arduino напрямую подает GPIO pulse на тестируемую плату,
@@ -36,8 +84,8 @@ Standalone GPIO стенд использует `rt-handler` как единст
 в SQLite:
 
 ```bash
-scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf
 ```
 
 Метрики CPU/памяти собираются через `node_exporter`; логовый формат
@@ -52,29 +100,49 @@ controller board, remote paths, transport settings, measurement parameters and
 observability paths. Текущий пример конфигурации:
 
 ```bash
-scripts/run_stand_measurement.py \
-    --config configs/stands/rockpi-plc-visionfive2-controller.conf
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf
 ```
 
 Скрипт проверяет сеть и preflight, запускает процессы на платах, receiver,
 локальные Prometheus и Grafana, сохраняет SQLite БД и печатает ссылку на
 дашборд с текущим `session_id`. Подробнее: [docs/prometheus.md](docs/prometheus.md).
 
-## Зависимости на ALT Linux
+## Возможности Развертывания
 
-PC-side measurement tools can be built as a noarch RPM and then invoked from
-any directory:
+| Режим | Установленные target-пакеты | Заранее размещенный source tree | Автоматический deploy | Build перед запуском |
+|-------|-----------------------------|--------------------------------|----------------------|----------------------|
+| Supervised | Да, штатный пакетный путь | Опционально, вручную | Нет опции `--deploy` | `--build`, только после ручного размещения source и изменения `repo`, `build` и `binary` в копии конфига |
+| Standalone GPIO | Да, штатный пакетный путь | Опционально | `--deploy` из `rt-handler-local` в `repo` | `--build` собирает уже размещенный `repo`; можно сочетать с `--deploy` |
+
+Пакетные supervised config указывают `/usr/share/rt-supervisor`,
+`/usr/share/rt-controller` и установленные binaries. Они не содержат параметра
+`build` и не предназначены для `--build` без изменений. Supervised runner не
+копирует исходники: их нужно вручную разместить на обеих платах и настроить
+собственную копию config.
+
+При запуске из checkout вместо wrappers допустимы
+`scripts/run_stand_measurement.py` и `scripts/run_gpio_measurement.py` с
+относительными путями проекта.
+
+## Зависимости На ALT Linux
+
+Сборка noarch RPM:
 
 ```bash
 gear-hsh --no-sisyphus-check -v --nprocs=12 /home/taranev/hasher/x86_64_chroot/
-rt-tester-run-stand --help
-rt-tester-run-gpio --help
 ```
 
-The package installs its data under `/usr/share/rt-tester-tools`. Runtime logs
-are written under `${XDG_STATE_HOME:-~/.local/state}/rt-tester`.
+Уровни зависимостей:
 
-ПК для `src/pc-receiver/receiver.py`, импорта trace-метрик и построения графиков:
+- Обязательные зависимости RPM: `python3`, `python3-module-serial`, `python3-module-requests`, `/bin/sh`, `openssh-clients`, `rsync`, `coreutils`.
+- Runtime ПК для полного observability: `prometheus`, опционально `grafana`; `python3-module-prometheus_client` не требуется текущему встроенному metrics server.
+- Source-only анализ и графики: `python3-module-pandas`, `python3-module-numpy`, `python3-module-matplotlib`; `python3-module-paramiko` нужен только legacy SSH tooling, отсутствующему в RPM.
+- Target runtime: пакеты `rt-handler` для standalone либо `rt-supervisor` и `rt-controller` для supervised, плюс `prometheus-node_exporter`; `stress-ng` нужен только для stress config.
+- Target source build: компилятор, build system и devel-пакеты соответствующего target-проекта; для `rt-handler` это `gcc make glibc-devel libgpiod-devel pkg-config`.
+- Arduino firmware build: `arduino-core avr-gcc`; firmware в `rt-tester-tools` не входит.
+
+Полный PC-набор для запуска стенда и source-only анализа:
 
 ```bash
 apt-get install python3 python3-module-serial python3-module-requests \
@@ -82,14 +150,15 @@ apt-get install python3 python3-module-serial python3-module-requests \
     python3-module-paramiko prometheus grafana openssh-clients rsync
 ```
 
-Одноплатник для standalone GPIO monitor из `rt-handler`:
+Одноплатник для пакетного standalone GPIO:
 
 ```bash
 apt-get install rt-handler prometheus-node_exporter stress-ng openssh-server
 ```
 
-Source deploy/build mode additionally needs `gcc make glibc-devel libgpiod-devel
-pkg-config` on the target.
+Для standalone `--deploy` дополнительно нужен локальный source tree `rt-handler`
+по пути `rt-handler-local`; для `--build` source должен находиться в target
+`repo`, а `binary` и `workdir` должны указывать на результат сборки.
 
 Arduino Mega firmware:
 

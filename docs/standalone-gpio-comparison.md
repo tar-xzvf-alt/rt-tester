@@ -7,8 +7,8 @@
 Команда:
 
 ```bash
-scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf \
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
     --groups 100
 ```
 

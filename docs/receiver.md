@@ -1,8 +1,12 @@
-# Код для ПК (receiver, plot_statistics, merge_databases)
+# Код Для ПК
 
 [Код для ПК](../src/pc-receiver)
 
 Код на Python управляет измерениями задержек между Arduino Mega и одноплатником. Подключается к Arduino через последовательный порт, отправляет команды управления и принимает обработанные данные в формате JSON. Программа работает в интерактивном режиме с консольным управлением. Метрики CPU/памяти собираются через Prometheus (node_exporter) и сохраняются в SQLite базу.
+
+RPM `rt-tester-tools` содержит receiver, import/summary trace-утилиты и их
+внутренние модули. `plot_statistics.py`, `merge_databases.py`, `soc_monitor.py` и
+`promql_metrics.py` доступны только в source checkout и в RPM не входят.
 
 ## Зависимости
 
@@ -19,6 +23,12 @@ apt-get install python3 python3-module-serial python3-module-requests \
 Prometheus/node_exporter.
 
 После запуска код автоматически ищет подключенную Arduino Mega по доступным COM-портам или запрашивает порт вручную. Установив соединение, программа переходит в режим командной строки, где пользователь может управлять измерениями: запускать сбор данных, останавливать сбор и проверять статус.
+
+Receiver хранит внутренние logs и `metrics_all_groups.log` в
+`${XDG_STATE_HOME:-$HOME/.local/state}/rt-tester`. Переменная
+`RT_TESTER_STATE_DIR` полностью заменяет этот каталог. Эта настройка относится
+только к receiver и не переносит SQLite БД, observability data/logs или target
+logs из `/tmp`, заданных stand config.
 
 ## Конфигурационный файл
 
@@ -54,7 +64,7 @@ standalone GPIO runner-ом не читается и не импортирует
 ## Сбор данных
 
 ```bash
-./receiver.py --params /path/to/params.conf
+rt-tester-receiver --params /path/to/params.conf
 # Интерактивные команды:
 start # запуск сессии сбора N
 stop  # остановка сессии сбора N
@@ -65,27 +75,27 @@ exit  # завершение сбора
 Неинтерактивный запуск с автостартом и выходом после остановки Arduino:
 
 ```bash
-./receiver.py --params /path/to/params.conf --start --exit-on-stop
+rt-tester-receiver --params /path/to/params.conf --start --exit-on-stop
 ```
 
 Количество групп можно переопределить из командной строки без правки
 конфигурационного файла:
 
 ```bash
-./receiver.py --params /path/to/params.conf --groups 3 --start --exit-on-stop
+rt-tester-receiver --params /path/to/params.conf --groups 3 --start --exit-on-stop
 ```
 
 Для внешней синхронизации с trace-системой можно задать session ID явно:
 
 ```bash
-./receiver.py --params /path/to/params.conf --session-id 123456 --groups 3 --start --exit-on-stop
+rt-tester-receiver --params /path/to/params.conf --session-id 123456 --groups 3 --start --exit-on-stop
 ```
 
 Trace-метрики, собранные Prometheus из `rt-supervisor` exporters, импортируются
 в SQLite отдельно:
 
 ```bash
-./import_trace_metrics.py arduino_data.db 123456 --prometheus-url http://localhost:9090
+rt-tester-import-trace arduino_data.db 123456 --prometheus-url http://localhost:9090
 ```
 
 Импорт заполняет таблицу `trace_group_metrics` с ключом
@@ -94,15 +104,19 @@ Trace-метрики, собранные Prometheus из `rt-supervisor` exporte
 Краткую сводку по сохранённой trace-сессии можно вывести так:
 
 ```bash
-./trace_summary.py arduino_data.db --session-id 123456
+rt-tester-trace-summary arduino_data.db --session-id 123456
 ```
 
 Для Prometheus на ПК без маршрута в сеть `10.43.0.0/24` используйте SSH tunnels
-и пример конфига `prometheus/trace-prometheus-local-tunnel.yml`. Для Prometheus,
-который видит RockPI/VisionFive напрямую, используйте
-`prometheus/trace-prometheus.yml`.
+и пакетный пример
+`/usr/share/rt-tester-tools/prometheus/trace-prometheus-local-tunnel.yml`.
+Конфиг `prometheus/trace-prometheus.yml` для прямой видимости плат доступен
+только в source checkout и в RPM не входит.
 
 ## Анализ данных (plot_statistics)
+
+Все команды этого раздела выполняются из source checkout. `plot_statistics.py`
+и его pandas/numpy/matplotlib зависимости не входят в `rt-tester-tools`.
 
 ```bash
 # Список всех сессий с информацией о плате, ядре и превышениях порога
@@ -177,6 +191,8 @@ Trace-метрики, собранные Prometheus из `rt-supervisor` exporte
 ## Объединение баз данных
 
 Скрипт `merge_databases.py` сливает все .db файлы из `tests/results_*/` в одну базу:
+
+Он также является source-only инструментом и не устанавливается RPM.
 
 ```bash
 python3 src/pc-receiver/merge_databases.py tests/ merged.db

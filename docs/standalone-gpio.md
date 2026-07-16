@@ -34,8 +34,11 @@ CPU/memory метрики собираются через `node_exporter` и Pro
 Пример для VisionFive 2:
 
 ```text
-configs/stands/visionfive2-standalone-gpio.conf
+/usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf
 ```
+
+Путь выше относится к установленному `rt-tester-tools`. В checkout тот же файл
+доступен как `configs/stands/visionfive2-standalone-gpio.conf`.
 
 Ключевые поля:
 
@@ -59,35 +62,43 @@ VisionFive 2. User-facing имя стенда и target-board остаются `
 Запустить measurement с установленным RPM-пакетом `rt-handler` на target:
 
 ```bash
-scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf
 ```
 
-Для source-tree обновления вместо установленного пакета можно оставить в конфиге
-`rt-handler-local`/`repo`, поставить `binary = /root/rt-handler/src/rt-handler`,
-`workdir = /root/rt-handler/src` и запускать с `--deploy --build`.
+Штатный пакетный config запускает `/usr/sbin/rt-handler` и не требует сборки.
+Standalone runner поддерживает оба source-сценария:
+
+- `--deploy` копирует локальный tree из `rt-handler-local` в target `repo`;
+- `--build` выполняет `make` в `<repo>/src` без копирования исходников;
+- `--deploy --build` сначала копирует, затем собирает.
+
+Для source-запуска нужно работать с собственной копией config и задать
+`rt-handler-local`/`repo`, `binary = /root/rt-handler/src/rt-handler` и
+`workdir = /root/rt-handler/src`. Один `--build` требует, чтобы source tree уже
+был размещен на target вручную или предыдущим `--deploy`.
 
 Короткий smoke:
 
 ```bash
-scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf \
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
     --groups 3
 ```
 
 Проверить команды без выполнения:
 
 ```bash
-scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf \
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
     --dry-run
 ```
 
 Только подготовить target без запуска Arduino measurement:
 
 ```bash
-scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf \
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
     --prepare-only
 ```
 
@@ -134,8 +145,8 @@ dashboard, поэтому ось X синхронизирована. В dashboar
 Остановить Prometheus и Grafana, поднятые runner-ом:
 
 ```bash
-scripts/run_gpio_measurement.py \
-    --config configs/stands/visionfive2-standalone-gpio.conf \
+rt-tester-run-gpio \
+    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
     --stop-observability
 ```
 
@@ -165,8 +176,13 @@ profiles `rt-handler`.
 - `events`;
 - `soc_metrics`, если Prometheus/node_exporter доступны.
 
-Для анализа используются те же команды `plot_statistics.py`, что и для supervised
-запусков.
+Пакетный config пишет БД, target log и локальные observability pid/log/data/config
+в `/tmp`. Receiver отдельно пишет свои внутренние logs и
+`metrics_all_groups.log` в XDG state directory; только этот путь можно заменить
+через `RT_TESTER_STATE_DIR`.
+
+Для анализа из checkout используется `src/pc-receiver/plot_statistics.py`. Эта
+source-only утилита не входит в RPM `rt-tester-tools`.
 
 Сводка свежего baseline и reference supervised-сессий хранится в
 [`standalone-gpio-comparison.md`](standalone-gpio-comparison.md).

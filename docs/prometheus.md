@@ -2,12 +2,12 @@
 
 ## Стандартный запуск измерения
 
-Основной пользовательский путь для raw-Ethernet стенда — один конфиг и одна
-команда из корня `rt-tester`:
+Основной пользовательский путь для raw-Ethernet стенда — пакетный wrapper и
+один установленный конфиг:
 
 ```bash
-scripts/run_stand_measurement.py \
-    --config configs/stands/rockpi-plc-visionfive2-controller.conf
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf
 ```
 
 Этот конфиг описывает роли плат:
@@ -34,8 +34,9 @@ controller board         = GPIO controller side
    а controller side дополнительно проверяет GPIO/libgpiod. Если
    `[measurement] target-stress = on`, runner также проверяет наличие `stress-ng`
    на runtime-плате.
-4. При `--build` пересобирает remote trees из `[supervisor] repo` и
-   `[controller] repo` с board names из config.
+4. При `--build` пересобирает заранее размещенные remote source trees из
+   `[supervisor] repo` и `[controller] repo` с board names из config. Runner не
+   имеет опции `--deploy` и не копирует эти trees.
 5. Стартует trace exporters на обеих платах. Они читают JSONL trace files и
    отдают Prometheus metrics на `:9201`.
 6. Стартует локальный Prometheus на `127.0.0.1:9091`. Он scrape-ит PC receiver,
@@ -81,25 +82,32 @@ visionfive2 = GPIO controller side
 
 ```bash
 # Короткий smoke на 10 групп
-scripts/run_stand_measurement.py \
-    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
     --groups 10
 
 # Такой же smoke с CPU+memory stress-ng на runtime-плате
-scripts/run_stand_measurement.py \
-    --config configs/stands/rockpi-plc-visionfive2-controller-stress.conf \
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller-stress.conf \
     --groups 10
 
 # Проверить команды без запуска стенда
-scripts/run_stand_measurement.py \
-    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
     --dry-run
 
-# Пересобрать удаленные деревья перед запуском
-scripts/run_stand_measurement.py \
-    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+# Пересобрать вручную размещенные и настроенные source trees
+rt-tester-run-stand \
+    --config /path/to/source-stand.conf \
     --build
 ```
+
+Пакетные config используют установленные `/usr/share/rt-supervisor`,
+`/usr/share/rt-controller`, `/usr/bin/alt-rt-supervisor` и
+`/usr/bin/controller-emu`; в них нет обязательного для сборки поля `build`.
+Поэтому `--build` не является готовой возможностью пакетной конфигурации. Нужно
+вручную разместить source trees на обеих платах и изменить `repo`, `build` и
+`binary` в собственной копии config. У supervised runner нет `--deploy`.
 
 После завершения measurement target-процессы (`alt-rt-supervisor`, Beremiz,
 `controller-emu`) останавливаются автоматически. Prometheus, Grafana и remote
@@ -107,8 +115,8 @@ trace exporters остаются запущенными, чтобы Grafana пр
 Остановить их можно так:
 
 ```bash
-scripts/run_stand_measurement.py \
-    --config configs/stands/rockpi-plc-visionfive2-controller.conf \
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
     --stop-observability
 ```
 
@@ -202,41 +210,51 @@ Target preflight настраивает `net.core.rmem_max` и `net.core.wmem_ma
 
 ## Зависимости
 
-### ПК (receiver + Prometheus + Grafana)
+### Обязательные Зависимости RPM На ПК
+
+`rt-tester-tools` требует `python3`, `python3-module-serial`,
+`python3-module-requests`, `/bin/sh`, `openssh-clients`, `rsync` и `coreutils`.
+Этого достаточно для установленных команд, но внешние сервисы observability и
+target software устанавливаются отдельно.
+
+### Observability И Source-Only Анализ На ПК
 
 ```bash
-apt-get install python3-module-serial \
-    python3-module-requests python3-module-prometheus_client \
-    python3-module-pandas python3-module-numpy python3-module-matplotlib \
-    python3-module-paramiko prometheus grafana openssh-clients rsync
+apt-get install prometheus grafana
 ```
 
 | Пакет | Назначение |
 |-------|-----------|
-| `python3-module-serial` | Связь с Arduino по COM-порту |
-| `python3-module-requests` | Запросы к Prometheus API |
-| `python3-module-prometheus_client` | Prometheus client library |
-| `python3-module-pandas` / `python3-module-numpy` / `python3-module-matplotlib` | Построение графиков и анализ БД |
-| `python3-module-paramiko` | Legacy SSH SoC monitor tooling |
 | `prometheus` | Сервер сбора метрик |
 | `grafana` | Визуализация (опционально) |
 
-### Одноплатник (SoC)
+Для source-only `plot_statistics.py` нужны `python3-module-pandas`,
+`python3-module-numpy` и `python3-module-matplotlib`. Пакет
+`python3-module-paramiko` нужен только legacy SSH SoC tooling, которое не входит
+в RPM. Текущий встроенный metrics server не требует
+`python3-module-prometheus_client`.
+
+### Target Runtime
 
 ```bash
-apt-get install libgpiod2 libgpiod-devel gcc make glibc-devel pkg-config \
-    prometheus-node_exporter stress-ng openssh-server
+apt-get install prometheus-node_exporter openssh-server
 ```
 
-| Пакет | Назначение |
-|-------|-----------|
-| `libgpiod2` | GPIO-библиотека |
-| `libgpiod-devel` | Заголовки GPIO для сборки |
-| `gcc` / `make` | Компиляция C-кода |
-| `glibc-devel` | Заголовки libc для сборки C-кода |
-| `pkg-config` | Проверка/поиск установленных библиотек |
-| `prometheus-node_exporter` | Экспорт метрик CPU/памяти |
-| `stress-ng` | Нагрузочное тестирование |
+Дополнительно устанавливаются `rt-handler` для standalone или
+`rt-supervisor`/`rt-controller` для supervised. `stress-ng` нужен только при
+`target-stress = on`.
+
+### Target Source Build
+
+Build-зависимости определяются target-проектом и не нужны при запуске
+установленных binaries. Для сборки `rt-handler` нужны:
+
+```bash
+apt-get install gcc make glibc-devel libgpiod-devel pkg-config
+```
+
+Supervised `--build` требует вручную размещенных source trees и настроенных
+`repo`, `build`, `binary`; runner не предоставляет `--deploy`.
 
 ### Arduino
 
@@ -251,6 +269,10 @@ apt-get install arduino-core avr-gcc
 
 ## Запуск Prometheus (systemd)
 
+Этот раздел описывает ручную настройку из source checkout. Файл
+`prometheus/prometheus.yml` не входит в RPM `rt-tester-tools`; пакетный runner
+генерирует локальный config в `/tmp` из stand config.
+
 ```bash
 sudo cp prometheus/prometheus.yml /etc/prometheus/prometheus.yml
 sudo systemctl restart prometheus
@@ -263,6 +285,10 @@ sudo systemctl restart prometheus
 - Retention: размерный (10GB) в systemd override
 
 ## Импорт дашборда Grafana
+
+Ниже используется legacy dashboard из source checkout. Файл
+`grafana/rt-tester-dashboard.json` не входит в RPM; пакет содержит dashboards и
+provisioning, которые runners используют из `/usr/share/rt-tester-tools/grafana`.
 
 ```bash
 curl -X POST http://admin:admin@localhost:3000/api/dashboards/db \
