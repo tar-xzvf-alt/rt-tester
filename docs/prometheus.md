@@ -104,7 +104,9 @@ rt-tester-run-stand \
 
 Пакетные config используют установленные `/usr/share/rt-supervisor`,
 `/usr/share/rt-controller`, `/usr/bin/alt-rt-supervisor` и
-`/usr/bin/controller-emu`; в них нет обязательного для сборки поля `build`.
+`/usr/bin/controller-emu`. Стандартный config также использует
+`/usr/bin/runtime` из отдельного target-пакета
+`rt-supervisor-runtime-example`; в них нет обязательного для сборки поля `build`.
 Поэтому `--build` не является готовой возможностью пакетной конфигурации. Нужно
 вручную разместить source trees на обеих платах и изменить `repo`, `build` и
 `binary` в собственной копии config. У supervised runner нет `--deploy`.
@@ -240,9 +242,11 @@ apt-get install prometheus grafana
 apt-get install prometheus-node_exporter openssh-server
 ```
 
-Дополнительно устанавливаются `rt-handler` для standalone или
-`rt-supervisor`/`rt-controller` для supervised. `stress-ng` нужен только при
-`target-stress = on`.
+Дополнительно устанавливается `rt-handler` для standalone. Стандартный
+supervised demo требует `rt-supervisor` и `rt-supervisor-runtime-example` на
+runtime board, `rt-controller` на controller board. Production PLC использует
+собственный runtime wrapper вместо example subpackage. `stress-ng` нужен только
+при `target-stress = on`.
 
 ### Target Source Build
 

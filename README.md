@@ -121,6 +121,11 @@ rt-tester-run-stand \
 копирует исходники: их нужно вручную разместить на обеих платах и настроить
 собственную копию config.
 
+Стандартный package-only config использует demo `/usr/bin/runtime`, который
+устанавливается отдельным target-пакетом `rt-supervisor-runtime-example` точной
+версии основного `rt-supervisor`. Для production PLC этот subpackage не нужен:
+в собственной копии config задается путь к внешнему runtime wrapper.
+
 При запуске из checkout вместо wrappers допустимы
 `scripts/run_stand_measurement.py` и `scripts/run_gpio_measurement.py` с
 относительными путями проекта.
@@ -138,7 +143,7 @@ gear-hsh --no-sisyphus-check -v --nprocs=12 /home/taranev/hasher/x86_64_chroot/
 - Обязательные зависимости RPM: `python3`, `python3-module-serial`, `python3-module-requests`, `/bin/sh`, `openssh-clients`, `rsync`, `coreutils`.
 - Runtime ПК для полного observability: `prometheus`, опционально `grafana`; `python3-module-prometheus_client` не требуется текущему встроенному metrics server.
 - Source-only анализ и графики: `python3-module-pandas`, `python3-module-numpy`, `python3-module-matplotlib`; `python3-module-paramiko` нужен только legacy SSH tooling, отсутствующему в RPM.
-- Target runtime: пакеты `rt-handler` для standalone либо `rt-supervisor` и `rt-controller` для supervised, плюс `prometheus-node_exporter`; `stress-ng` нужен только для stress config.
+- Target runtime: `rt-handler` для standalone; `rt-supervisor`, `rt-controller` и `rt-supervisor-runtime-example` для стандартного supervised demo. Production PLC заменяет example своим wrapper. `prometheus-node_exporter` устанавливается для target metrics; `stress-ng` нужен только для stress config.
 - Target source build: компилятор, build system и devel-пакеты соответствующего target-проекта; для `rt-handler` это `gcc make glibc-devel libgpiod-devel pkg-config`.
 - Arduino firmware build: `arduino-core avr-gcc`; firmware в `rt-tester-tools` не входит.
 
