@@ -7,6 +7,7 @@ import argparse
 import configparser
 import json
 import os
+import re
 import shlex
 import shutil
 import signal
@@ -17,15 +18,32 @@ import tempfile
 import time
 import urllib.error
 import urllib.request
+from collections import deque
 from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
 PC_RECEIVER_DIR = ROOT / "src" / "pc-receiver"
+VERBOSE = False
+RECEIVER_PROGRESS_RE = re.compile(
+    r"^Group (?P<current>\d+)/(?P<total>\d+) stored"
+)
 
 
 def q(value: str | os.PathLike[str]) -> str:
     return shlex.quote(str(value))
+
+
+def verbose(message: str) -> None:
+    if VERBOSE:
+        print(message)
+
+
+def format_command(cmd: list[str], cwd: Path | None = None) -> str:
+    printable = " ".join(q(part) for part in cmd)
+    if cwd:
+        printable = f"(cd {q(cwd)} && {printable})"
+    return printable
 
 
 def die(message: str) -> None:
@@ -64,21 +82,36 @@ def config_bool(value: str) -> bool:
 
 def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
         check: bool = True, capture: bool = False) -> subprocess.CompletedProcess[str]:
-    printable = " ".join(q(part) for part in cmd)
-    if cwd:
-        printable = f"(cd {q(cwd)} && {printable})"
-    print(f"$ {printable}")
-    sys.stdout.flush()
+    printable = format_command(cmd, cwd)
+    if VERBOSE or dry_run:
+        print(f"$ {printable}")
+        sys.stdout.flush()
     if dry_run:
         return subprocess.CompletedProcess(cmd, 0, "", "")
-    return subprocess.run(
+    collect = capture or not VERBOSE
+    result = subprocess.run(
         cmd,
         cwd=str(cwd) if cwd else None,
-        check=check,
+        check=False,
         text=True,
-        stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.STDOUT if capture else None,
+        stdout=subprocess.PIPE if collect else None,
+        stderr=subprocess.STDOUT if collect else None,
     )
+    if VERBOSE and capture and result.stdout:
+        print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
+    if check and result.returncode != 0:
+        raise subprocess.CalledProcessError(
+            result.returncode, cmd, output=result.stdout
+        )
+    if not check and result.returncode != 0:
+        print(
+            f"warning: command exited with status {result.returncode}: {printable}",
+            file=sys.stderr,
+        )
+        if not VERBOSE and result.stdout:
+            for line in result.stdout.strip().splitlines()[-10:]:
+                print(f"  {line}", file=sys.stderr)
+    return result
 
 
 def ssh(host: str, command: str, *, dry_run: bool = False,
@@ -188,7 +221,7 @@ def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | 
     port = int(optional(cfg, "observability", "prometheus-port", "9091"))
     url = f"http://127.0.0.1:{port}"
     if http_ok(f"{url}/-/healthy"):
-        print(f"Prometheus already healthy: {url}")
+        verbose(f"Prometheus already healthy: {url}")
         return url
 
     binary = optional(cfg, "observability", "prometheus", "prometheus")
@@ -201,10 +234,10 @@ def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | 
     data_path = Path(require(cfg, "observability", "prometheus-data"))
     log_path = Path(require(cfg, "observability", "prometheus-log"))
     pid_path = Path(require(cfg, "observability", "prometheus-pid"))
-    write_prometheus_config(config_path, cfg)
     if dry_run:
         print(f"would start Prometheus on {url}")
         return url
+    write_prometheus_config(config_path, cfg)
     data_path.mkdir(parents=True, exist_ok=True)
     log_file = log_path.open("ab")
     proc = subprocess.Popen([
@@ -217,7 +250,7 @@ def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | 
     pid_path.write_text(f"{proc.pid}\n", encoding="utf-8")
     for _ in range(20):
         if http_ok(f"{url}/-/healthy"):
-            print(f"Prometheus started: {url}")
+            verbose(f"Prometheus started: {url}")
             return url
         time.sleep(0.25)
     print(f"warning: Prometheus did not become healthy; see {log_path}")
@@ -258,14 +291,14 @@ def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | Non
     dashboard_url = optional(cfg, "observability", "grafana-url", "")
     base_url = f"http://127.0.0.1:{port}"
     if http_ok(f"{base_url}/api/health"):
-        print(f"Grafana already healthy: {base_url}")
+        verbose(f"Grafana already healthy: {base_url}")
         return dashboard_url or base_url
 
     binary = optional(cfg, "observability", "grafana", "grafana-server")
     resolved = shutil.which(binary) if "/" not in binary else binary
     if not resolved:
         print("warning: grafana-server binary not found; dashboard will not start")
-        return dashboard_url or None
+        return None
 
     data_path = Path(require(cfg, "observability", "grafana-data"))
     log_path = Path(require(cfg, "observability", "grafana-log"))
@@ -298,11 +331,11 @@ def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | Non
     ], stdout=log_file, stderr=subprocess.STDOUT)
     for _ in range(40):
         if http_ok(f"{base_url}/api/health"):
-            print(f"Grafana started: {base_url}")
+            verbose(f"Grafana started: {base_url}")
             return dashboard_url or base_url
         time.sleep(0.25)
     print(f"warning: Grafana did not become healthy; see {log_path}")
-    return dashboard_url or base_url
+    return None
 
 
 def stop_pidfile(pid_path: Path, *, dry_run: bool) -> None:
@@ -312,7 +345,7 @@ def stop_pidfile(pid_path: Path, *, dry_run: bool) -> None:
         pid = int(pid_path.read_text(encoding="utf-8").strip())
     except ValueError:
         return
-    print(f"stopping pid {pid} from {pid_path}")
+    verbose(f"stopping pid {pid} from {pid_path}")
     if dry_run:
         return
     try:
@@ -333,7 +366,7 @@ def stop_observability(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
         ssh(host,
             f"if [ -f {q(exporter_pid)} ]; then "
             f"kill $(cat {q(exporter_pid)}) 2>/dev/null || true; fi",
-            dry_run=dry_run, check=False)
+            dry_run=dry_run)
 
 
 def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
@@ -373,7 +406,7 @@ def sync_target_clocks(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
         seen.add(host)
         ssh(host, f"date -u -s '@{timestamp}' >/dev/null",
             dry_run=dry_run)
-        print(f"{host} time synchronized")
+        verbose(f"{host} time synchronized")
 
 
 def stop_local_receivers(*, dry_run: bool) -> None:
@@ -394,7 +427,7 @@ def stop_local_receivers(*, dry_run: bool) -> None:
     if not matches:
         return
     for pid, cmdline in matches:
-        print(f"Stopping stale receiver.py pid={pid}: {cmdline}")
+        verbose(f"Stopping stale receiver.py pid={pid}: {cmdline}")
         if not dry_run:
             try:
                 os.kill(pid, signal.SIGTERM)
@@ -416,7 +449,7 @@ def stop_local_receivers(*, dry_run: bool) -> None:
             time.sleep(0.1)
 
     for pid in alive:
-        print(f"Killing stale receiver.py pid={pid}")
+        print(f"warning: killing stale receiver.py pid={pid}")
         try:
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
@@ -447,7 +480,7 @@ def cleanup_before_run(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
         f"pkill -f '[t]race_exporter.py' 2>/dev/null || true; "
         f"rm -f /dev/shm/shmem_input /dev/shm/shmem_output"
     )
-    ssh(supervisor_host, supervisor_cmd, dry_run=dry_run, check=False)
+    ssh(supervisor_host, supervisor_cmd, dry_run=dry_run)
 
     controller_host = require(cfg, "controller", "host")
     controller_pid = require(cfg, "controller", "pid-path")
@@ -462,7 +495,7 @@ def cleanup_before_run(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
         f"rm -f {q(controller_trace_pid)}; fi; "
         f"pkill -f '[t]race_exporter.py' 2>/dev/null || true"
     )
-    ssh(controller_host, controller_cmd, dry_run=dry_run, check=False)
+    ssh(controller_host, controller_cmd, dry_run=dry_run)
 
 
 def build_remote(cfg: configparser.ConfigParser, section: str, *, dry_run: bool) -> None:
@@ -565,7 +598,7 @@ def start_controller(cfg: configparser.ConfigParser, session_id: int,
 
 def start_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     if not runtime_stress_enabled(cfg):
-        print("Runtime stress: off")
+        verbose("Runtime stress: off")
         return
 
     host = require(cfg, "supervisor", "host")
@@ -585,7 +618,8 @@ def start_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> No
         f"{stress_cmd} > {q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}"
     )
-    print(f"Runtime stress: on ({stress_cmd})")
+    print("Runtime stress: on")
+    verbose(f"Runtime stress command: {stress_cmd}")
     ssh(host, command, dry_run=dry_run)
 
 
@@ -713,7 +747,8 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
         "err", "drop", "crc", "overflow", "underflow", "missed", "lost",
         "fifo", "coll", "carrier", "squeeze",
     )
-    print("Network counter delta:")
+    if VERBOSE:
+        print("Network counter delta:")
     for section in ("supervisor", "controller"):
         if section not in before or section not in after:
             continue
@@ -725,13 +760,14 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
         ethtool_delta = counter_delta(
             before[section].get("ethtool", {}), current.get("ethtool", {}))
 
-        print(
-            f"  {section} {current.get('host')} {current.get('iface')}: "
-            f"rx_packets={dev_delta.get('rx_packets', 0)} "
-            f"tx_packets={dev_delta.get('tx_packets', 0)} "
-            f"rx_bytes={dev_delta.get('rx_bytes', 0)} "
-            f"tx_bytes={dev_delta.get('tx_bytes', 0)}"
-        )
+        if VERBOSE:
+            print(
+                f"  {section} {current.get('host')} {current.get('iface')}: "
+                f"rx_packets={dev_delta.get('rx_packets', 0)} "
+                f"tx_packets={dev_delta.get('tx_packets', 0)} "
+                f"rx_bytes={dev_delta.get('rx_bytes', 0)} "
+                f"tx_bytes={dev_delta.get('tx_bytes', 0)}"
+            )
 
         anomalies = {
             f"dev.{key}": value for key, value in dev_delta.items()
@@ -748,9 +784,14 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
 
         if anomalies:
             ok = False
+            if not VERBOSE:
+                print(
+                    f"warning: network counter growth on {section} "
+                    f"{current.get('host')} {current.get('iface')}"
+                )
             for key, value in sorted(anomalies.items()):
-                print(f"    {key}: +{value}")
-        else:
+                print(f"  {key}: +{value}")
+        elif VERBOSE:
             print("    no network error/drop counter growth")
     return ok
 
@@ -773,7 +814,7 @@ def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
 
 
 def run_receiver(cfg: configparser.ConfigParser, session_id: int,
-                 receiver_config: Path, groups: int, *, dry_run: bool) -> None:
+                  receiver_config: Path, groups: int, *, dry_run: bool) -> None:
     cmd = [
         "python3", "-u", "receiver.py",
         "--params", str(receiver_config),
@@ -782,18 +823,62 @@ def run_receiver(cfg: configparser.ConfigParser, session_id: int,
         "--start",
         "--exit-on-stop",
     ]
-    run(cmd, cwd=PC_RECEIVER_DIR, dry_run=dry_run)
+    printable = format_command(cmd, PC_RECEIVER_DIR)
+    if dry_run:
+        print(f"$ {printable}")
+        return
+    if VERBOSE:
+        run(cmd, cwd=PC_RECEIVER_DIR)
+        return
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(PC_RECEIVER_DIR),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+    )
+    output: deque[str] = deque(maxlen=40)
+    assert proc.stdout is not None
+    for raw_line in proc.stdout:
+        line = raw_line.rstrip("\n")
+        output.append(line)
+        match = RECEIVER_PROGRESS_RE.match(line)
+        if match:
+            print(f"Progress: {match.group('current')}/{match.group('total')} groups")
+        elif any(token in line.lower() for token in (
+            "warning", "error", "failed", "fall detected", "recovered",
+        )):
+            print(line)
+    returncode = proc.wait()
+    if returncode != 0:
+        error = subprocess.CalledProcessError(
+            returncode, cmd, output="\n".join(output)
+        )
+        error.cwd = PC_RECEIVER_DIR
+        raise error
 
 
 def import_trace_metrics(db_path: str, session_id: int, prometheus_url: str | None,
-                         *, dry_run: bool) -> None:
+                         *, dry_run: bool) -> bool:
     if not prometheus_url:
-        return
+        return True
+    if dry_run:
+        run([
+            "python3", "import_trace_metrics.py", db_path, str(session_id),
+            "--prometheus-url", prometheus_url,
+        ], cwd=PC_RECEIVER_DIR, dry_run=True)
+        return True
     time.sleep(1.5)
-    run([
+    result = run([
         "python3", "import_trace_metrics.py", db_path, str(session_id),
         "--prometheus-url", prometheus_url,
     ], cwd=PC_RECEIVER_DIR, dry_run=dry_run, check=False)
+    if result.returncode != 0:
+        print("warning: trace metric import failed")
+        return False
+    return True
 
 
 def print_db_summary(db_path: str, session_id: int, expected_groups: int) -> bool:
@@ -838,10 +923,11 @@ def print_db_summary(db_path: str, session_id: int, expected_groups: int) -> boo
     if latency_count is None or latency_count <= 0:
         ok = False
 
-    print("SQLite summary:")
-    print(f"  groups: {groups}")
-    print(f"  latencies: {latencies}")
-    print(f"  events: {events}")
+    if VERBOSE or not ok:
+        print("SQLite summary:")
+        print(f"  groups: {groups}")
+        print(f"  latencies: {latencies}")
+        print(f"  events: {events}")
     if not ok:
         print("warning: measurement database contains anomalies")
     return ok
@@ -964,7 +1050,7 @@ def print_trace_counts(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
         trace_path = require(cfg, section, "trace-path")
         result = ssh(host, f"wc -l {q(trace_path)} 2>/dev/null || true",
                      dry_run=dry_run, capture=True, check=False)
-        if not dry_run and result.stdout:
+        if VERBOSE and not dry_run and result.stdout:
             print(f"{section} trace: {result.stdout.strip()}")
 
 
@@ -983,33 +1069,50 @@ def print_target_log_summary(cfg: configparser.ConfigParser, *, dry_run: bool) -
             count = int(count_text)
         except ValueError:
             count = 0
-        print(f"{section} log anomaly count: {count}")
         if count > 0:
+            print(
+                f"warning: {section} log contains {count} anomaly match(es): "
+                f"{host}:{log_path}"
+            )
             ok = False
+        elif VERBOSE:
+            print(f"{section} log anomaly count: 0")
     return ok
+
+
+def grafana_session_url(base_url: str, session_id: int) -> str:
+    separator = "&" if "?" in base_url else "?"
+    return f"{base_url}{separator}var-session_id={session_id}"
 
 
 def run_measurement(args: argparse.Namespace) -> None:
     cfg = load_config(Path(args.config))
     stand_name = require(cfg, "stand", "name")
+
+    if args.stop_observability:
+        print(f"Stand: {stand_name}")
+        print("Stopping observability...")
+        stop_observability(cfg, dry_run=args.dry_run)
+        print("Observability stopped")
+        return
+
     session_id = args.session_id or int(time.time())
     groups = args.groups or int(require(cfg, "measurement", "groups"))
     db_path = args.db or require(cfg, "measurement", "db")
 
     print(f"Stand: {stand_name}")
     print(f"Session ID: {session_id}")
-    print(f"Groups: {groups}")
     measurements_per_group = clamped_measurements_per_group(cfg)
     interval_us = int(require(cfg, "measurement", "measurement-interval-us"))
     duration_s = groups * measurements_per_group * interval_us / 1_000_000
-    print(f"Measurements per group: {measurements_per_group}")
-    print(f"Expected measurement time: {duration_s:.1f}s")
+    print(
+        f"Test plan: {groups} groups x {measurements_per_group} measurements, "
+        f"approximately {duration_s:.1f}s"
+    )
+    print(f"Database: {db_path}")
     sys.stdout.flush()
 
-    if args.stop_observability:
-        stop_observability(cfg, dry_run=args.dry_run)
-        return
-
+    print("Preparing stand...")
     check_prerequisites(cfg, dry_run=args.dry_run,
                         skip_network=args.skip_pc_network_check,
                         skip_time_sync=args.skip_time_sync)
@@ -1026,18 +1129,26 @@ def run_measurement(args: argparse.Namespace) -> None:
         cfg, dry_run=args.dry_run)
     grafana_url = None if args.no_grafana else start_grafana(
         cfg, dry_run=args.dry_run)
+    dashboard_url = (
+        grafana_session_url(grafana_url, session_id) if grafana_url else None
+    )
+    if dashboard_url:
+        print(f"Grafana: {dashboard_url}")
 
     receiver_config = Path(tempfile.gettempdir()) / f"rt-stand-{stand_name}-{session_id}.conf"
-    write_receiver_config(receiver_config, cfg, db_path, groups)
-    print(f"Receiver config: {receiver_config}")
+    if not args.dry_run:
+        write_receiver_config(receiver_config, cfg, db_path, groups)
+    verbose(f"Receiver config: {receiver_config}")
 
     network_before = None
     network_after = None
     try:
+        print("Starting targets...")
         start_runtime_stress(cfg, dry_run=args.dry_run)
         start_supervisor(cfg, dry_run=args.dry_run)
         start_controller(cfg, session_id, dry_run=args.dry_run)
         network_before = collect_network_snapshots(cfg, dry_run=args.dry_run)
+        print("Measuring...")
         run_receiver(cfg, session_id, receiver_config, groups,
                      dry_run=args.dry_run)
     finally:
@@ -1046,34 +1157,50 @@ def run_measurement(args: argparse.Namespace) -> None:
         if not args.keep_targets:
             stop_targets(cfg, dry_run=args.dry_run)
 
-    import_trace_metrics(db_path, session_id, prometheus_url,
-                         dry_run=args.dry_run)
-    db_ok = True
+    print("Collecting and validating results...")
+    trace_import_ok = import_trace_metrics(
+        db_path, session_id, prometheus_url, dry_run=args.dry_run
+    )
+    db_ok = trace_import_ok
     if not args.dry_run:
-        db_ok = print_db_summary(db_path, session_id, groups)
+        db_ok = print_db_summary(db_path, session_id, groups) and db_ok
         db_ok = check_trace_group_alignment(db_path, session_id, groups) and db_ok
         db_ok = check_latency_trace_consistency(db_path, session_id) and db_ok
     print_trace_counts(cfg, dry_run=args.dry_run)
     logs_ok = print_target_log_summary(cfg, dry_run=args.dry_run)
     network_ok = print_network_delta(network_before, network_after)
 
-    if prometheus_url:
+    if VERBOSE and prometheus_url:
         print(f"Prometheus: {prometheus_url}")
-    if grafana_url:
-        print(f"Grafana: {grafana_url}?var-session_id={session_id}")
+    if dashboard_url:
+        print(f"Grafana: {dashboard_url}")
     if db_ok and logs_ok and network_ok:
-        print("Measurement completed successfully")
+        print("Result: measurement completed successfully")
     else:
-        print("Measurement completed with anomalies")
+        print("Result: measurement completed with anomalies")
         raise SystemExit(2)
 
 
-def main() -> None:
-    try:
-        sys.stdout.reconfigure(line_buffering=True)
-    except AttributeError:
-        pass
-    parser = argparse.ArgumentParser(description=__doc__)
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="rt-tester-run-stand",
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""examples:
+  Standard test:
+    rt-tester-run-stand --config /usr/share/rt-tester-tools/configs/stands/rockpi-beremiz-visionfive2-controller.conf
+
+  Short test with full diagnostic output:
+    rt-tester-run-stand --config /path/to/stand.conf --groups 2 --verbose
+
+  Show commands without changing the stand:
+    rt-tester-run-stand --config /path/to/stand.conf --dry-run
+
+Normal output shows test phases, every completed group, Grafana URL and result.
+Use --verbose to print commands and complete foreground child-process output.
+Background service and target output remains in log files configured by the stand.
+""",
+    )
     parser.add_argument("--config", required=True,
                         help="stand config file")
     parser.add_argument("--session-id", type=int,
@@ -1097,12 +1224,59 @@ def main() -> None:
                         help="stop Prometheus and remote trace exporters from config")
     parser.add_argument("--dry-run", action="store_true",
                         help="print commands without executing them")
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        help="print commands and complete foreground process output")
+    return parser
+
+
+def report_command_failure(exc: subprocess.CalledProcessError) -> None:
+    command = exc.cmd if isinstance(exc.cmd, list) else [str(exc.cmd)]
+    print(
+        f"error: command failed with exit status {exc.returncode}",
+        file=sys.stderr,
+    )
+    print(
+        f"command: {format_command(command, getattr(exc, 'cwd', None))}",
+        file=sys.stderr,
+    )
+    output = (exc.output or "").strip()
+    if output:
+        lines = output.splitlines()
+        if len(lines) > 40:
+            print(f"child output (last 40 of {len(lines)} lines):", file=sys.stderr)
+            lines = lines[-40:]
+        else:
+            print("child output:", file=sys.stderr)
+        for line in lines:
+            print(f"  {line}", file=sys.stderr)
+    if not VERBOSE:
+        print("hint: rerun with --verbose for complete diagnostic output", file=sys.stderr)
+
+
+def main() -> None:
+    global VERBOSE
+    try:
+        sys.stdout.reconfigure(line_buffering=True)
+    except AttributeError:
+        pass
+    parser = build_parser()
     args = parser.parse_args()
     if args.groups is not None and args.groups < 1:
         parser.error("--groups must be >= 1")
     if args.session_id is not None and args.session_id < 1:
         parser.error("--session-id must be >= 1")
-    run_measurement(args)
+    VERBOSE = args.verbose
+    try:
+        run_measurement(args)
+    except subprocess.CalledProcessError as exc:
+        report_command_failure(exc)
+        raise SystemExit(exc.returncode or 1) from None
+    except KeyboardInterrupt:
+        print("error: interrupted", file=sys.stderr)
+        raise SystemExit(130) from None
+    except (OSError, configparser.Error, sqlite3.Error, ValueError) as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        raise SystemExit(1) from None
 
 
 if __name__ == "__main__":

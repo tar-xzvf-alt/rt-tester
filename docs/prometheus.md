@@ -17,6 +17,25 @@ runtime/supervisor board = Beremiz runtime + alt-rt-supervisor
 controller board         = GPIO controller side
 ```
 
+Без дополнительных параметров runner показывает пользовательский summary:
+stand и session ID, план теста, этапы подготовки, ссылку Grafana, каждую
+завершенную группу и итоговые аномалии. Ссылка с выбранным `session_id`
+печатается сразу после запуска Grafana, поэтому dashboard можно открыть во время
+измерения.
+
+Полный список команд и foreground-вывод включается отдельно:
+
+```bash
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
+    --verbose
+```
+
+В обычном режиме ошибка всё равно содержит команду, exit status и до 40 последних
+строк дочернего вывода. Prometheus, Grafana, trace exporters, supervisor,
+runtime и controller продолжают писать в log files из stand config; `--verbose`
+не заменяет эти файлы, а показывает команды их запуска.
+
 ## Pipeline работы стенда
 
 `run_stand_measurement.py` выполняет полный цикл стенда:
@@ -96,6 +115,12 @@ rt-tester-run-stand \
     --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
     --dry-run
 
+# Полная диагностика команд и foreground-процессов
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
+    --groups 2 \
+    --verbose
+
 # Пересобрать вручную размещенные и настроенные source trees
 rt-tester-run-stand \
     --config /path/to/source-stand.conf \
@@ -122,12 +147,13 @@ rt-tester-run-stand \
     --stop-observability
 ```
 
-Скрипт печатает итоговые URL, например:
+Скрипт печатает Grafana URL перед measurement и повторяет его в итогах:
 
 ```text
-Prometheus: http://127.0.0.1:9091
 Grafana: http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=1782751117
 ```
+
+Prometheus URL является диагностической деталью и печатается при `--verbose`.
 
 ## Просмотр latency и trace breakdown в Grafana
 

@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.1.2
+Version: 0.1.3
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -62,6 +62,7 @@ EOF
 done
 
 %check
+PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py'
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_stand_measurement.py --help >/dev/null
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_gpio_measurement.py --help >/dev/null
 PYTHONDONTWRITEBYTECODE=1 python3 src/pc-receiver/receiver.py --help >/dev/null
@@ -82,6 +83,11 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %doc README.md LICENSE.md docs/*.md
 
 %changelog
+* Mon Jul 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.3-alt1
+- Add the RockPI Beremiz and VisionFive 2 controller stand configuration.
+- Add concise stand progress, early Grafana links and optional verbose diagnostics.
+- Improve public command help and cover output behavior during package checks.
+
 * Fri Jul 17 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.2-alt1
 - Document the separate rt-supervisor runtime example package.
 

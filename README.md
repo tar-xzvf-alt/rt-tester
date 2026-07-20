@@ -52,7 +52,7 @@ RPM содержит:
 
 - пять wrappers `/usr/bin/rt-tester-*`;
 - два runner-а, receiver, import/summary trace-утилиты и необходимые им Python-модули в `/usr/share/rt-tester-tools`;
-- четыре stand config из `configs/stands/`;
+- пять stand config из `configs/stands/`;
 - Grafana dashboards и provisioning для двух режимов;
 - `prometheus/trace-prometheus-local-tunnel.yml`;
 - `README.md`, `LICENSE.md` и `docs/*.md` как документацию RPM.
@@ -107,6 +107,20 @@ rt-tester-run-stand \
 Скрипт проверяет сеть и preflight, запускает процессы на платах, receiver,
 локальные Prometheus и Grafana, сохраняет SQLite БД и печатает ссылку на
 дашборд с текущим `session_id`. Подробнее: [docs/prometheus.md](docs/prometheus.md).
+
+Обычный вывод ориентирован на тестировщика: он показывает этапы запуска, ссылку
+Grafana до начала длительного измерения, прогресс каждой группы и итог проверки.
+Команды SSH и полный вывод foreground-процессов доступны отдельно:
+
+```bash
+rt-tester-run-stand \
+    --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
+    --verbose
+```
+
+При ошибке краткий режим всё равно печатает завершившуюся команду, код возврата
+и полезный хвост дочернего вывода. Background services и target-процессы всегда
+пишут в log paths из выбранного stand config.
 
 ## Возможности Развертывания
 
