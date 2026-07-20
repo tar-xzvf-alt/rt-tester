@@ -6,6 +6,7 @@ rt-tester.code-workspace
 /logs/
 src/pc-receiver/measurement.conf
 arduino.db
+/merged.db
 
 # Generated local plots and board dumps from ad-hoc experiments.
 /*.png

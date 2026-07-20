@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.1.3
+Version: 0.1.4
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -83,6 +83,9 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %doc README.md LICENSE.md docs/*.md
 
 %changelog
+* Mon Jul 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.4-alt1
+- Keep the generated merged measurement database out of version control.
+
 * Mon Jul 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.3-alt1
 - Add the RockPI Beremiz and VisionFive 2 controller stand configuration.
 - Add concise stand progress, early Grafana links and optional verbose diagnostics.
