@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.1.4
+Version: 0.1.5
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -83,6 +83,10 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %doc README.md LICENSE.md docs/*.md
 
 %changelog
+* Tue Jul 21 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.5-alt1
+- Report host-wide softnet time squeeze as a per-CPU warning, not packet loss.
+- Ignore local SQLite sidecar files for the merged measurement database.
+
 * Mon Jul 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.4-alt1
 - Keep the generated merged measurement database out of version control.
 

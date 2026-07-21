@@ -86,8 +86,10 @@ runtime и controller продолжают писать в log files из stand 
 Перед запуском receiver и сразу после measurement runner снимает network-health
 snapshots на runtime и controller платах: `/proc/net/dev`, `/proc/net/softnet_stat`
 и `ethtool -S <iface>` если `ethtool` доступен. В summary печатается delta по
-traffic counters и рост drops/errors/CRC/overflow/underflow/softnet `time_squeeze`.
-Ненулевой рост таких counters считается measurement anomaly.
+traffic counters и рост drops/errors/CRC/overflow/underflow. Эти counters
+считаются measurement anomaly. Host-wide `softnet.time_squeeze` не привязан к
+конкретному interface и сам по себе не означает потерю пакетов, поэтому он
+печатается как per-CPU warning и не меняет результат measurement.
 
 Example stand `configs/stands/rockpi-plc-visionfive2-controller.conf` задает
 такую текущую лабораторную топологию:
@@ -202,7 +204,7 @@ Network RX/TX показываются как `rate(node_network_*_bytes_total)`
 Если measurement завершился, но в SQLite появились события кроме `start`/`stop`,
 в логах target-процессов есть `ERR`/`WARN`/CRC/timeout, trace group count не
 совпадает с receiver group count, trace-метрики противоречат Arduino latency или
-network-health counters выросли по drops/errors/softnet squeeze, скрипт печатает
+network-health counters выросли по drops/errors, скрипт печатает
 `Measurement completed with anomalies` и завершает работу с кодом `2`. При этом
 БД, Prometheus и ссылка Grafana остаются доступными для разбора причины.
 

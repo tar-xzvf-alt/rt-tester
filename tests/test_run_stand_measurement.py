@@ -126,5 +126,63 @@ class HelpTest(unittest.TestCase):
         )
 
 
+class NetworkPolicyTest(unittest.TestCase):
+    def setUp(self):
+        runner.VERBOSE = False
+
+    def snapshots(self, *, dropped=0, squeeze=0, rx_drop=0):
+        before = {
+            "controller": {
+                "host": "root@board",
+                "iface": "end0",
+                "dev": {"rx_drop": 10},
+                "softnet": {"dropped": 20, "time_squeeze": 30},
+                "softnet_per_cpu": [
+                    {"cpu": 0, "dropped": 10, "time_squeeze": 10},
+                    {"cpu": 1, "dropped": 10, "time_squeeze": 20},
+                ],
+                "ethtool": {},
+            }
+        }
+        after = {
+            "controller": {
+                "host": "root@board",
+                "iface": "end0",
+                "dev": {"rx_drop": 10 + rx_drop},
+                "softnet": {
+                    "dropped": 20 + dropped,
+                    "time_squeeze": 30 + squeeze,
+                },
+                "softnet_per_cpu": [
+                    {"cpu": 0, "dropped": 10 + dropped, "time_squeeze": 10},
+                    {"cpu": 1, "dropped": 10, "time_squeeze": 20 + squeeze},
+                ],
+                "ethtool": {},
+            }
+        }
+        return before, after
+
+    def test_time_squeeze_is_warning_not_failure(self):
+        before, after = self.snapshots(squeeze=3)
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            result = runner.print_network_delta(before, after)
+
+        self.assertTrue(result)
+        self.assertIn("softnet.time_squeeze", output.getvalue())
+        self.assertIn("cpu1=+3", output.getvalue())
+        self.assertIn("no packet loss implied", output.getvalue())
+
+    def test_softnet_drop_is_failure(self):
+        before, after = self.snapshots(dropped=1)
+
+        self.assertFalse(runner.print_network_delta(before, after))
+
+    def test_interface_drop_is_failure(self):
+        before, after = self.snapshots(rx_drop=1)
+
+        self.assertFalse(runner.print_network_delta(before, after))
+
+
 if __name__ == "__main__":
     unittest.main()

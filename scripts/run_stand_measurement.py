@@ -652,7 +652,13 @@ import json
 import subprocess
 
 iface = {iface!r}
-snapshot = {{"iface": iface, "dev": {{}}, "softnet": {{}}, "ethtool": {{}}}}
+snapshot = {{
+    "iface": iface,
+    "dev": {{}},
+    "softnet": {{}},
+    "softnet_per_cpu": [],
+    "ethtool": {{}},
+}}
 
 keys = [
     "rx_bytes", "rx_packets", "rx_errs", "rx_drop", "rx_fifo",
@@ -675,12 +681,18 @@ except OSError:
 softnet = {{"processed": 0, "dropped": 0, "time_squeeze": 0}}
 try:
     with open("/proc/net/softnet_stat", "r", encoding="utf-8") as stat_file:
-        for line in stat_file:
+        for cpu, line in enumerate(stat_file):
             fields = line.split()
             if len(fields) >= 3:
-                softnet["processed"] += int(fields[0], 16)
-                softnet["dropped"] += int(fields[1], 16)
-                softnet["time_squeeze"] += int(fields[2], 16)
+                values = {{
+                    "cpu": cpu,
+                    "processed": int(fields[0], 16),
+                    "dropped": int(fields[1], 16),
+                    "time_squeeze": int(fields[2], 16),
+                }}
+                snapshot["softnet_per_cpu"].append(values)
+                for key in ("processed", "dropped", "time_squeeze"):
+                    softnet[key] += values[key]
     snapshot["softnet"] = softnet
 except OSError:
     pass
@@ -737,6 +749,16 @@ def counter_delta(before: dict[str, int], after: dict[str, int]) -> dict[str, in
     return delta
 
 
+def softnet_cpu_delta(before: list[dict[str, int]], after: list[dict[str, int]],
+                      key: str) -> dict[int, int]:
+    before_by_cpu = {int(item["cpu"]): int(item.get(key, 0)) for item in before}
+    after_by_cpu = {int(item["cpu"]): int(item.get(key, 0)) for item in after}
+    return {
+        cpu: after_by_cpu.get(cpu, 0) - before_by_cpu.get(cpu, 0)
+        for cpu in sorted(set(before_by_cpu) | set(after_by_cpu))
+    }
+
+
 def print_network_delta(before: dict[str, dict[str, object]] | None,
                         after: dict[str, dict[str, object]] | None) -> bool:
     if not before or not after:
@@ -745,7 +767,7 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
     ok = True
     anomaly_names = (
         "err", "drop", "crc", "overflow", "underflow", "missed", "lost",
-        "fifo", "coll", "carrier", "squeeze",
+        "fifo", "coll", "carrier",
     )
     if VERBOSE:
         print("Network counter delta:")
@@ -757,6 +779,11 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
             before[section].get("dev", {}), current.get("dev", {}))
         softnet_delta = counter_delta(
             before[section].get("softnet", {}), current.get("softnet", {}))
+        squeeze_by_cpu = softnet_cpu_delta(
+            before[section].get("softnet_per_cpu", []),
+            current.get("softnet_per_cpu", []),
+            "time_squeeze",
+        )
         ethtool_delta = counter_delta(
             before[section].get("ethtool", {}), current.get("ethtool", {}))
 
@@ -771,16 +798,26 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
 
         anomalies = {
             f"dev.{key}": value for key, value in dev_delta.items()
-            if value and any(name in key for name in anomaly_names)
+            if value > 0 and any(name in key for name in anomaly_names)
         }
-        anomalies.update({
-            f"softnet.{key}": value for key, value in softnet_delta.items()
-            if value and key in ("dropped", "time_squeeze")
-        })
+        if softnet_delta.get("dropped", 0) > 0:
+            anomalies["host_softnet.dropped"] = softnet_delta["dropped"]
         anomalies.update({
             f"ethtool.{key}": value for key, value in ethtool_delta.items()
-            if value and any(name in key for name in anomaly_names)
+            if value > 0 and any(name in key for name in anomaly_names)
         })
+
+        squeeze = softnet_delta.get("time_squeeze", 0)
+        if squeeze > 0:
+            cpu_text = ", ".join(
+                f"cpu{cpu}=+{value}"
+                for cpu, value in squeeze_by_cpu.items() if value > 0
+            )
+            detail = f" ({cpu_text})" if cpu_text else ""
+            print(
+                f"warning: host-wide softnet.time_squeeze on {section} "
+                f"{current.get('host')}: +{squeeze}{detail}; no packet loss implied"
+            )
 
         if anomalies:
             ok = False
@@ -791,7 +828,7 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
                 )
             for key, value in sorted(anomalies.items()):
                 print(f"  {key}: +{value}")
-        elif VERBOSE:
+        elif VERBOSE and squeeze <= 0:
             print("    no network error/drop counter growth")
     return ok
 
