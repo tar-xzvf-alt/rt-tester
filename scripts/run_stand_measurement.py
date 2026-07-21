@@ -458,6 +458,21 @@ def stop_local_receivers(*, dry_run: bool) -> None:
             pass
 
 
+def stop_pidfile_command(pid_path: str) -> str:
+    path = q(pid_path)
+    return (
+        f"if [ -f {path} ]; then "
+        f"pid=$(cat {path} 2>/dev/null || true); "
+        f"case $pid in ''|*[!0-9]*) pid=;; esac; "
+        f"if [ -n \"$pid\" ] && kill -0 $pid 2>/dev/null; then "
+        f"kill $pid 2>/dev/null || true; i=0; "
+        f"while kill -0 $pid 2>/dev/null && [ $i -lt 30 ]; do "
+        f"sleep 0.1; i=$((i + 1)); done; "
+        f"if kill -0 $pid 2>/dev/null; then kill -KILL $pid 2>/dev/null || true; "
+        f"sleep 0.1; fi; fi; rm -f {path}; fi; "
+    )
+
+
 def cleanup_before_run(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     stop_local_receivers(dry_run=dry_run)
 
@@ -466,10 +481,8 @@ def cleanup_before_run(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
     supervisor_trace_pid = require(cfg, "supervisor", "trace-exporter-pid")
     stress_pid = optional(cfg, "stress", "runtime-pid", "/tmp/rt-runtime-stress.pid")
     supervisor_cmd = (
-        f"if [ -f {q(supervisor_pid)} ]; then "
-        f"kill $(cat {q(supervisor_pid)}) 2>/dev/null || true; "
-        f"rm -f {q(supervisor_pid)}; fi; "
-        f"pkill -x alt-rt-supervis 2>/dev/null || true; "
+        stop_pidfile_command(supervisor_pid) +
+        f"pkill -KILL -x alt-rt-supervis 2>/dev/null || true; "
         f"pkill -KILL -x runtime 2>/dev/null || true; "
         f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true; "
         f"if [ -f {q(stress_pid)} ]; then "
@@ -488,9 +501,7 @@ def cleanup_before_run(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
     controller_pid = require(cfg, "controller", "pid-path")
     controller_trace_pid = require(cfg, "controller", "trace-exporter-pid")
     controller_cmd = (
-        f"if [ -f {q(controller_pid)} ]; then "
-        f"kill $(cat {q(controller_pid)}) 2>/dev/null || true; "
-        f"rm -f {q(controller_pid)}; fi; "
+        stop_pidfile_command(controller_pid) +
         f"pkill -KILL -x controller-emu 2>/dev/null || true; "
         f"if [ -f {q(controller_trace_pid)} ]; then "
         f"kill $(cat {q(controller_trace_pid)}) 2>/dev/null || true; "
@@ -555,9 +566,8 @@ def start_supervisor(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     if env:
         env += " "
     command = (
-        f"pkill -x alt-rt-supervis 2>/dev/null || true; "
-        f"pkill -x runtime 2>/dev/null || true; "
-        f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true; "
+        f"if pgrep -x alt-rt-supervis >/dev/null; then "
+        f"echo 'existing alt-rt-supervisor did not stop' >&2; exit 1; fi; "
         f"rm -f /dev/shm/shmem_input /dev/shm/shmem_output; "
         f": > {q(trace_path)}; : > {q(log_path)}; "
         f"cd {q(repo)} || exit 1; "
@@ -849,12 +859,13 @@ def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     controller_host = require(cfg, "controller", "host")
     controller_pid = require(cfg, "controller", "pid-path")
     ssh(supervisor_host,
-        f"kill $(cat {q(supervisor_pid)}) 2>/dev/null || true; "
-        f"sleep 1; pkill -KILL -x runtime 2>/dev/null || true; "
-        f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true",
+        stop_pidfile_command(supervisor_pid) +
+        f"pkill -KILL -x runtime 2>/dev/null || true; "
+        f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true; "
+        f"rm -f /dev/shm/shmem_input /dev/shm/shmem_output",
         dry_run=dry_run, check=False)
     ssh(controller_host,
-        f"kill $(cat {q(controller_pid)}) 2>/dev/null || true; sleep 1; "
+        stop_pidfile_command(controller_pid) +
         f"pkill -KILL -x controller-emu 2>/dev/null || true",
         dry_run=dry_run, check=False)
     stop_runtime_stress(cfg, dry_run=dry_run)

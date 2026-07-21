@@ -95,6 +95,10 @@ Runner также передает controller ожидаемое число meas
 GPIO edges после этого окна записываются controller в log как timestamped
 `trace out-of-window edge` warnings для диагностики startup/shutdown pulses.
 
+При cleanup runner ждёт завершения PID-file supervisor/controller до трёх секунд
+и только затем удаляет shared-memory names или запускает новый экземпляр. Это
+не допускает одновременную работу старого и нового runtime ABI.
+
 Example stand `configs/stands/rockpi-plc-visionfive2-controller.conf` задает
 такую текущую лабораторную топологию:
 

@@ -251,5 +251,15 @@ class ControllerLaunchTest(unittest.TestCase):
             ("root@controller", "kill -USR1 $(cat /tmp/controller.pid); sleep 0.1"),
         )
 
+
+class LifecycleCommandTest(unittest.TestCase):
+    def test_pidfile_stop_waits_before_kill_and_removal(self):
+        command = runner.stop_pidfile_command("/tmp/supervisor.pid")
+
+        self.assertLess(command.index("kill $pid"), command.index("while kill -0"))
+        self.assertLess(command.index("while kill -0"), command.index("kill -KILL"))
+        self.assertLess(command.index("kill -KILL"), command.index("rm -f"))
+        self.assertIn("[ $i -lt 30 ]", command)
+
 if __name__ == "__main__":
     unittest.main()
