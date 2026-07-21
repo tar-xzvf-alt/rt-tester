@@ -716,6 +716,8 @@ def main():
                        help=f'Baud rate (default: {config.DEFAULT_BAUDRATE})')
     parser.add_argument('--start', action='store_true',
                        help='Start measurement immediately after connecting')
+    parser.add_argument('--start-gate-stdin', action='store_true',
+                       help='Wait for a line on stdin before starting measurement')
     parser.add_argument('--exit-on-stop', action='store_true',
                        help='Exit when Arduino reports stopped/auto_stopped')
     parser.add_argument('--groups', type=int,
@@ -727,6 +729,9 @@ def main():
 
     if args.exit_on_stop and not args.start:
         parser.error('--exit-on-stop requires --start')
+
+    if args.start_gate_stdin and not args.start:
+        parser.error('--start-gate-stdin requires --start')
 
     if args.groups is not None and args.groups < 1:
         parser.error('--groups must be >= 1')
@@ -750,6 +755,11 @@ def main():
     
     if not collector.connect():
         sys.exit(1)
+
+    if args.start_gate_stdin:
+        print("Arduino ready for target start", flush=True)
+        if not sys.stdin.readline():
+            sys.exit("error: start gate closed before target startup")
     
     collector.run(auto_start=args.start, exit_on_stop=args.exit_on_stop)
 

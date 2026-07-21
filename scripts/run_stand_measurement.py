@@ -19,6 +19,7 @@ import time
 import urllib.error
 import urllib.request
 from collections import deque
+from collections.abc import Callable
 from pathlib import Path
 
 
@@ -28,6 +29,7 @@ VERBOSE = False
 RECEIVER_PROGRESS_RE = re.compile(
     r"^Group (?P<current>\d+)/(?P<total>\d+) stored"
 )
+RECEIVER_READY = "Arduino ready for target start"
 
 
 def q(value: str | os.PathLike[str]) -> str:
@@ -852,7 +854,8 @@ def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
 
 
 def run_receiver(cfg: configparser.ConfigParser, session_id: int,
-                  receiver_config: Path, groups: int, *, dry_run: bool) -> None:
+                  receiver_config: Path, groups: int, *, dry_run: bool,
+                  on_ready: Callable[[], None] | None = None) -> None:
     cmd = [
         "python3", "-u", "receiver.py",
         "--params", str(receiver_config),
@@ -861,11 +864,13 @@ def run_receiver(cfg: configparser.ConfigParser, session_id: int,
         "--start",
         "--exit-on-stop",
     ]
+    if on_ready is not None:
+        cmd.append("--start-gate-stdin")
     printable = format_command(cmd, PC_RECEIVER_DIR)
     if dry_run:
         print(f"$ {printable}")
         return
-    if VERBOSE:
+    if VERBOSE and on_ready is None:
         run(cmd, cwd=PC_RECEIVER_DIR)
         return
 
@@ -873,23 +878,38 @@ def run_receiver(cfg: configparser.ConfigParser, session_id: int,
         cmd,
         cwd=str(PC_RECEIVER_DIR),
         text=True,
+        stdin=subprocess.PIPE if on_ready is not None else None,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         bufsize=1,
     )
     output: deque[str] = deque(maxlen=40)
+    ready = False
     assert proc.stdout is not None
     for raw_line in proc.stdout:
         line = raw_line.rstrip("\n")
         output.append(line)
+        if line == RECEIVER_READY and on_ready is not None:
+            on_ready()
+            assert proc.stdin is not None
+            proc.stdin.write("start\n")
+            proc.stdin.flush()
+            ready = True
+            if VERBOSE:
+                print(line)
+            continue
         match = RECEIVER_PROGRESS_RE.match(line)
-        if match:
+        if VERBOSE:
+            print(line)
+        elif match:
             print(f"Progress: {match.group('current')}/{match.group('total')} groups")
         elif any(token in line.lower() for token in (
             "warning", "error", "failed", "fall detected", "recovered",
         )):
             print(line)
     returncode = proc.wait()
+    if on_ready is not None and not ready and returncode == 0:
+        returncode = 1
     if returncode != 0:
         error = subprocess.CalledProcessError(
             returncode, cmd, output="\n".join(output)
@@ -1184,11 +1204,22 @@ def run_measurement(args: argparse.Namespace) -> None:
         print("Starting targets...")
         start_runtime_stress(cfg, dry_run=args.dry_run)
         start_supervisor(cfg, dry_run=args.dry_run)
-        start_controller(cfg, session_id, groups, dry_run=args.dry_run)
-        network_before = collect_network_snapshots(cfg, dry_run=args.dry_run)
-        print("Measuring...")
-        run_receiver(cfg, session_id, receiver_config, groups,
-                     dry_run=args.dry_run)
+        if args.dry_run:
+            start_controller(cfg, session_id, groups, dry_run=True)
+            network_before = collect_network_snapshots(cfg, dry_run=True)
+            print("Measuring...")
+            run_receiver(cfg, session_id, receiver_config, groups, dry_run=True)
+        else:
+            def start_measurement_targets() -> None:
+                nonlocal network_before
+                start_controller(cfg, session_id, groups, dry_run=False)
+                network_before = collect_network_snapshots(cfg, dry_run=False)
+                print("Measuring...")
+
+            run_receiver(
+                cfg, session_id, receiver_config, groups, dry_run=False,
+                on_ready=start_measurement_targets,
+            )
     finally:
         if network_before is not None:
             network_after = collect_network_snapshots(cfg, dry_run=args.dry_run)

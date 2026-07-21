@@ -73,6 +73,29 @@ class OutputTest(unittest.TestCase):
             "Progress: 1/2 groups\nProgress: 2/2 groups\n",
         )
 
+    def test_receiver_gates_start_until_targets_are_ready(self):
+        process = mock.Mock()
+        process.stdin = io.StringIO()
+        process.stdout = io.StringIO(
+            "Arduino ready for target start\n"
+            "Group 1/1 stored (index 0, 100.0%)\n"
+        )
+        process.wait.return_value = 0
+        ready = mock.Mock()
+        output = io.StringIO()
+        with (
+            mock.patch.object(runner.subprocess, "Popen", return_value=process),
+            contextlib.redirect_stdout(output),
+        ):
+            runner.run_receiver(
+                mock.Mock(), 42, Path("/tmp/config"), 1,
+                dry_run=False, on_ready=ready,
+            )
+
+        ready.assert_called_once_with()
+        self.assertEqual(process.stdin.getvalue(), "start\n")
+        self.assertIn("Progress: 1/1 groups", output.getvalue())
+
     def test_command_failure_is_actionable_without_traceback(self):
         error = subprocess.CalledProcessError(
             255, ["ssh", "host"], output="connection refused\n"
