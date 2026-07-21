@@ -91,6 +91,10 @@ traffic counters и рост drops/errors/CRC/overflow/underflow. Эти counter
 конкретному interface и сам по себе не означает потерю пакетов, поэтому он
 печатается как per-CPU warning и не меняет результат measurement.
 
+Runner также передает controller ожидаемое число measurement groups. Новые
+GPIO edges после этого окна записываются controller в log как timestamped
+`trace out-of-window edge` warnings для диагностики startup/shutdown pulses.
+
 Example stand `configs/stands/rockpi-plc-visionfive2-controller.conf` задает
 такую текущую лабораторную топологию:
 

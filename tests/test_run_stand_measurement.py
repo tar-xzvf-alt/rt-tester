@@ -184,5 +184,31 @@ class NetworkPolicyTest(unittest.TestCase):
         self.assertFalse(runner.print_network_delta(before, after))
 
 
+class ControllerLaunchTest(unittest.TestCase):
+    def test_expected_group_count_is_passed_to_controller(self):
+        cfg = runner.configparser.ConfigParser(interpolation=None)
+        cfg.read_dict({
+            "controller": {
+                "host": "root@controller",
+                "repo": "/usr/share/rt-controller",
+                "iface": "end0",
+                "board": "visionfive2",
+                "binary": "/usr/bin/controller-emu",
+                "trace-path": "/tmp/trace.jsonl",
+                "log-path": "/tmp/controller.log",
+                "pid-path": "/tmp/controller.pid",
+                "stand-config": "configs/stand/controller.conf",
+            },
+            "measurement": {"measurements-per-group": "100"},
+        })
+
+        with mock.patch.object(runner, "ssh") as ssh:
+            runner.start_controller(cfg, 123, 2, dry_run=False)
+
+        command = ssh.call_args.args[1]
+        self.assertIn("RT_TRACE_SESSION_ID=123", command)
+        self.assertIn("RT_TRACE_MEASUREMENTS_PER_GROUP=100", command)
+        self.assertIn("RT_TRACE_EXPECTED_GROUPS=2", command)
+
 if __name__ == "__main__":
     unittest.main()

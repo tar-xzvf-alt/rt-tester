@@ -567,7 +567,7 @@ def start_supervisor(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     ssh(host, command, dry_run=dry_run)
 
 
-def start_controller(cfg: configparser.ConfigParser, session_id: int,
+def start_controller(cfg: configparser.ConfigParser, session_id: int, groups: int,
                      *, dry_run: bool) -> None:
     host = require(cfg, "controller", "host")
     repo = require(cfg, "controller", "repo")
@@ -589,6 +589,7 @@ def start_controller(cfg: configparser.ConfigParser, session_id: int,
         f"{env}RT_TRACE_PATH={q(trace_path)} "
         f"RT_TRACE_SESSION_ID={session_id} "
         f"RT_TRACE_MEASUREMENTS_PER_GROUP={q(measurements_per_group)} "
+        f"RT_TRACE_EXPECTED_GROUPS={q(groups)} "
         f"{q(binary)} -i {q(iface)} -b {q(board)} > {q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}; "
         f"sleep 2; scripts/pin_stand.sh {q(stand_config)} >/tmp/pin-controller.log 2>&1 || true"
@@ -1183,7 +1184,7 @@ def run_measurement(args: argparse.Namespace) -> None:
         print("Starting targets...")
         start_runtime_stress(cfg, dry_run=args.dry_run)
         start_supervisor(cfg, dry_run=args.dry_run)
-        start_controller(cfg, session_id, dry_run=args.dry_run)
+        start_controller(cfg, session_id, groups, dry_run=args.dry_run)
         network_before = collect_network_snapshots(cfg, dry_run=args.dry_run)
         print("Measuring...")
         run_receiver(cfg, session_id, receiver_config, groups,
