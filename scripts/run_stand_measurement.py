@@ -592,11 +592,18 @@ def start_controller(cfg: configparser.ConfigParser, session_id: int, groups: in
         f"RT_TRACE_SESSION_ID={session_id} "
         f"RT_TRACE_MEASUREMENTS_PER_GROUP={q(measurements_per_group)} "
         f"RT_TRACE_EXPECTED_GROUPS={q(groups)} "
+        f"RT_MEASUREMENT_START_PAUSED=1 "
         f"{q(binary)} -i {q(iface)} -b {q(board)} > {q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}; "
         f"sleep 2; scripts/pin_stand.sh {q(stand_config)} >/tmp/pin-controller.log 2>&1 || true"
     )
     ssh(host, command, dry_run=dry_run)
+
+
+def arm_controller(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    host = require(cfg, "controller", "host")
+    pid_path = require(cfg, "controller", "pid-path")
+    ssh(host, f"kill -USR1 $(cat {q(pid_path)}); sleep 0.1", dry_run=dry_run)
 
 
 def start_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
@@ -1214,6 +1221,7 @@ def run_measurement(args: argparse.Namespace) -> None:
                 nonlocal network_before
                 start_controller(cfg, session_id, groups, dry_run=False)
                 network_before = collect_network_snapshots(cfg, dry_run=False)
+                arm_controller(cfg, dry_run=False)
                 print("Measuring...")
 
             run_receiver(

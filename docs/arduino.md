@@ -23,9 +23,10 @@
 Управление осуществляется через последовательный порт командами START и STOP. Каждая сессия измерений имеет уникальный идентификатор для последующего анализа данных на компьютере.
 
 Supervised stand runner открывает serial и выполняет reset/STOP до запуска
-controller. После readiness barrier он запускает controller и только затем
-разрешает receiver отправить START. Поэтому GPIO-переходы при reset не входят в
-trace sequence измерительной сессии.
+controller. После readiness barrier он запускает paused controller, разрешает
+обработку GPIO через `SIGUSR1` и только затем разрешает receiver отправить START.
+Поэтому GPIO-переходы при reset и настройке line не входят в trace sequence
+измерительной сессии.
 
 ## JSON формат данных о группе измерений
 

@@ -232,6 +232,24 @@ class ControllerLaunchTest(unittest.TestCase):
         self.assertIn("RT_TRACE_SESSION_ID=123", command)
         self.assertIn("RT_TRACE_MEASUREMENTS_PER_GROUP=100", command)
         self.assertIn("RT_TRACE_EXPECTED_GROUPS=2", command)
+        self.assertIn("RT_MEASUREMENT_START_PAUSED=1", command)
+
+    def test_controller_is_armed_with_signal(self):
+        cfg = runner.configparser.ConfigParser(interpolation=None)
+        cfg.read_dict({
+            "controller": {
+                "host": "root@controller",
+                "pid-path": "/tmp/controller.pid",
+            },
+        })
+
+        with mock.patch.object(runner, "ssh") as ssh:
+            runner.arm_controller(cfg, dry_run=False)
+
+        self.assertEqual(
+            ssh.call_args.args,
+            ("root@controller", "kill -USR1 $(cat /tmp/controller.pid); sleep 0.1"),
+        )
 
 if __name__ == "__main__":
     unittest.main()
