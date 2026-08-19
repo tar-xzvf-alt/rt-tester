@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import configparser
+import contextlib
 import json
 import os
 import shlex
@@ -776,7 +777,7 @@ def print_db_summary(db_path: str, session_id: int, expected_groups: int) -> boo
         print(f"warning: database not found: {db_path}")
         return False
 
-    with sqlite3.connect(db_path) as conn:
+    with contextlib.closing(sqlite3.connect(db_path)) as conn:
         cur = conn.cursor()
         groups = cur.execute(
             "select count(*), min(group_index), max(group_index) from groups "
