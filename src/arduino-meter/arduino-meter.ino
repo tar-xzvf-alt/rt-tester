@@ -29,12 +29,13 @@ void loop() {
       return;
     }
     
-    // If group is complete - send statistics before scheduling a new pulse.
-    if (measurementInGroup >= measurementsPerGroup) {
+    // Finish after exactly measurementsPerGroup requests, including timeouts.
+    if (sendingInGroup >= measurementsPerGroup && !responsePending) {
       sendGroupData();
       groupIndex++;
       measurementInGroup = 0;
       sendingInGroup = 0;
+      timeoutsInGroup = 0;
       // Optional progress output
       if (groupIndex % 10 == 0) {
         Serial.print(F("{\"progress\":\""));
@@ -48,23 +49,36 @@ void loop() {
       return;
     }
 
-    // Timer-based measurement with configurable interval
+    // Do not resend a pending request. A timeout is accounted as a lost sample.
     unsigned long now = micros();
-    if ((now - lastMeasurementTime >= measurementIntervalUs)&&(measurementInGroup==sendingInGroup)||((now - lastMeasurementTime >= measurementIntervalUs*2))) {
-      lastMeasurementTime = now;
+    noInterrupts();
+    bool pending = responsePending;
+    unsigned long requestStart = t_start;
+    interrupts();
+    if (pending && now - requestStart >= responseTimeoutUs) {
+      noInterrupts();
+      if (responsePending && micros() - t_start >= responseTimeoutUs) {
+        responsePending = false;
+        timeoutsInGroup++;
+      }
+      interrupts();
+    }
 
-      sendingInGroup = measurementInGroup+1;
-      
-      // Send pulse — protect 32-bit t_start write from ISR on 8-bit AVR
+    if (!responsePending && sendingInGroup < measurementsPerGroup &&
+        now - lastMeasurementTime >= measurementIntervalUs) {
+      // Publish pending state and timestamp atomically with the GPIO edge.
       noInterrupts();
       t_start = micros();
-      interrupts();
+      lastMeasurementTime = t_start;
+      sendingInGroup++;
+      responsePending = true;
       active = !active;
       if (active) {
         *portOutputRegisterPin7 |= pin7Mask;
       } else {
         *portOutputRegisterPin7 &= ~pin7Mask;
       }
+      interrupts();
     }
   }
 }
@@ -88,18 +102,26 @@ void checkSerialCommands() {
           ? doc["interval_us"].as<unsigned long>()
           : DEFAULT_MEASUREMENT_INTERVAL_US;
         int msr_per_group = doc["measurements_per_group"] | GROUP_SIZE;
+        unsigned long response_timeout_us =
+          doc["response_timeout_us"] | 10000UL;
         
         // Validate parameters
         if (worst_cnt < 1) worst_cnt = 1;
         if (interval_us < 10) interval_us = 10;
         if (msr_per_group < 1) msr_per_group = 1;
         if (msr_per_group > GROUP_SIZE) msr_per_group = GROUP_SIZE;
+        if (response_timeout_us < 1) response_timeout_us = 1;
+        if (response_timeout_us > UINT16_MAX) {
+          response_timeout_us = UINT16_MAX;
+        }
         
         if (new_session_id != 0) {
-          startMeasurement(new_session_id, groups, worst_cnt, interval_us, msr_per_group);
+          startMeasurement(new_session_id, groups, worst_cnt, interval_us,
+                           msr_per_group, response_timeout_us);
         } else {
           randomSeed(micros());
-          startMeasurement(random(100000, 999999), groups, worst_cnt, interval_us, msr_per_group);
+          startMeasurement(random(100000, 999999), groups, worst_cnt,
+                           interval_us, msr_per_group, response_timeout_us);
         }
       } else {
         Serial.print(F("{\"error\":\"Invalid parameters: "));
@@ -109,6 +131,7 @@ void checkSerialCommands() {
     }
     else if (command == "STOP") {
       collectingData = false;
+      responsePending = false;
       
       StaticJsonDocument<64> doc;
       doc["status"] = "stopped";
@@ -125,6 +148,8 @@ void checkSerialCommands() {
       doc["groups"] = groupIndex;
       doc["max_groups"] = maxGroups;
       doc["measurements"] = measurementInGroup;
+      doc["requests"] = sendingInGroup;
+      doc["timeouts"] = timeoutsInGroup;
       serializeJson(doc, Serial);
       Serial.println();
     }
@@ -132,6 +157,8 @@ void checkSerialCommands() {
       groupIndex = 0;
       measurementInGroup = 0;
       sendingInGroup = 0;
+      timeoutsInGroup = 0;
+      responsePending = false;
       collectingData = false;
       maxGroups = 0;
       sessionId = 0;
@@ -141,19 +168,25 @@ void checkSerialCommands() {
   }
 }
 
-void startMeasurement(unsigned long new_session_id, int groups, 
+void startMeasurement(unsigned long new_session_id, int groups,
                       int worst_cnt, unsigned long interval_us,
-                      int msr_per_group) {
+                      int msr_per_group,
+                      unsigned long response_timeout_us) {
   noInterrupts();
-  
+  collectingData = false;
+  responsePending = false;
+  active = false;
+  *portOutputRegisterPin7 &= ~pin7Mask;
   sessionId = new_session_id;
   groupIndex = 0;
   measurementInGroup = 0;
   sendingInGroup = 0;
+  timeoutsInGroup = 0;
   collectingData = true;
   maxGroups = groups;
   worstCount = worst_cnt;
   measurementIntervalUs = interval_us;
+  responseTimeoutUs = response_timeout_us;
   measurementsPerGroup = msr_per_group;
   lastMeasurementTime = micros();
   
@@ -166,6 +199,7 @@ void startMeasurement(unsigned long new_session_id, int groups,
   doc["worst_count"] = worstCount;
   doc["interval_us"] = measurementIntervalUs;
   doc["measurements_per_group"] = measurementsPerGroup;
+  doc["response_timeout_us"] = responseTimeoutUs;
   if (maxGroups > 0) {
     doc["auto_stop"] = true;
   }

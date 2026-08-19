@@ -22,6 +22,8 @@ from collections import deque
 from collections.abc import Callable
 from pathlib import Path
 
+import central_observability
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PC_RECEIVER_DIR = ROOT / "src" / "pc-receiver"
@@ -175,11 +177,13 @@ def write_prometheus_config(path: Path, cfg: configparser.ConfigParser) -> None:
     runtime_node_target = optional(cfg, "observability",
                                    "runtime-node-exporter-target",
                                    f"{supervisor_host}:9100")
+    labels = central_observability.external_labels(cfg, "rt-stand")
+    remote_write = central_observability.remote_write_block(cfg)
     content = f"""global:
   scrape_interval: 500ms
   evaluation_interval: 15s
   external_labels:
-    monitor: 'rt-stand'
+{labels}
 
 scrape_configs:
   - job_name: 'arduino_latency'
@@ -215,6 +219,7 @@ scrape_configs:
           board: '{supervisor_board}'
           role: 'runtime'
           source: 'node-exporter'
+{remote_write}
 """
     path.write_text(content, encoding="utf-8")
 
@@ -222,9 +227,16 @@ scrape_configs:
 def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | None:
     port = int(optional(cfg, "observability", "prometheus-port", "9091"))
     url = f"http://127.0.0.1:{port}"
+    pid_path = Path(require(cfg, "observability", "prometheus-pid"))
     if http_ok(f"{url}/-/healthy"):
-        verbose(f"Prometheus already healthy: {url}")
-        return url
+        if pid_path.exists():
+            verbose(f"Restarting managed Prometheus on {url}")
+            stop_pidfile(pid_path, dry_run=dry_run)
+            if not dry_run:
+                time.sleep(1)
+        else:
+            verbose(f"Prometheus already healthy: {url}")
+            return url
 
     binary = optional(cfg, "observability", "prometheus", "prometheus")
     resolved = shutil.which(binary) if "/" not in binary else binary
@@ -235,7 +247,6 @@ def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | 
     config_path = Path(require(cfg, "observability", "prometheus-config"))
     data_path = Path(require(cfg, "observability", "prometheus-data"))
     log_path = Path(require(cfg, "observability", "prometheus-log"))
-    pid_path = Path(require(cfg, "observability", "prometheus-pid"))
     if dry_run:
         print(f"would start Prometheus on {url}")
         return url
@@ -289,6 +300,8 @@ def transport_env(cfg: configparser.ConfigParser) -> str:
 
 
 def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | None:
+    if not central_observability.managed_grafana(cfg):
+        return central_observability.grafana_url(cfg) or None
     port = int(optional(cfg, "observability", "grafana-port", "3001"))
     dashboard_url = optional(cfg, "observability", "grafana-url", "")
     base_url = f"http://127.0.0.1:{port}"
@@ -362,6 +375,7 @@ def stop_observability(cfg: configparser.ConfigParser, *, dry_run: bool) -> None
     if cfg.has_option("observability", "grafana-pid"):
         stop_pidfile(Path(require(cfg, "observability", "grafana-pid")),
                      dry_run=dry_run)
+    central_observability.stop_tunnel(cfg, dry_run=dry_run)
     for section in ("supervisor", "controller"):
         host = require(cfg, section, "host")
         exporter_pid = require(cfg, section, "trace-exporter-pid")
@@ -1201,6 +1215,8 @@ def run_measurement(args: argparse.Namespace) -> None:
 
     start_trace_exporter(cfg, "supervisor", dry_run=args.dry_run)
     start_trace_exporter(cfg, "controller", dry_run=args.dry_run)
+    if not args.no_prometheus or not args.no_grafana:
+        central_observability.start_tunnel(cfg, dry_run=args.dry_run)
     prometheus_url = None if args.no_prometheus else start_prometheus(
         cfg, dry_run=args.dry_run)
     grafana_url = None if args.no_grafana else start_grafana(

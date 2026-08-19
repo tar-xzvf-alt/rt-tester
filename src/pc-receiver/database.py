@@ -145,6 +145,9 @@ def init_database(db_path: str) -> None:
                 delay_us INTEGER,
                 measurements_per_group INTEGER,
                 worst_count INTEGER,
+                requests_sent INTEGER DEFAULT 0,
+                responses_received INTEGER DEFAULT 0,
+                timeout_count INTEGER DEFAULT 0,
                 target_board TEXT,
                 target_kernel TEXT,
                 target_stress TEXT,
@@ -174,6 +177,16 @@ def init_database(db_path: str) -> None:
             cursor.execute("ALTER TABLE groups ADD COLUMN target_payload TEXT DEFAULT 'off'")
         except sqlite3.OperationalError:
             pass
+
+        for column in (
+            "requests_sent INTEGER DEFAULT 0",
+            "responses_received INTEGER DEFAULT 0",
+            "timeout_count INTEGER DEFAULT 0",
+        ):
+            try:
+                cursor.execute(f"ALTER TABLE groups ADD COLUMN {column}")
+            except sqlite3.OperationalError:
+                pass
         
         # Individual latencies table (N  worst per group)
         cursor.execute('''
@@ -364,8 +377,9 @@ def save_group_data(db_path: str, data: dict, current_time_us: int,
             INSERT OR REPLACE INTO groups 
             (session_id, group_index, pc_timestamp, pc_timestamp_us, arduino_timestamp,
              jitter_us, delay_us, measurements_per_group, worst_count,
+             requests_sent, responses_received, timeout_count,
              target_board, target_kernel, target_stress, target_payload)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             data.get('session_id', 0),
             data['group_index'],
@@ -376,6 +390,9 @@ def save_group_data(db_path: str, data: dict, current_time_us: int,
             params.get('interval_us', 0),
             params.get('measurements_per_group', 0),
             data.get('worst_count', 125),
+            data.get('requests_sent', 0),
+            data.get('responses_received', 0),
+            data.get('timeouts', 0),
             target_board,
             target_kernel,
             target_stress,

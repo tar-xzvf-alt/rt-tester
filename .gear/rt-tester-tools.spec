@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.1.9
+Version: 0.2.0
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -27,10 +27,12 @@ supervised raw-Ethernet RT latency stands.
 %install
 root=%buildroot%_datadir/%name
 install -d "$root/scripts" "$root/src/pc-receiver"
-install -d "$root/configs/stands" "$root/grafana" "$root/prometheus"
+install -d "$root/configs/stands" "$root/configs/server" \
+    "$root/grafana" "$root/prometheus"
 
 install -m755 scripts/run_stand_measurement.py scripts/run_gpio_measurement.py \
     "$root/scripts/"
+install -m644 scripts/central_observability.py "$root/scripts/"
 install -m755 src/pc-receiver/receiver.py \
     src/pc-receiver/import_trace_metrics.py src/pc-receiver/trace_summary.py \
     "$root/src/pc-receiver/"
@@ -41,6 +43,7 @@ install -m644 src/pc-receiver/config.py src/pc-receiver/config_loader.py \
     src/pc-receiver/measurement-supervised-smoke.conf \
     "$root/src/pc-receiver/"
 cp -a configs/stands/. "$root/configs/stands/"
+cp -a configs/server/. "$root/configs/server/"
 cp -a grafana/dashboards grafana/provisioning "$root/grafana/"
 install -m644 prometheus/trace-prometheus-local-tunnel.yml "$root/prometheus/"
 
@@ -83,6 +86,12 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %doc README.md LICENSE.md docs/*.md
 
 %changelog
+* Wed Aug 19 2026 Taran Evgeniy <taranev@basealt.ru> 0.2.0-alt1
+- Add centralized Prometheus remote write and Grafana provisioning
+- Add standalone userspace and kernelspace GPIO experiment workflows
+- Validate measurement integrity and preserve timeout statistics
+- Keep Arduino response timeout independent from measurement interval
+
 * Tue Jul 21 2026 Taran Evgeniy <taranev@basealt.ru> 0.1.9-alt1
 - Wait for target shutdown before removing shared memory or restarting.
 

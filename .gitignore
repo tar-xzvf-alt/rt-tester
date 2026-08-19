@@ -1,5 +1,8 @@
 /.vscode/
 /src/pc-receiver/__pycache__/
+**/__pycache__/
+*.py[cod]
+/arduino_data.db
 /venv/
 rt-tester.code-workspace
 /src/pc-receiver/logs

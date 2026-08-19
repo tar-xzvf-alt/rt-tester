@@ -54,6 +54,9 @@ class ArduinoCollector:
 
         self.measurement_interval_us = int(config_dict.get(
             'measurement-interval-us', config.DEFAULT_MEASUREMENT_INTERVAL_US))
+        self.response_timeout_us = int(config_dict.get(
+            'response-timeout-us', config.DEFAULT_RESPONSE_TIMEOUT_US))
+        self.response_timeout_us = max(1, min(65535, self.response_timeout_us))
 
         # Auto-calculate worst_count: 5% of measurements per group (min 1)
         self.worst_count = max(1, int(self.measurements_per_group * 0.05))
@@ -117,6 +120,7 @@ class ArduinoCollector:
         print(f"    Measurements per group: {self.measurements_per_group}")
         print(f"    Worst count (5%): {self.worst_count}")
         print(f"    Measurement interval: {self.measurement_interval_us} µs")
+        print(f"    Response timeout: {self.response_timeout_us} µs")
         
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
@@ -199,6 +203,18 @@ class ArduinoCollector:
             self.session_logger = setup_session_logging(self.current_session_id)
         
         if self.is_collecting:
+            requests = int(msg.get('requests_sent', 0))
+            responses = int(msg.get('responses_received', 0))
+            timeouts = int(msg.get('timeouts', 0))
+            if (requests != self.measurements_per_group or
+                    responses != requests or timeouts):
+                print(
+                    f"warning: group {group_index} integrity: "
+                    f"requests={requests}, responses={responses}, "
+                    f"timeouts={timeouts}",
+                    flush=True,
+                )
+
             # Add target info to the message for Prometheus metrics
             msg['board'] = self.target_board
             msg['kernel'] = self.target_kernel
@@ -389,7 +405,8 @@ class ArduinoCollector:
             "groups": self.auto_stop_groups if self.auto_stop_groups else 0,
             "worst_count": self.worst_count,
             "interval_us": self.measurement_interval_us,
-            "measurements_per_group": self.measurements_per_group
+            "measurements_per_group": self.measurements_per_group,
+            "response_timeout_us": self.response_timeout_us,
         }
         
         # Set local session state before sending START so the read thread can
@@ -426,6 +443,7 @@ class ArduinoCollector:
         print(f"  Measurements per group: {self.measurements_per_group}")
         print(f"  Worst count (5%): {self.worst_count}")
         print(f"  Interval: {self.measurement_interval_us} µs")
+        print(f"  Response timeout: {self.response_timeout_us} µs")
         if self.auto_stop_groups:
             print(f"  Auto-stop: after {self.auto_stop_groups} groups")
         
@@ -524,10 +542,12 @@ class ArduinoCollector:
             actual_interval = msg.get('interval_us')
             actual_mpg = msg.get('measurements_per_group')
             actual_worst = msg.get('worst_count')
+            actual_response_timeout = msg.get('response_timeout_us')
             print("\nArduino confirmed measurement start")
             print(f"  interval_us: {actual_interval}")
             print(f"  measurements_per_group: {actual_mpg}")
             print(f"  worst_count: {actual_worst}")
+            print(f"  response_timeout_us: {actual_response_timeout}")
 
             mismatches = []
             if actual_interval != self.measurement_interval_us:
@@ -544,6 +564,11 @@ class ArduinoCollector:
                 mismatches.append(
                     f"worst_count expected {self.worst_count}, "
                     f"got {actual_worst}"
+                )
+            if actual_response_timeout != self.response_timeout_us:
+                mismatches.append(
+                    f"response_timeout_us expected {self.response_timeout_us}, "
+                    f"got {actual_response_timeout}"
                 )
 
             if mismatches:

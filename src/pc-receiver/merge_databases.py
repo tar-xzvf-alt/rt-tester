@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS groups (
     delay_us INTEGER,
     measurements_per_group INTEGER,
     worst_count INTEGER,
+    requests_sent INTEGER DEFAULT 0,
+    responses_received INTEGER DEFAULT 0,
+    timeout_count INTEGER DEFAULT 0,
     target_board TEXT,
     target_kernel TEXT,
     target_stress TEXT,
@@ -145,6 +148,14 @@ def merge_all(results_dir, output_db):
                        'delay_us', 'measurements_per_group', 'worst_count',
                        'target_board', 'target_kernel', 'target_stress',
                        'target_payload']
+        existing_group_cols = {
+            row[1] for row in src.execute("PRAGMA table_info(groups)")
+        }
+        groups_cols.extend(
+            column for column in
+            ['requests_sent', 'responses_received', 'timeout_count']
+            if column in existing_group_cols
+        )
 
         latencies_cols = ['group_id', 'latency_us', 'rank_in_group']
         soc_cols = ['session_id', 'group_index', 'pc_timestamp', 'cpu_percent',

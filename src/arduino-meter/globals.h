@@ -10,6 +10,8 @@ extern volatile unsigned long t_start;
 extern volatile int groupIndex;
 extern volatile int measurementInGroup;
 extern volatile int sendingInGroup;
+extern volatile int timeoutsInGroup;
+extern volatile bool responsePending;
 extern volatile bool collectingData;
 extern volatile unsigned long sessionId;
 extern volatile int maxGroups;
@@ -20,6 +22,7 @@ extern volatile unsigned long lastMeasurementTime;
 // Measurement parameters (configurable via START command)
 extern volatile int worstCount;                       // Number of worst latencies to report
 extern volatile unsigned long measurementIntervalUs;  // Interval between measurements
+extern volatile unsigned long responseTimeoutUs;      // Timeout for one GPIO response
 extern volatile int measurementsPerGroup;             // Measurements per group (1-GROUP_SIZE)
 
 // For direct port access
@@ -29,10 +32,12 @@ extern volatile uint8_t* portInputRegisterPin20;
 extern uint8_t pin20Mask;
 
 // Temporary arrays for current group
-extern volatile unsigned long currentGroupLatency[GROUP_SIZE];
+extern volatile uint16_t currentGroupLatency[GROUP_SIZE];
 
 // Functions
 void checkSerialCommands();
-void startMeasurement(unsigned long session_id, int groups, int worst_cnt, unsigned long interval_us, int msr_per_group);
+void startMeasurement(unsigned long session_id, int groups, int worst_cnt,
+                      unsigned long interval_us, int msr_per_group,
+                      unsigned long response_timeout_us);
 
 #endif

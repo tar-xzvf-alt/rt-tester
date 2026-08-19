@@ -78,6 +78,7 @@ def load_config(config_path=None):
         'auto-stop-groups': config.AUTO_STOP,
         'measurements-per-group': config.DEFAULT_MEASUREMENTS_PER_GROUP,
         'measurement-interval-us': config.DEFAULT_MEASUREMENT_INTERVAL_US,
+        'response-timeout-us': config.DEFAULT_RESPONSE_TIMEOUT_US,
         'target-board': config.DEFAULT_TARGET_BOARD,
         'target-kernel': config.DEFAULT_TARGET_KERNEL,
         'target-stress': config.DEFAULT_TARGET_STRESS,
@@ -99,6 +100,7 @@ def load_config(config_path=None):
             # Update global parameters
             for key in ['db', 'timeout-us', 'check-interval-us', 'auto-stop-groups',
                         'measurements-per-group', 'measurement-interval-us',
+                        'response-timeout-us',
                         'target-board', 'target-kernel', 'target-stress',
                         'target-payload', 'prometheus-url']:
                 if key in file_config:
@@ -140,6 +142,7 @@ def load_config(config_path=None):
             print(f"  db = {config_dict['db']}")
             print(f"  measurements-per-group = {config_dict['measurements-per-group']}")
             print(f"  measurement-interval-us = {config_dict['measurement-interval-us']} µs")
+            print(f"  response-timeout-us = {config_dict['response-timeout-us']} µs")
             print(f"  target-board = {config_dict['target-board']}")
             print(f"  target-kernel = {config_dict['target-kernel']}")
             print(f"  target-stress = {config_dict['target-stress']}")

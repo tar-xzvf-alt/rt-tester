@@ -20,6 +20,8 @@ import urllib.parse
 import urllib.request
 from pathlib import Path
 
+import central_observability
+
 
 ROOT = Path(__file__).resolve().parents[1]
 PC_RECEIVER_DIR = ROOT / "src" / "pc-receiver"
@@ -61,6 +63,13 @@ def optional(cfg: configparser.ConfigParser, section: str, key: str,
 
 def config_bool(value: str) -> bool:
     return value.strip().lower() in ("1", "on", "true", "yes")
+
+
+def execution_mode(cfg: configparser.ConfigParser) -> str:
+    mode = optional(cfg, "target", "execution-mode", "userspace")
+    if mode not in ("userspace", "kernelspace"):
+        die(f"unsupported [target] execution-mode: {mode}")
+    return mode
 
 
 def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
@@ -131,6 +140,7 @@ def write_receiver_config(path: Path, cfg: configparser.ConfigParser,
         f"db = {db_path}",
         f"measurements-per-group = {clamped_measurements_per_group(cfg)}",
         f"measurement-interval-us = {measurement.get('measurement-interval-us')}",
+        f"response-timeout-us = {measurement.get('response-timeout-us', '10000')}",
         f"auto-stop-groups = {groups}",
         f"target-board = {measurement.get('target-board')}",
         f"target-kernel = {measurement.get('target-kernel')}",
@@ -148,11 +158,13 @@ def write_prometheus_config(path: Path, cfg: configparser.ConfigParser) -> None:
     node_target = optional(
         cfg, "observability", "node-exporter-target", f"{target_host}:9100")
     board = optional(cfg, "target", "label", require(cfg, "target", "board"))
+    labels = central_observability.external_labels(cfg, "rt-gpio-stand")
+    remote_write = central_observability.remote_write_block(cfg)
     content = f"""global:
   scrape_interval: 500ms
   evaluation_interval: 15s
   external_labels:
-    monitor: 'rt-gpio-stand'
+{labels}
 
 scrape_configs:
   - job_name: 'arduino_latency'
@@ -170,6 +182,7 @@ scrape_configs:
           board: '{board}'
           role: 'standalone-gpio'
           source: 'node-exporter'
+{remote_write}
 """
     path.write_text(content, encoding="utf-8")
 
@@ -197,19 +210,23 @@ def start_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> str | 
     config_path = Path(require(cfg, "observability", "prometheus-config"))
     data_path = Path(require(cfg, "observability", "prometheus-data"))
     log_path = Path(require(cfg, "observability", "prometheus-log"))
+    retention = optional(cfg, "observability", "prometheus-retention-time", "6h")
+    config_path.parent.mkdir(parents=True, exist_ok=True)
     write_prometheus_config(config_path, cfg)
     if dry_run:
         print(f"would start Prometheus on {url}")
         return url
 
     data_path.mkdir(parents=True, exist_ok=True)
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    pid_path.parent.mkdir(parents=True, exist_ok=True)
     log_file = log_path.open("ab")
     proc = subprocess.Popen([
         resolved,
         f"--config.file={config_path}",
         f"--web.listen-address=127.0.0.1:{port}",
         f"--storage.tsdb.path={data_path}",
-        "--storage.tsdb.retention.time=6h",
+        f"--storage.tsdb.retention.time={retention}",
     ], stdout=log_file, stderr=subprocess.STDOUT)
     pid_path.write_text(f"{proc.pid}\n", encoding="utf-8")
     for _ in range(20):
@@ -259,6 +276,8 @@ providers:
 
 def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool,
                   prometheus_url: str) -> str | None:
+    if not central_observability.managed_grafana(cfg):
+        return central_observability.grafana_url(cfg) or None
     port = int(optional(cfg, "observability", "grafana-port", "3002"))
     dashboard_url = optional(
         cfg, "observability", "grafana-url",
@@ -283,6 +302,7 @@ def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool,
 
     data_path = Path(require(cfg, "observability", "grafana-data"))
     log_path = Path(require(cfg, "observability", "grafana-log"))
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     provisioning = write_grafana_provisioning(
         data_path / "provisioning", cfg, prometheus_url)
     plugins_path = data_path / "plugins"
@@ -320,42 +340,42 @@ def start_grafana(cfg: configparser.ConfigParser, *, dry_run: bool,
     return dashboard_url
 
 
-def stop_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
-    pid_path = Path(require(cfg, "observability", "prometheus-pid"))
+def stop_managed_process(pid_path: Path, name: str, *, dry_run: bool) -> None:
     if not pid_path.exists():
         return
-    pid = pid_path.read_text(encoding="utf-8").strip()
-    if not pid:
+    raw_pid = pid_path.read_text(encoding="utf-8").strip()
+    if not raw_pid:
         pid_path.unlink(missing_ok=True)
         return
     if dry_run:
-        print(f"would stop Prometheus pid {pid}")
+        print(f"would stop {name} pid {raw_pid}")
         return
     try:
-        os.kill(int(pid), signal.SIGTERM)
-    except (ProcessLookupError, ValueError):
+        pid = int(raw_pid)
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(100):
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                break
+            time.sleep(0.1)
+        else:
+            os.kill(pid, signal.SIGKILL)
+    except (ProcessLookupError, ValueError, PermissionError):
         pass
     pid_path.unlink(missing_ok=True)
+
+
+def stop_prometheus(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    pid_path = Path(require(cfg, "observability", "prometheus-pid"))
+    stop_managed_process(pid_path, "Prometheus", dry_run=dry_run)
 
 
 def stop_grafana(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     if not cfg.has_option("observability", "grafana-pid"):
         return
     pid_path = Path(require(cfg, "observability", "grafana-pid"))
-    if not pid_path.exists():
-        return
-    pid = pid_path.read_text(encoding="utf-8").strip()
-    if not pid:
-        pid_path.unlink(missing_ok=True)
-        return
-    if dry_run:
-        print(f"would stop Grafana pid {pid}")
-        return
-    try:
-        os.kill(int(pid), signal.SIGTERM)
-    except (ProcessLookupError, ValueError):
-        pass
-    pid_path.unlink(missing_ok=True)
+    stop_managed_process(pid_path, "Grafana", dry_run=dry_run)
 
 
 def stop_local_receivers(*, dry_run: bool) -> None:
@@ -382,6 +402,10 @@ def stop_local_receivers(*, dry_run: bool) -> None:
 
 def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
                         need_deploy: bool, need_build: bool) -> None:
+    mode = execution_mode(cfg)
+    if mode == "kernelspace" and (need_deploy or need_build):
+        die("--deploy/--build are only supported for userspace rt-handler")
+
     local_commands = ["ssh"]
     if need_deploy:
         local_commands.append("rsync")
@@ -391,18 +415,34 @@ def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
 
     host = require(cfg, "target", "host")
     ssh(host, "hostname >/dev/null", dry_run=dry_run)
-    if need_build:
-        ssh(host, "command -v make >/dev/null && command -v cc >/dev/null",
-            dry_run=dry_run)
+    if mode == "userspace":
+        if need_build:
+            ssh(host, "command -v make >/dev/null && command -v cc >/dev/null",
+                dry_run=dry_run)
+        else:
+            binary = require(cfg, "target", "binary")
+            command = (
+                f"case {q(binary)} in */*) test -x {q(binary)} ;; "
+                f"*) command -v {q(binary)} >/dev/null ;; esac"
+            )
+            ssh(host, command, dry_run=dry_run)
     else:
-        binary = require(cfg, "target", "binary")
-        command = (
-            f"case {q(binary)} in */*) test -x {q(binary)} ;; "
-            f"*) command -v {q(binary)} >/dev/null ;; esac"
-        )
-        ssh(host, command, dry_run=dry_run)
-    ssh(host, "command -v node_exporter >/dev/null || true", dry_run=dry_run,
-        check=False)
+        module = optional(cfg, "target", "module", "rt_gpio_responder")
+        ssh(host, f"command -v modprobe >/dev/null && modinfo {q(module)} >/dev/null",
+            dry_run=dry_run)
+
+    expected_kernel = optional(cfg, "target", "expected-kernel", "")
+    if expected_kernel:
+        ssh(host, f"test \"$(uname -r)\" = {q(expected_kernel)}",
+            dry_run=dry_run)
+
+    remote_commands = ["chrt", "taskset", "node_exporter"]
+    if config_bool(optional(cfg, "measurement", "target-stress", "off")):
+        remote_commands.append("stress-ng")
+    command = " && ".join(
+        f"command -v {q(command)} >/dev/null" for command in remote_commands
+    )
+    ssh(host, command, dry_run=dry_run)
 
 
 def check_arduino(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
@@ -469,31 +509,41 @@ def deploy_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
 def build_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     host = require(cfg, "target", "host")
     repo = require(cfg, "target", "repo")
-    command = f"cd {q(repo + '/src')} && make"
+    command = f"cd {q(repo + '/src')} && make clean && make"
     ssh(host, command, dry_run=dry_run)
 
 
 def cleanup_target(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     host = require(cfg, "target", "host")
-    pid_path = require(cfg, "target", "pid-path")
-    binary = Path(require(cfg, "target", "binary")).name
-    binary_path = require(cfg, "target", "binary")
     stress_pid = optional(cfg, "stress", "pid", "/tmp/rt-gpio-stress.pid")
-    command = (
-        f"if [ -f {q(pid_path)} ]; then "
-        f"kill $(cat {q(pid_path)}) 2>/dev/null || true; "
-        f"rm -f {q(pid_path)}; fi; "
-        f"pkill -x {q(binary)} 2>/dev/null || true; "
-        f"pkill -f {q(binary_path)} 2>/dev/null || true; "
+    commands = [
+        "systemctl stop rt-handler 2>/dev/null || true",
+        "pkill -x rt-handler 2>/dev/null || true",
+    ]
+    if cfg.has_option("target", "pid-path"):
+        pid_path = require(cfg, "target", "pid-path")
+        commands.extend([
+            f"if [ -f {q(pid_path)} ]; then kill $(cat {q(pid_path)}) "
+            f"2>/dev/null || true; rm -f {q(pid_path)}; fi",
+        ])
+    module = optional(cfg, "target", "module", "rt_gpio_responder")
+    commands.extend([
+        f"modprobe -r {q(module)} 2>/dev/null || true",
         f"if [ -f {q(stress_pid)} ]; then "
-        f"kill $(cat {q(stress_pid)}) 2>/dev/null || true; "
-        f"rm -f {q(stress_pid)}; fi; "
-        f"pkill -x stress-ng 2>/dev/null || true"
-    )
-    ssh(host, command, dry_run=dry_run, check=False)
+        f"pid=$(cat {q(stress_pid)}); kill $pid 2>/dev/null || true; "
+        "i=0; while kill -0 $pid 2>/dev/null && [ $i -lt 50 ]; do "
+        "sleep 0.1; i=$((i + 1)); done; "
+        "kill -KILL $pid 2>/dev/null || true; "
+        f"rm -f {q(stress_pid)}; fi",
+        "pkill -TERM -f '^stress-ng' 2>/dev/null || true",
+        "sleep 0.2",
+        "pkill -KILL -f '^stress-ng' 2>/dev/null || true",
+    ])
+    ssh(host, "; ".join(commands), dry_run=dry_run, check=False)
 
 
-def start_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+def start_userspace_handler(cfg: configparser.ConfigParser,
+                            *, dry_run: bool) -> None:
     host = require(cfg, "target", "host")
     board = require(cfg, "target", "board")
     binary = require(cfg, "target", "binary")
@@ -517,6 +567,28 @@ def start_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     ssh(host, command, dry_run=dry_run)
 
 
+def start_kernel_handler(cfg: configparser.ConfigParser,
+                         *, dry_run: bool) -> None:
+    host = require(cfg, "target", "host")
+    module = optional(cfg, "target", "module", "rt_gpio_responder")
+    module_args = optional(
+        cfg, "target", "module-args", "board=starfive log_events=0")
+    command = (
+        f"modprobe {q(module)} {module_args}; sleep 1; "
+        f"test -d /sys/module/{q(module)}; "
+        f"grep -q {q(optional(cfg, 'target', 'irq-name', 'rt-gpio-responder'))} "
+        f"/proc/interrupts"
+    )
+    ssh(host, command, dry_run=dry_run)
+
+
+def start_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    if execution_mode(cfg) == "kernelspace":
+        start_kernel_handler(cfg, dry_run=dry_run)
+    else:
+        start_userspace_handler(cfg, dry_run=dry_run)
+
+
 def start_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     if not config_bool(optional(cfg, "measurement", "target-stress", "off")):
         print("Target stress: off")
@@ -529,7 +601,8 @@ def start_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     pid_path = optional(cfg, "stress", "pid", "/tmp/rt-gpio-stress.pid")
     log_path = optional(cfg, "stress", "log", "/tmp/rt-gpio-stress.log")
     command = (
-        f"pkill -x stress-ng 2>/dev/null || true; "
+        f"pkill -TERM -f '^stress-ng' 2>/dev/null || true; sleep 0.2; "
+        f"pkill -KILL -f '^stress-ng' 2>/dev/null || true; "
         f": > {q(log_path)}; "
         f"{stress_cmd} >{q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}"
@@ -538,18 +611,88 @@ def start_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     ssh(host, command, dry_run=dry_run)
 
 
+def warm_up_stress(cfg: configparser.ConfigParser, seconds: int,
+                   *, dry_run: bool) -> None:
+    if seconds <= 0 or not config_bool(
+            optional(cfg, "measurement", "target-stress", "off")):
+        return
+    print(f"Stress warm-up: {seconds} seconds")
+    if not dry_run:
+        time.sleep(seconds)
+
+    host = require(cfg, "target", "host")
+    sample_count = int(optional(cfg, "stress", "stability-samples", "6"))
+    sample_interval = int(optional(cfg, "stress", "stability-interval-seconds", "5"))
+    max_spread = float(optional(cfg, "stress", "memory-stability-percent", "5"))
+    samples = []
+    for index in range(sample_count):
+        result = ssh(
+            host,
+            "awk '/MemAvailable:/ { print $2 }' /proc/meminfo",
+            dry_run=dry_run,
+            capture=True,
+        )
+        if dry_run:
+            continue
+        samples.append(int(result.stdout.strip()))
+        if index + 1 < sample_count:
+            time.sleep(sample_interval)
+    if samples:
+        spread = 100 * (max(samples) - min(samples)) / max(samples)
+        print(f"Stress memory stability: spread={spread:.2f}%")
+        if spread > max_spread:
+            die(
+                f"stress memory did not stabilize: {spread:.2f}% > "
+                f"{max_spread:.2f}%"
+            )
+
+
 def pin_node_exporter(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     host = require(cfg, "target", "host")
     housekeeping = optional(cfg, "target", "housekeeping-cpus", "0")
     command = (
-        "pgrep -x node_exporter 2>/dev/null | while read -r pid; do "
-        "ps -L -p \"$pid\" -o tid= | while read -r tid; do "
-        "chrt -o -p 0 \"$tid\" 2>/dev/null || true; "
-        f"taskset -pc {q(housekeeping)} \"$tid\" >/dev/null 2>&1 || true; "
+        "set -eu; pids=$(pgrep -x node_exporter); test -n \"$pids\"; "
+        "for pid in $pids; do for task in /proc/$pid/task/*; do "
+        "tid=${task##*/}; "
+        "chrt -o -p 0 \"$tid\"; "
+        f"taskset -pc {q(housekeeping)} \"$tid\" >/dev/null; "
         "done; done"
     )
-    ssh(host, command, dry_run=dry_run, check=False)
+    ssh(host, command, dry_run=dry_run)
     print(f"node_exporter pinned to SCHED_OTHER on CPU(s): {housekeeping}")
+
+
+def pin_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    host = require(cfg, "target", "host")
+    rt_cpu = optional(cfg, "target", "rt-cpu", "1")
+    irq_priority = int(optional(cfg, "target", "gpio-irq-priority", "99"))
+    irq_name = require(cfg, "target", "irq-name")
+    commands = []
+
+    if execution_mode(cfg) == "userspace":
+        pid_path = require(cfg, "target", "pid-path")
+        handler_priority = int(optional(
+            cfg, "target", "handler-priority", "85"))
+        commands.extend([
+            f"pid=$(cat {q(pid_path)}); test -d /proc/$pid",
+            "for task in /proc/$pid/task/*; do tid=${task##*/}; "
+            f"chrt -f -p {handler_priority} $tid; "
+            f"taskset -pc {q(rt_cpu)} $tid >/dev/null; done",
+        ])
+
+    commands.extend([
+        f"irq=$(awk -v name={q(irq_name)} '$0 ~ name "
+        "{ gsub(\":\", \"\", $1); print $1; exit }' /proc/interrupts)",
+        "test -n \"$irq\"",
+        "tid=$(ps -eLo tid=,comm= | awk -v prefix=\"irq/$irq-\" "
+        "'index($2, prefix) == 1 { print $1; exit }')",
+        "test -n \"$tid\"",
+        f"chrt -f -p {irq_priority} $tid",
+        f"taskset -pc {q(rt_cpu)} $tid >/dev/null",
+        "ps -p $tid -o pid=,tid=,cls=,rtprio=,psr=,comm=",
+    ])
+    ssh(host, "set -eu; " + "; ".join(commands), dry_run=dry_run)
+    print(f"Handler path pinned to CPU {rt_cpu}; GPIO IRQ FIFO {irq_priority}")
 
 
 def run_receiver(cfg: configparser.ConfigParser, session_id: int,
@@ -575,22 +718,35 @@ def print_target_diagnostics(cfg: configparser.ConfigParser,
     if dry_run:
         return
     host = require(cfg, "target", "host")
-    pid_path = require(cfg, "target", "pid-path")
-    stdout_log = require(cfg, "target", "stdout-log")
+    if execution_mode(cfg) == "kernelspace":
+        module = optional(cfg, "target", "module", "rt_gpio_responder")
+        handler_diagnostics = (
+            "echo '== kernel handler =='; "
+            f"lsmod | grep -w '^{module}' || true; "
+            f"grep {q(require(cfg, 'target', 'irq-name'))} /proc/interrupts || true; "
+            "echo '== kernel log =='; "
+            "journalctl -k -n 30 --no-pager 2>/dev/null || dmesg | tail -n 30"
+        )
+    else:
+        pid_path = require(cfg, "target", "pid-path")
+        stdout_log = require(cfg, "target", "stdout-log")
+        handler_diagnostics = (
+            "echo '== rt-handler process =='; "
+            f"if [ -f {q(pid_path)} ]; then "
+            f"pid=$(cat {q(pid_path)} 2>/dev/null || true); "
+            f"if [ -n \"$pid\" ]; then ps -fp \"$pid\" || true; "
+            "else echo 'empty pidfile'; fi; "
+            "else echo 'pidfile missing'; fi; "
+            "echo '== rt-handler log tail =='; "
+            f"tail -n 40 {q(stdout_log)} 2>/dev/null || true"
+        )
     command = (
-        f"echo '== rt-handler process =='; "
-        f"if [ -f {q(pid_path)} ]; then "
-        f"pid=$(cat {q(pid_path)} 2>/dev/null || true); "
-        f"if [ -n \"$pid\" ]; then ps -fp \"$pid\" || true; "
-        f"else echo 'empty pidfile'; fi; "
-        f"else echo 'pidfile missing'; fi; "
+        handler_diagnostics + "; "
         f"echo '== node_exporter process =='; "
         f"pgrep -a -x node_exporter 2>/dev/null || echo 'not running'; "
         f"echo '== node_exporter scheduling =='; "
         f"ps -eLo pid,tid,cls,rtprio,psr,comm,args | "
-        f"awk '$6 == \"node_exporter\" {{ print }}'; "
-        f"echo '== rt-handler log tail =='; "
-        f"tail -n 40 {q(stdout_log)} 2>/dev/null || true"
+        f"awk '$6 == \"node_exporter\" {{ print }}'"
     )
     result = ssh(host, command, capture=True, check=False)
     if result.stdout:
@@ -639,6 +795,16 @@ def print_db_summary(db_path: str, session_id: int, expected_groups: int) -> boo
             "select event_type, count(*) from events where session_id=? "
             "group by event_type order by event_type", (session_id,),
         ).fetchall()
+        integrity = cur.execute(
+            "select coalesce(sum(measurements_per_group),0), "
+            "coalesce(sum(requests_sent),0), "
+            "coalesce(sum(responses_received),0), "
+            "coalesce(sum(timeout_count),0), "
+            "sum(case when requests_sent != measurements_per_group or "
+            "responses_received != requests_sent or timeout_count != 0 "
+            "then 1 else 0 end) from groups where session_id=?",
+            (session_id,),
+        ).fetchone()
 
     count, first_group, last_group = groups
     print("SQLite summary:")
@@ -646,9 +812,18 @@ def print_db_summary(db_path: str, session_id: int, expected_groups: int) -> boo
     print(f"  latencies: {latencies}")
     print(f"  soc_metrics: {soc_count}")
     print(f"  events: {events}")
+    print(
+        "  integrity (expected, requests, responses, timeouts, bad groups): "
+        f"{integrity}"
+    )
+    expected_measurements = integrity[0]
     return (
         count == expected_groups and first_group == 0 and
-        last_group == expected_groups - 1 and (latencies[0] or 0) > 0
+        last_group == expected_groups - 1 and (latencies[0] or 0) > 0 and
+        integrity == (
+            expected_measurements, expected_measurements,
+            expected_measurements, 0, 0,
+        )
     )
 
 
@@ -658,16 +833,21 @@ def run_measurement(args: argparse.Namespace) -> None:
     session_id = args.session_id or int(time.time())
     groups = args.groups or int(require(cfg, "measurement", "groups"))
     db_path = args.db or require(cfg, "measurement", "db")
+    warmup_seconds = args.warmup_seconds
+    if warmup_seconds is None:
+        warmup_seconds = int(optional(cfg, "stress", "warmup-seconds", "0"))
 
     print(f"Stand: {stand_name}")
     print(f"Session ID: {session_id}")
     print(f"Groups: {groups}")
     print(f"Measurements per group: {clamped_measurements_per_group(cfg)}")
+    print(f"Execution mode: {execution_mode(cfg)}")
     sys.stdout.flush()
 
     if args.stop_observability:
         stop_prometheus(cfg, dry_run=args.dry_run)
         stop_grafana(cfg, dry_run=args.dry_run)
+        central_observability.stop_tunnel(cfg, dry_run=args.dry_run)
         return
 
     check_prerequisites(
@@ -687,6 +867,8 @@ def run_measurement(args: argparse.Namespace) -> None:
 
     cleanup_target(cfg, dry_run=args.dry_run)
     stop_local_receivers(dry_run=args.dry_run)
+    if not args.no_prometheus or not args.no_grafana:
+        central_observability.start_tunnel(cfg, dry_run=args.dry_run)
     prometheus_url = None if args.no_prometheus else start_prometheus(
         cfg, dry_run=args.dry_run)
     grafana_url = None
@@ -694,14 +876,23 @@ def run_measurement(args: argparse.Namespace) -> None:
         grafana_url = start_grafana(
             cfg, dry_run=args.dry_run, prometheus_url=prometheus_url)
 
+    if prometheus_url:
+        print(f"Prometheus: {prometheus_url}")
+    if grafana_url:
+        print(f"Grafana: {grafana_url}?var-session_id={session_id}")
+
     receiver_config = Path(tempfile.gettempdir()) / f"rt-gpio-{stand_name}-{session_id}.conf"
+    if not args.dry_run:
+        Path(db_path).expanduser().parent.mkdir(parents=True, exist_ok=True)
     write_receiver_config(receiver_config, cfg, db_path, groups)
     print(f"Receiver config: {receiver_config}")
 
     try:
         start_stress(cfg, dry_run=args.dry_run)
-        start_handler(cfg, dry_run=args.dry_run)
         pin_node_exporter(cfg, dry_run=args.dry_run)
+        warm_up_stress(cfg, warmup_seconds, dry_run=args.dry_run)
+        start_handler(cfg, dry_run=args.dry_run)
+        pin_handler(cfg, dry_run=args.dry_run)
         run_receiver(cfg, session_id, receiver_config, groups,
                      dry_run=args.dry_run)
     finally:
@@ -712,10 +903,6 @@ def run_measurement(args: argparse.Namespace) -> None:
             cleanup_target(cfg, dry_run=args.dry_run)
 
     db_ok = True if args.dry_run else print_db_summary(db_path, session_id, groups)
-    if prometheus_url:
-        print(f"Prometheus: {prometheus_url}")
-    if grafana_url:
-        print(f"Grafana: {grafana_url}?var-session_id={session_id}")
     if db_ok:
         print("GPIO measurement completed successfully")
     else:
@@ -734,6 +921,8 @@ def main() -> None:
                         help="fixed session ID; default is current Unix time")
     parser.add_argument("--groups", type=int,
                         help="override measurement group count")
+    parser.add_argument("--warmup-seconds", type=int,
+                        help="override target stress warm-up")
     parser.add_argument("--db", help="override SQLite database path")
     parser.add_argument("--deploy", action="store_true",
                         help="rsync rt-handler to the target before run")
