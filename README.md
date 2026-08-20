@@ -152,6 +152,16 @@ rt-tester-run-stand \
 gear-hsh --no-sisyphus-check -v --nprocs=12 /home/taranev/hasher/x86_64_chroot/
 ```
 
+Запуск установленного cyclictest runner:
+
+```bash
+rt-tester-run-linux-benchmark \
+  --config /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-idle.conf
+```
+
+На target требуется штатный пакет `linux-rt-tests`; stressed profile также
+использует `stress-ng`.
+
 Уровни зависимостей:
 
 - Обязательные зависимости RPM: `python3`, `python3-module-serial`, `python3-module-requests`, `/bin/sh`, `openssh-clients`, `rsync`, `coreutils`.
