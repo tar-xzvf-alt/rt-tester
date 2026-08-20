@@ -3,7 +3,7 @@
 Receiver управляет Arduino measurement session, принимает group JSON, собирает
 SoC metrics через Prometheus и сохраняет session SQLite DB.
 
-- Source: [`src/pc-receiver`](../../src/pc-receiver)
+- Source: [`src/pc-receiver`](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/pc-receiver)
 - SQLite reference: [SQLite Schema](../reference/sqlite-schema.md)
 - Post-processing: [Analysis and Reports](analysis-and-reports.md)
 - Dependencies: [Dependencies](../reference/dependencies.md)

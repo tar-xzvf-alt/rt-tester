@@ -1,6 +1,6 @@
 # Arduino Meter
 
-[Код для Arduino](../../src/arduino-meter)
+[Код для Arduino](https://altlinux.space/besogon1238/rt-tester/src/branch/main/src/arduino-meter)
 
 Код на Arduino C измеряет задержки в системе связи с SoC. Он отправляет импульсы через пин 7 и принимает ответные сигналы через пин 20 (на Arduino Mega). Для каждого импульса измеряется **время отклика системы** (разница между отправкой сигнала на SoC и получением ответа).
 

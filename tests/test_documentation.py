@@ -39,17 +39,26 @@ class DocumentationTest(unittest.TestCase):
     def test_local_markdown_links_resolve(self):
         sources = [ROOT / "README.md", *sorted((ROOT / "docs").rglob("*.md"))]
         broken = []
+        escaped = []
         for source in sources:
             text = source.read_text(encoding="utf-8")
             for target in re.findall(r"\[[^]]*\]\(([^)]+)\)", text):
                 path = target.split("#", 1)[0]
                 if not path or "://" in path or path.startswith(("#", "mailto:")):
                     continue
-                if not (source.parent / path).resolve().exists():
+                resolved = (source.parent / path).resolve()
+                if not resolved.exists():
                     broken.append(
                         f"{source.relative_to(ROOT)} -> {target}"
                     )
+                if source != ROOT / "README.md" and not resolved.is_relative_to(
+                    ROOT / "docs"
+                ):
+                    escaped.append(
+                        f"{source.relative_to(ROOT)} -> {target}"
+                    )
         self.assertEqual(broken, [])
+        self.assertEqual(escaped, [])
 
 
 if __name__ == "__main__":
