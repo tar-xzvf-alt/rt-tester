@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.3.1
+Version: 0.4.0
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -31,7 +31,7 @@ install -d "$root/configs/stands" "$root/configs/server" \
     "$root/grafana" "$root/prometheus"
 
 install -m755 scripts/run_stand_measurement.py scripts/run_gpio_measurement.py \
-    scripts/run_linux_benchmark.py "$root/scripts/"
+    scripts/run_linux_benchmark.py scripts/publish_cyclictest.py "$root/scripts/"
 install -m644 scripts/central_observability.py "$root/scripts/"
 install -m755 src/pc-receiver/receiver.py \
     src/pc-receiver/import_trace_metrics.py src/pc-receiver/trace_summary.py \
@@ -52,6 +52,7 @@ for entry in \
     'rt-tester-run-stand scripts/run_stand_measurement.py' \
     'rt-tester-run-gpio scripts/run_gpio_measurement.py' \
     'rt-tester-run-linux-benchmark scripts/run_linux_benchmark.py' \
+    'rt-tester-publish-cyclictest scripts/publish_cyclictest.py' \
     'rt-tester-receiver src/pc-receiver/receiver.py' \
     'rt-tester-import-trace src/pc-receiver/import_trace_metrics.py' \
     'rt-tester-trace-summary src/pc-receiver/trace_summary.py'; do
@@ -70,12 +71,13 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_*.py'
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_stand_measurement.py --help >/dev/null
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_gpio_measurement.py --help >/dev/null
 PYTHONDONTWRITEBYTECODE=1 python3 scripts/run_linux_benchmark.py --help >/dev/null
+PYTHONDONTWRITEBYTECODE=1 python3 scripts/publish_cyclictest.py --help >/dev/null
 PYTHONDONTWRITEBYTECODE=1 python3 src/pc-receiver/receiver.py --help >/dev/null
 PYTHONDONTWRITEBYTECODE=1 python3 src/pc-receiver/import_trace_metrics.py --help >/dev/null
 PYTHONDONTWRITEBYTECODE=1 python3 src/pc-receiver/trace_summary.py --help >/dev/null
 for command in rt-tester-run-stand rt-tester-run-gpio \
-    rt-tester-run-linux-benchmark rt-tester-receiver rt-tester-import-trace \
-    rt-tester-trace-summary; do
+    rt-tester-run-linux-benchmark rt-tester-publish-cyclictest \
+    rt-tester-receiver rt-tester-import-trace rt-tester-trace-summary; do
     RT_TESTER_ROOT=%buildroot%_datadir/%name \
     %buildroot%_bindir/$command --help >/dev/null
 done
@@ -89,6 +91,11 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %doc README.md LICENSE.md docs/*.md
 
 %changelog
+* Thu Aug 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.4.0-alt1
+- Add validated, idempotent cyclictest bundle publication over SSH
+- Keep failed publications in a retryable sidecar queue
+- Add optional automatic publication after successful measurements
+
 * Thu Aug 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.3.1-alt1
 - Document fixed-frequency idle and stressed cyclictest comparisons
 - Record the stress-ng package version in stressed result bundles

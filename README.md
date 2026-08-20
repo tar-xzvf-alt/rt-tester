@@ -159,6 +159,16 @@ rt-tester-run-linux-benchmark \
   --config /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-idle.conf
 ```
 
+Add `--publish` to validate and import the completed bundle into the configured
+central `rt-results` catalog. Publication failures do not invalidate the local
+measurement and can be retried with:
+
+```bash
+rt-tester-publish-cyclictest \
+  --config /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-idle.conf \
+  --pending
+```
+
 На target требуется штатный пакет `linux-rt-tests`; stressed profile также
 использует `stress-ng`. Начиная с `rt-handler-0.1.8-alt1`, оба инструмента
 устанавливаются как его RPM-зависимости. Для cyclictest-only устройства без

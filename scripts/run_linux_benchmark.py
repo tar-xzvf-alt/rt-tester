@@ -17,6 +17,8 @@ import sys
 import uuid
 from pathlib import Path
 
+from publish_cyclictest import publish_bundle
+
 
 BUNDLE_SCHEMA_VERSION = 1
 CYCLICTEST_JSON_VERSION = 1
@@ -338,6 +340,11 @@ def main() -> None:
     parser.add_argument("--output-root", type=Path)
     parser.add_argument("--duration", help="override cyclictest duration")
     parser.add_argument("--print-command", action="store_true")
+    parser.add_argument(
+        "--publish",
+        action="store_true",
+        help="publish the completed bundle to the configured rt-results host",
+    )
     args = parser.parse_args()
 
     cfg = load_config(args.config.expanduser())
@@ -356,6 +363,14 @@ def main() -> None:
 
     bundle = execute(cfg, output_root)
     print(f"Completed bundle: {bundle}")
+    if args.publish:
+        try:
+            publish_bundle(bundle, cfg)
+        except Exception as error:
+            print(
+                f"warning: measurement complete but publication failed: {error}",
+                file=sys.stderr,
+            )
 
 
 if __name__ == "__main__":

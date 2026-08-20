@@ -30,6 +30,38 @@ the same profile and substantially longer durations.
 The stress config starts a dedicated stress-ng process group and stops only
 that group. It does not use broad `pkill` cleanup.
 
+## Publishing results
+
+The packaged VisionFive 2 profiles contain a `[publish]` section for the
+central `rt-results` server. Publish automatically after a successful run:
+
+```sh
+rt-tester-run-linux-benchmark \
+  --config /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-idle.conf \
+  --duration 10m \
+  --publish
+```
+
+The publisher validates the local manifest and every artifact digest, uploads
+the bundle into a unique temporary directory, invokes
+`rt-results-import-cyclictest`, verifies `run_uid` in the remote catalog, and
+removes the staging directory. The importer is idempotent.
+
+Publication status is stored outside the immutable bundle under
+`~/.local/state/rt-tester/cyclictest-publish`. A network or server error leaves
+the measurement complete and marks publication as `pending`. Retry all pending
+bundles with:
+
+```sh
+rt-tester-publish-cyclictest \
+  --config /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-idle.conf \
+  --pending
+```
+
+The current stand configuration uses the existing root SSH access. For a
+shared or production installation, replace it with a dedicated account whose
+only privileged operation is the catalog importer.
+
 ## Fixed-frequency idle and stress comparison
 
 Frequency control must be applied before both runs so that stress-induced DVFS
