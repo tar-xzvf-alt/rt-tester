@@ -160,7 +160,9 @@ rt-tester-run-linux-benchmark \
 ```
 
 На target требуется штатный пакет `linux-rt-tests`; stressed profile также
-использует `stress-ng`.
+использует `stress-ng`. Начиная с `rt-handler-0.1.8-alt1`, оба инструмента
+устанавливаются как его RPM-зависимости. Для cyclictest-only устройства без
+`rt-handler` установите их напрямую.
 
 Уровни зависимостей:
 

@@ -209,6 +209,7 @@ def preflight(cfg: configparser.ConfigParser) -> dict[str, object]:
         die(f"unsupported [workload] engine: {workload}")
     if workload == "stress-ng":
         ssh(host, "command -v stress-ng >/dev/null")
+        metadata["stress_package"] = remote_value(host, "rpm -q stress-ng")
     return metadata
 
 

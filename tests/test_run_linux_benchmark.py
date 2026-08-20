@@ -95,5 +95,28 @@ class StressLifecycleTest(unittest.TestCase):
         self.assertNotIn("pkill", stop_command)
 
 
+class PreflightTest(unittest.TestCase):
+    def test_stress_records_package_version(self):
+        cfg = config()
+        cfg.set("workload", "engine", "stress-ng")
+
+        with (
+            mock.patch.object(runner, "ssh"),
+            mock.patch.object(runner, "collect_target_metadata", return_value={}),
+            mock.patch.object(
+                runner,
+                "remote_value",
+                return_value="stress-ng-0.21.04-alt1.riscv64",
+            ) as remote_value,
+        ):
+            metadata = runner.preflight(cfg)
+
+        self.assertEqual(
+            metadata["stress_package"],
+            "stress-ng-0.21.04-alt1.riscv64",
+        )
+        remote_value.assert_called_once_with("root@board", "rpm -q stress-ng")
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.3.0
+Version: 0.3.1
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -89,6 +89,10 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %doc README.md LICENSE.md docs/*.md
 
 %changelog
+* Thu Aug 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.3.1-alt1
+- Document fixed-frequency idle and stressed cyclictest comparisons
+- Record the stress-ng package version in stressed result bundles
+
 * Thu Aug 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.3.0-alt1
 - Add remote cyclictest runner with idle and stress-ng profiles
 - Preserve native JSON, histograms and versioned bundle manifests
