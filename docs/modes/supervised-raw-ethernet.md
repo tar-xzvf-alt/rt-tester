@@ -1,4 +1,16 @@
-# Prometheus и Grafana
+# Supervised Raw-Ethernet Режим
+
+Этот режим измеряет полный путь Arduino, controller, raw Ethernet supervisor и
+runtime. Основной интерфейс — `rt-tester-run-stand`; runner единолично управляет
+readiness barrier, workload, receiver и trace collection.
+
+```text
+PC receiver -> Arduino -> controller GPIO -> raw Ethernet
+             <- Arduino <- controller GPIO <- supervisor/runtime response
+```
+
+Для baseline без supervisor используйте [Standalone GPIO](standalone-gpio.md).
+Для scheduler-only измерений используйте [Linux Benchmarks](linux-benchmarks.md).
 
 ## Стандартный запуск измерения
 
@@ -60,7 +72,9 @@ runtime и controller продолжают писать в log files из stand 
    отдают Prometheus metrics на `:9201`.
 6. Стартует локальный Prometheus на `127.0.0.1:9091`. Он scrape-ит PC receiver,
    оба trace exporters и `node_exporter` runtime-платы.
-7. Стартует локальную Grafana на `127.0.0.1:3001` с provisioning из `grafana/`.
+7. Для текущего packaged profile поднимает SSH tunnel к central Grafana на
+   `127.0.0.1:13000`. Локальная managed Grafana на `3001` используется только
+   профилями с `grafana-managed = true`.
 8. Если `[measurement] target-stress = on`, запускает CPU+memory нагрузку на
    runtime-плате. По умолчанию используется
    `stress-ng --cpu 0 --vm 0 --vm-bytes 85% --timeout 0`; команду, pidfile и log
@@ -157,10 +171,11 @@ rt-tester-run-stand \
     --stop-observability
 ```
 
-Скрипт печатает Grafana URL перед measurement и повторяет его в итогах:
+Текущий centrally managed profile печатает Grafana URL перед measurement и
+повторяет его в итогах:
 
 ```text
-Grafana: http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=1782751117
+Grafana: http://127.0.0.1:13000/d/rt-trace-stages?var-session_id=1782751117
 ```
 
 Prometheus URL является диагностической деталью и печатается при `--verbose`.
@@ -170,7 +185,7 @@ Prometheus URL является диагностической деталью и
 Основной dashboard для stand runs:
 
 ```text
-http://127.0.0.1:3001/d/rt-trace-stages?var-session_id=<session_id>
+http://127.0.0.1:13000/d/rt-trace-stages?var-session_id=<session_id>
 ```
 
 Он называется `RT Trace Stage Breakdown` и показывает Arduino latency вместе с
@@ -246,92 +261,10 @@ Target preflight настраивает `net.core.rmem_max` и `net.core.wmem_ma
 это уже controller-side retry всего request/response cycle после истечения
 `RT_RESPONSE_TIMEOUT_MS`.
 
-## Зависимости
+## Связанные Документы
 
-### Обязательные Зависимости RPM На ПК
-
-`rt-tester-tools` требует `python3`, `python3-module-serial`,
-`python3-module-requests`, `/bin/sh`, `openssh-clients`, `rsync` и `coreutils`.
-Этого достаточно для установленных команд, но внешние сервисы observability и
-target software устанавливаются отдельно.
-
-### Observability И Source-Only Анализ На ПК
-
-```bash
-apt-get install prometheus grafana
-```
-
-| Пакет | Назначение |
-|-------|-----------|
-| `prometheus` | Сервер сбора метрик |
-| `grafana` | Визуализация (опционально) |
-
-Для source-only `plot_statistics.py` нужны `python3-module-pandas`,
-`python3-module-numpy` и `python3-module-matplotlib`. Пакет
-`python3-module-paramiko` нужен только legacy SSH SoC tooling, которое не входит
-в RPM. Текущий встроенный metrics server не требует
-`python3-module-prometheus_client`.
-
-### Target Runtime
-
-```bash
-apt-get install prometheus-node_exporter openssh-server
-```
-
-Дополнительно устанавливается `rt-handler` для standalone. Стандартный
-supervised demo требует `rt-supervisor` и `rt-supervisor-runtime-example` на
-runtime board, `rt-controller` на controller board. Production PLC использует
-собственный runtime wrapper вместо example subpackage. `stress-ng` нужен только
-при `target-stress = on`.
-
-### Target Source Build
-
-Build-зависимости определяются target-проектом и не нужны при запуске
-установленных binaries. Для сборки `rt-handler` нужны:
-
-```bash
-apt-get install gcc make glibc-devel libgpiod-devel pkg-config
-```
-
-Supervised `--build` требует вручную размещенных source trees и настроенных
-`repo`, `build`, `binary`; runner не предоставляет `--deploy`.
-
-### Arduino
-
-```bash
-apt-get install arduino-core avr-gcc
-```
-
-| Пакет | Назначение |
-|-------|-----------|
-| `arduino-core` | Ядро Arduino |
-| `avr-gcc` | Компилятор для AVR (Arduino Mega) |
-
-## Запуск Prometheus (systemd)
-
-Этот раздел описывает ручную настройку из source checkout. Файл
-`prometheus/prometheus.yml` не входит в RPM `rt-tester-tools`; пакетный runner
-генерирует локальный config в `/tmp` из stand config.
-
-```bash
-sudo cp prometheus/prometheus.yml /etc/prometheus/prometheus.yml
-sudo systemctl restart prometheus
-```
-
-Конфигурация в `prometheus/prometheus.yml`:
-- Scrape interval: 500ms
-- node_exporter на SoC: `<IP_SOC>:9100`
-- receiver metrics server: `localhost:9101`
-- Retention: размерный (10GB) в systemd override
-
-## Импорт дашборда Grafana
-
-Ниже используется legacy dashboard из source checkout. Файл
-`grafana/rt-tester-dashboard.json` не входит в RPM; пакет содержит dashboards и
-provisioning, которые runners используют из `/usr/share/rt-tester-tools/grafana`.
-
-```bash
-curl -X POST http://admin:admin@localhost:3000/api/dashboards/db \
-  -H "Content-Type: application/json" \
-  -d "{\"dashboard\":$(cat grafana/rt-tester-dashboard.json),\"overwrite\":true}"
-```
+- [Dependencies](../reference/dependencies.md): PC, runtime, controller и Arduino packages.
+- [Central Observability](../observability/central.md): remote write, SSH tunnel и server deployment.
+- [PC Receiver](../usage/receiver.md): collection, trace import и integrity.
+- [Analysis and Reports](../usage/analysis-and-reports.md): post-processing SQLite sessions.
+- [GPIO Methodology](../methodology/gpio-measurements.md): воспроизводимые comparison runs.

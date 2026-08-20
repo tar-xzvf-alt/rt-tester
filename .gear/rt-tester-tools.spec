@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.4.0
+Version: 0.4.1
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -88,9 +88,14 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %files
 %_bindir/rt-tester-*
 %_datadir/%name/
-%doc README.md LICENSE.md docs/*.md
+%doc README.md LICENSE.md docs/
 
 %changelog
+* Thu Aug 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.4.1-alt1
+- Restructure documentation by measurement mode and usage scenario
+- Add complete cyclictest publication and fixed-frequency workflows
+- Package the full nested documentation tree
+
 * Thu Aug 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.4.0-alt1
 - Add validated, idempotent cyclictest bundle publication over SSH
 - Keep failed publications in a retryable sidecar queue

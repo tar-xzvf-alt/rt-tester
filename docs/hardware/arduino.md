@@ -1,6 +1,6 @@
-# Код для Arduino
+# Arduino Meter
 
-[Код для Arduino](../src/arduino-meter)
+[Код для Arduino](../../src/arduino-meter)
 
 Код на Arduino C измеряет задержки в системе связи с SoC. Он отправляет импульсы через пин 7 и принимает ответные сигналы через пин 20 (на Arduino Mega). Для каждого импульса измеряется **время отклика системы** (разница между отправкой сигнала на SoC и получением ответа).
 
@@ -9,16 +9,33 @@
 - `measurements_per_group` — количество измерений в группе (1-1500, по умолчанию 1500)
 - `worst_count` — количество худших задержек (авто 5% от `measurements_per_group`)
 - `measurement_interval_us` — интервал между измерениями (мкс, по умолчанию 300)
+- `response_timeout_us` — deadline ожидания ответа на один импульс
+
+Firmware ограничивает `response_timeout_us` диапазоном 1-65535 µs.
+
+## Подготовка Firmware
+
+Firmware предназначен для Arduino Mega 2560 и находится в
+`src/arduino-meter/arduino-meter.ino`. Он требует Arduino AVR core и библиотеку
+ArduinoJson. Репозиторий пока не содержит автоматизированного build/upload
+script, поэтому используйте Arduino IDE или настроенный Arduino CLI, выберите
+board Mega 2560 и serial port, затем убедитесь, что receiver обнаруживает порт и
+отвечает на status/START protocol до подключения GPIO стенда.
 
 ## Режим работы
 
-- Arduino генерирует меандр с переключением каждые `measurement_interval_us` мкс
+- Arduino начинает следующий request не раньше `measurement_interval_us` и
+  только после response или истечения `response_timeout_us`; одновременно
+  существует не более одного outstanding request
 - Прерывание `CHANGE` на входном пине фиксирует момент получения ответа от SoC
-- По команде `START {"session_id":123,"groups":100,"worst_count":75,"interval_us":300,"measurements_per_group":1500}` начинается сбор данных
+- В каждый момент ожидается ответ только на один request; отсутствие ответа до
+  `response_timeout_us` увеличивает timeout counter и не блокирует всю группу
+- По команде `START {"session_id":123,"groups":100,"worst_count":75,"interval_us":300,"measurements_per_group":1500,"response_timeout_us":10000}` начинается сбор данных
 - После заполнения группы (заданного числа измерений) формируется JSON-пакет со статистикой
 - Данные отправляются на ПК через Serial
 
-После сбора всех N групп программа формирует JSON-пакет со статистикой о группе, который отправляется на ПК автоматически после того как группа из N измерений была проведена.
+После каждой завершенной группы firmware формирует и отправляет отдельный JSON.
+После N групп session автоматически останавливается.
 
 Управление осуществляется через последовательный порт командами START и STOP. Каждая сессия измерений имеет уникальный идентификатор для последующего анализа данных на компьютере.
 
@@ -40,12 +57,16 @@ controller. После readiness barrier он запускает paused controll
   "min_latency_us": 223,
   "max_latency_us": 487,
   "jitter_us": 12.34,
-  "worst_count": 25,
+  "requests_sent": 1500,
+  "responses_received": 1499,
+  "timeouts": 1,
+  "worst_count": 75,
   "worst_latencies_us": [487, 476, ...],
   "parameters": {
     "interval_us": 300,
     "measurements_per_group": 1500,
-    "max_groups": 10
+    "max_groups": 10,
+    "response_timeout_us": 10000
   }
 }
 ```

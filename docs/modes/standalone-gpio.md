@@ -5,11 +5,13 @@ raw Ethernet и Beremiz/runtime слоя.
 
 ```text
 PC receiver.py -> Arduino Mega -> GPIO input target board
-                              <- GPIO output target board <- rt-handler
+                              <- GPIO output target board <- handler
 ```
 
-`rt-handler` является единственным source of truth для C-кода на целевой плате.
-В `rt-tester` локальной копии `src/socs-investigation/` больше нет.
+Default package workflow использует userspace `rt-handler`. Экспериментальные
+profiles также поддерживают kernelspace `rt_gpio_responder`. Source of truth
+находится в соответствующих target repositories; в `rt-tester` target C-код не
+дублируется.
 
 ## Когда Использовать
 
@@ -59,6 +61,8 @@ VisionFive 2. User-facing имя стенда и target-board остаются `
 
 ## Запуск
 
+### Userspace Package
+
 Запустить measurement с установленным RPM-пакетом `rt-handler` на target:
 
 ```bash
@@ -77,6 +81,20 @@ Standalone runner поддерживает оба source-сценария:
 `rt-handler-local`/`repo`, `binary = /root/rt-handler/src/rt-handler` и
 `workdir = /root/rt-handler/src`. Один `--build` требует, чтобы source tree уже
 был размещен на target вручную или предыдущим `--deploy`.
+
+### Kernelspace Module
+
+Kernelspace profile задает:
+
+```ini
+[target]
+execution-mode = kernelspace
+module = rt_gpio_responder
+```
+
+В этом режиме runner проверяет module, выполняет `modprobe`, проверяет IRQ и не
+разрешает `--deploy` или `--build`. Пакетные VisionFive 2 comparison profiles
+покрывают userspace/kernelspace, RT/non-RT и idle/stressed combinations.
 
 Короткий smoke:
 
@@ -107,28 +125,33 @@ rt-tester-run-gpio \
 1. проверяет SSH до target;
 2. проверяет, что Arduino serial port доступен;
 3. опционально синхронизирует время target;
-4. при `--deploy` копирует внешний `rt-handler` на target;
-5. при `--build` запускает `make` в source tree на target;
-6. останавливает старые `rt-handler`/`stress-ng` процессы;
+4. для userspace при `--deploy` копирует внешний `rt-handler` на target;
+5. для userspace при `--build` запускает `make` в source tree на target;
+6. останавливает старые userspace handler/stress процессы или подготавливает
+   выбранный kernel module;
 7. стартует Prometheus на `127.0.0.1:9092`, если он не запущен;
-8. стартует Grafana на `127.0.0.1:3002`, если она включена;
-9. стартует `rt-handler` на target;
-10. если `rt-handler` не стартовал, печатает tail его log;
+8. подготавливает Grafana согласно profile: current profile использует central
+   tunnel на `13000`, а local managed profile может использовать `3002`;
+9. стартует выбранный userspace handler или загружает kernel module;
+10. печатает userspace log или kernel module/IRQ diagnostics;
 11. переводит `node_exporter` в `SCHED_OTHER` и пинит его на housekeeping CPU;
 12. запускает `receiver.py --start --exit-on-stop`;
-13. печатает diagnostics по `rt-handler`, `node_exporter`, Prometheus samples;
+13. печатает handler, `node_exporter` и Prometheus diagnostics;
 14. проверяет SQLite summary.
 
 ## Grafana
 
-Standalone GPIO runner использует отдельную Grafana на порту `3002`, чтобы не
-конфликтовать с supervised raw-Ethernet Grafana на `3001`.
-
-После запуска runner печатает ссылку вида:
+Текущий packaged profile использует central Prometheus/Grafana через SSH tunnel
+и печатает ссылку вида:
 
 ```text
-Grafana: http://127.0.0.1:3002/d/rt-standalone-gpio?var-session_id=<session_id>
+Grafana: http://127.0.0.1:13000/d/rt-standalone-gpio?var-session_id=<session_id>
 ```
+
+Для этого нужны доступ к `wetgrape.su` и configured central SSH identity. Без
+central infrastructure используйте `--no-prometheus --no-grafana` или создайте
+profile с local observability. Если `grafana-managed = true`, standalone runner
+может управлять отдельной локальной Grafana на configured port, обычно `3002`.
 
 Dashboard называется `RT Standalone GPIO` и находится в папке `RT GPIO`. Он
 показывает:
@@ -142,7 +165,7 @@ dashboard, поэтому ось X синхронизирована. В dashboar
 и `session_id`; latency/jitter панели используют thresholds для быстрого поиска
 выбросов.
 
-Остановить Prometheus и Grafana, поднятые runner-ом:
+Остановить observability processes/tunnel, которыми управляет runner:
 
 ```bash
 rt-tester-run-gpio \
@@ -176,13 +199,14 @@ profiles `rt-handler`.
 - `events`;
 - `soc_metrics`, если Prometheus/node_exporter доступны.
 
-Пакетный config пишет БД, target log и локальные observability pid/log/data/config
-в `/tmp`. Receiver отдельно пишет свои внутренние logs и
-`metrics_all_groups.log` в XDG state directory; только этот путь можно заменить
-через `RT_TESTER_STATE_DIR`.
+Result paths задаются конкретным profile: smoke configs могут использовать
+`/tmp`, а comparison configs используют persistent state directory. Receiver
+пишет внутренние logs и `metrics_all_groups.log` в XDG state directory; этот
+путь можно заменить через `RT_TESTER_STATE_DIR`. Общая карта находится в
+[Runtime Paths](../reference/runtime-paths.md).
 
 Для анализа из checkout используется `src/pc-receiver/plot_statistics.py`. Эта
 source-only утилита не входит в RPM `rt-tester-tools`.
 
-Сводка свежего baseline и reference supervised-сессий хранится в
-[`standalone-gpio-comparison.md`](standalone-gpio-comparison.md).
+Сводка baseline и reference supervised-сессий хранится в
+[Standalone GPIO Baseline](../results/standalone-gpio-baseline.md).

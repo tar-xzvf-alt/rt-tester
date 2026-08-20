@@ -1,4 +1,7 @@
-# VisionFive 2 GPIO handler cross-kernel comparison
+# VisionFive 2 Userspace vs Kernelspace, PREEMPT_RT
+
+Non-RT baseline для cross-kernel части находится в
+[VisionFive 2 Userspace vs Kernelspace, Non-RT](visionfive2-userspace-vs-kernelspace-non-rt.md).
 
 ## Methodology
 

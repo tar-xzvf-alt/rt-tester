@@ -66,8 +66,8 @@ sessions from different measurement PCs do not overwrite each other.
 Stop local observability and its central tunnel with:
 
 ```sh
-./scripts/run_gpio_measurement.py --config CONFIG --stop-observability
-./scripts/run_stand_measurement.py --config CONFIG --stop-observability
+rt-tester-run-gpio --config CONFIG --stop-observability
+rt-tester-run-stand --config CONFIG --stop-observability
 ```
 
 ## Server configuration
@@ -97,7 +97,12 @@ Both existing dashboards are provisioned in the `RT Tester` folder.
 ## Scope of stored data
 
 Prometheus receives the live time series exported by receiver, node_exporter,
-and trace exporters. The complete SQLite session database still remains the
-source of truth for all 75 stored tail samples per group, integrity counters,
-events, and imported trace aggregates. Uploading those SQLite artifacts to a
-central session repository is a separate step from Prometheus remote write.
+and trace exporters. The complete GPIO/supervised SQLite session database still
+remains the source of truth for all configured stored tail samples, integrity
+counters, events, and imported trace aggregates. Uploading those SQLite
+artifacts is not implemented by Prometheus remote write.
+
+Cyclictest uses a separate workflow: finalized bundles can be published into
+the central `rt-results` catalog with `rt-tester-publish-cyclictest`. See
+[Publishing Cyclictest](../usage/publish-cyclictest.md). This publisher does not
+use Prometheus.

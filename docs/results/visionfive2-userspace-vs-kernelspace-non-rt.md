@@ -1,4 +1,4 @@
-# VisionFive 2 userspace vs kernelspace GPIO comparison v2
+# VisionFive 2 Userspace vs Kernelspace, Non-RT
 
 ## Methodology
 
