@@ -1,59 +1,36 @@
-# Publishing Cyclictest Results
+# Publishing cyclictest results
 
-Publisher переносит validated cyclictest bundle на central server и вызывает
-remote `rt-results-import-cyclictest`. Он не пишет SQLite через network
-filesystem и не связывает успешность измерения с доступностью сервера.
+[Русский](../ru/usage/publish-cyclictest.md)
 
-## Сценарии
+The publisher uploads a validated cyclictest bundle and invokes the external
+server's `rt-results-import-cyclictest`. It does not write SQLite over a network
+filesystem. Measurement completion is independent of server availability.
 
-| Сценарий | Команда | Ошибка публикации |
+| Workflow | Invocation | Publication failure |
 |---|---|---|
-| Только измерение | runner без `--publish` | Публикация не выполняется |
-| Измерение и публикация | runner с `--publish` | Warning, measurement остается complete |
-| Existing bundle | publisher с bundle path | Exit status 1 |
-| Retry queue | publisher с `--pending` | Неуспешные sidecars остаются pending |
-
-## Автоматическая Публикация
+| Collection only | Runner without `--publish` | No publication attempted |
+| Collection and publication | Runner with `--publish` | Warning; measurement stays complete |
+| Existing bundle | Publisher with bundle path(s) | Exit status `1` |
+| Retry queue | Publisher with `--pending` | Failed sidecars stay pending |
 
 ```bash
-rt-tester-run-linux-benchmark \
-  --config /path/to/cyclictest.conf \
-  --duration 10m \
-  --publish
-```
-
-## Публикация Existing Bundle
-
-```bash
-rt-tester-publish-cyclictest \
-  --config /path/to/cyclictest.conf \
+rt-tester-run-linux-benchmark --config ./cyclictest.conf \
+  --duration 10m --publish
+rt-tester-publish-cyclictest --config ./cyclictest.conf \
   ~/.local/state/rt-tester/cyclictest-results/RUN_UID
+rt-tester-publish-cyclictest --config ./cyclictest.conf --pending
 ```
 
-Можно передать несколько bundle paths одной командой.
+You can pass several finalized bundle paths. Sidecars live outside bundles, so
+retries do not modify immutable evidence. States are `publishing`, `pending`, and
+`published`; records contain bundle path, attempts, update time, and last error.
+`--pending` skips records whose bundle directories no longer exist.
 
-## Retry Pending
-
-```bash
-rt-tester-publish-cyclictest \
-  --config /path/to/cyclictest.conf \
-  --pending
-```
-
-Sidecars хранятся вне finalized bundle. Состояния:
-
-- `publishing`: начата попытка;
-- `pending`: remote step завершился ошибкой;
-- `published`: importer и remote `run_uid` подтверждены.
-
-Sidecar содержит bundle path, attempts, updated timestamp и last error.
-`--pending` пропускает записи, чей bundle directory больше не существует.
-
-## Конфигурация
+## Configure your server
 
 ```ini
 [publish]
-host = publisher@results.example
+host = publisher@RESULTS_HOST
 port = 22
 identity = ~/.ssh/rt-results-publisher
 remote-directory = /tmp/rt-tester-cyclictest-publish
@@ -62,46 +39,29 @@ database = /var/lib/rt-results-prototype/cyclictest.db
 state-directory = ~/.local/state/rt-tester/cyclictest-publish
 ```
 
-| Поле | Обязательно | Default |
-|---|---:|---|
-| `host` | Да | Нет |
-| `port` | Нет | `22` |
-| `identity` | Нет | SSH default identity |
-| `remote-directory` | Нет | `/tmp/rt-tester-cyclictest-publish` |
-| `importer` | Нет | `/usr/bin/rt-results-import-cyclictest` |
-| `database` | Нет | `/var/lib/rt-results-prototype/cyclictest.db` |
-| `state-directory` | Нет | `~/.local/state/rt-tester/cyclictest-publish` |
+Only `host` is required. Other defaults are shown above except `identity`, which
+defaults to SSH's identity selection. Target SSH and publication SSH settings are
+independent. The PC needs Python 3, `ssh`, `scp`, writable state, and noninteractive
+authentication. The server needs Python 3, the importer from `rt-results`, a
+writable catalog database, and staging create/remove permissions. Repository
+and package availability must be established for your server separately. Use an
+account with appropriate importer/catalog permissions; laboratory root access is
+not a portable prerequisite.
 
-Runner SSH settings для target и publisher SSH settings независимы.
+## Validation contract
 
-## Validation Contract
+Before network access the publisher checks schema version `1`, benchmark type
+`cyclictest`, status `complete`, canonical UUID `run_uid`, declared
+`cyclictest.json`/`histogram.txt`, exact declared file set, paths confined to the
+bundle, and every file's size/SHA256. This bundle schema is separate from the
+unused GPIO SQLite `schema_version` table.
 
-До network access publisher проверяет:
+After upload the server importer validates again. The publisher confirms the
+remote `runs` table contains `run_uid` and removes staging. Re-uploading the same
+bundle does not create another logical run. Preserve the original bundle and
+sidecar if diagnosing publication problems.
 
-- bundle schema version 1;
-- benchmark type `cyclictest`;
-- completion status `complete`;
-- canonical UUID `run_uid`;
-- наличие declared `cyclictest.json` и `histogram.txt`;
-- точное совпадение фактического и declared file set;
-- отсутствие artifact paths за пределами bundle;
-- size и SHA256 каждого artifact.
-
-После upload server importer повторно валидирует bundle. Publisher проверяет,
-что `run_uid` существует в remote `runs` table, и удаляет staging directory.
-Повторная отправка того же bundle не создает второй logical run.
-
-## Prerequisites
-
-На PC нужны `ssh`, `scp`, Python 3, writable state directory и noninteractive
-SSH authentication. На сервере нужны Python 3, `rt-results-import-cyclictest`,
-доступ к catalog DB и права на staging create/remove.
-
-Текущий лабораторный profile использует существующий root SSH. Для общего
-стенда используйте отдельного account с ограниченным importer privilege.
-
-## Разделение С Prometheus
-
-Cyclictest publication передает complete bundles в `rt-results`. Prometheus
-remote write передает live time-series GPIO/supervised стендов. Эти механизмы
-независимы; publisher не использует Prometheus.
+This workflow publishes complete bundles into the `rt-results` catalog.
+[Prometheus remote write](../observability/central.md) sends live GPIO/supervised
+time series and does not upload their SQLite databases. The two mechanisms are
+independent.

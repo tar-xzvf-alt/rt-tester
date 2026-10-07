@@ -1,53 +1,43 @@
-# RT Tester Documentation
+# RT Tester documentation
 
-Документация организована по режимам измерения, пользовательским сценариям и
-справочным материалам. Operational guides описывают текущий пакетный путь;
-исторические результаты вынесены отдельно и не заменяют методику.
+[Русский](ru/README.md)
 
-## Начало Работы
+## Experiment engineer route
 
-- [Getting Started](getting-started.md): выбрать режим и выполнить smoke test.
-- [Dependencies](reference/dependencies.md): подготовить PC, target и сервер.
-- [Runtime Paths](reference/runtime-paths.md): понять, где появляются данные.
+Start with [getting started](getting-started.md), then the
+[complete standalone GPIO walkthrough](usage/standalone-gpio-walkthrough.md).
+It covers the VisionFive 2 / Arduino Mega 2560 / ALT Linux stand, installed
+tools, reader-owned profiles, collection, integrity, and interpretation.
 
-## Режимы Измерения
+| Stage | Documents |
+|---|---|
+| Prepare | [Dependencies](reference/dependencies.md), [Arduino](hardware/arduino.md), [target GPIO](hardware/target-gpio.md) |
+| Choose what to measure | [Standalone GPIO](modes/standalone-gpio.md), [supervised raw Ethernet](modes/supervised-raw-ethernet.md), [Linux benchmarks](modes/linux-benchmarks.md) |
+| Collect and preserve | [Receiver](usage/receiver.md), [runtime paths](reference/runtime-paths.md), [SQLite schema](reference/sqlite-schema.md) |
+| Verify and interpret | [Analysis and reports](usage/analysis-and-reports.md), [measurement statistics](reference/measurement-statistics.md), [validation record](reference/validation.md) |
+| Design comparisons | [GPIO methodology](methodology/gpio-measurements.md), [cyclictest comparisons](methodology/cyclictest-comparisons.md) |
+| Observe or publish | [Local observability](observability/local.md), [central observability](observability/central.md), [publish cyclictest](usage/publish-cyclictest.md) |
+| Consult past evidence | [Dated results](results/README.md) |
 
-- [Standalone GPIO](modes/standalone-gpio.md): Arduino и userspace/kernelspace handler.
-- [Supervised Raw Ethernet](modes/supervised-raw-ethernet.md): runtime, supervisor и controller.
-- [Linux Benchmarks](modes/linux-benchmarks.md): cyclictest без Arduino и GPIO.
+SQLite is the primary GPIO/supervised artifact. Prometheus is live monitoring,
+not database publication. Historical reports record earlier conditions and do
+not substitute for a current installation or wiring procedure.
 
-## Сценарии Использования
+## Developer route
 
-- [PC Receiver](usage/receiver.md): collection и SQLite для Arduino/GPIO.
-- [Analysis and Reports](usage/analysis-and-reports.md): source-only post-processing.
-- [Publishing Cyclictest](usage/publish-cyclictest.md): автоматический remote import и retry queue.
-- [Central Observability](observability/central.md): Prometheus remote write и Grafana.
+1. [Architecture](development/architecture.md): modules, interfaces, data flow.
+2. [Development and testing](development/development-and-testing.md): source
+   setup, focused checks, and packaging workflow.
+3. [Change guide](development/change-guide.md): where to make a change and what
+   to verify.
 
-## Методики
+## Documentation maintenance
 
-- [GPIO Measurements](methodology/gpio-measurements.md): воспроизводимые GPIO-серии.
-- [Cyclictest Comparisons](methodology/cyclictest-comparisons.md): ABBA и fixed-frequency сравнение.
-
-## Reference
-
-- [Dependencies](reference/dependencies.md): packages по ролям.
-- [Runtime Paths](reference/runtime-paths.md): local и remote state.
-- [SQLite Schema](reference/sqlite-schema.md): GPIO/supervised session DB.
-
-## Hardware И Target
-
-- [Arduino Meter](hardware/arduino.md): firmware, wiring и serial protocol.
-- [Target GPIO Software](hardware/target-gpio.md): userspace и kernelspace target paths.
-
-## Результаты
-
-- [Results Index](results/README.md): датированные отчеты и примененные профили.
-
-## Правила Обновления
-
-- README содержит только обзор и quick starts.
-- Один режим имеет один canonical mode guide.
-- Команды анализа и публикации описываются в `usage/`.
-- Повторяемые условия эксперимента описываются в `methodology/`.
-- Версии, пути и форматы данных описываются в `reference/`.
-- Численные результаты и локальные артефакты описываются в `results/`.
+English is canonical at existing paths. Russian mirrors reader documents in
+`ru/`; update commands, definitions, limitations, and language switches together.
+Keep README compact and engineer-first. Each mode has one canonical mode guide;
+workflows belong in `usage/`, experimental controls in `methodology/`, formats
+and paths in `reference/`, and dated numerical evidence in `results/`.
+Keep operational instructions independent of private hostnames and author paths.
+Validation records distinguish static/offline checks from physical measurements
+and server walkthroughs.

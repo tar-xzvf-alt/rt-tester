@@ -1,5 +1,11 @@
 # VisionFive 2 Userspace vs Kernelspace, Non-RT
 
+[Русский](../ru/results/visionfive2-userspace-vs-kernelspace-non-rt.md)
+
+Historical v2 comparison. The original report does not state a calendar run date
+or full non-RT kernel/handler/firmware revisions; session IDs below preserve its
+recorded provenance. These are not measurements from the current tutorial.
+
 ## Methodology
 
 Both implementations were measured with the same Arduino Mega firmware,
@@ -16,7 +22,8 @@ wiring, kernel, CPU affinity, priorities, and measurement parameters:
 The Arduino allows only one outstanding request. A response timeout is stored
 as a lost response and never causes a retry with a new timestamp. Every valid
 session must therefore have exactly 150000 requests, 150000 responses, and no
-timeouts.
+timeouts for the loss-free acceptance criterion used in this comparison.
+Sessions with timeouts remain diagnostic data but do not meet that criterion.
 
 The stressed sessions used:
 
@@ -56,6 +63,8 @@ us, an improvement of 30.6%. All six sessions completed with 150000 requests,
 
 ## Artifacts
 
+The original local paths are provenance references, not packaged artifacts:
+
 ```text
 ~/.local/state/rt-tester/visionfive2-handler-comparison-v2/comparison.db
 ~/.local/state/rt-tester/visionfive2-handler-comparison-v2/idle-userspace-vs-kernelspace.png
@@ -63,3 +72,12 @@ us, an improvement of 30.6%. All six sessions completed with 150000 requests,
 ~/.local/state/rt-tester/visionfive2-handler-comparison-v2/stressed-pair2.png
 ~/.local/state/rt-tester/visionfive2-handler-comparison-v2/stressed-pair3.png
 ```
+
+Tail averages describe retained worst response samples. Avg jitter is the
+average of whole-received-group standard deviations; the reported group stddev
+is distinct from firmware jitter. The original report does not fully specify
+its aggregation procedure, so keep the column labels and values rather than
+reinterpreting them as whole-population statistics. The uncontrolled `schedutil`
+frequency behavior limits idle/stress causal interpretation. See
+[statistics](../reference/measurement-statistics.md) and
+[comparison methodology](../methodology/gpio-measurements.md).

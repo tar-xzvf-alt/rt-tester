@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import json
 import re
 import unittest
 from pathlib import Path
@@ -17,6 +18,13 @@ REQUIRED = (
     "docs/reference/runtime-paths.md",
     "docs/reference/sqlite-schema.md",
     "docs/results/README.md",
+    "docs/usage/standalone-gpio-walkthrough.md",
+    "docs/observability/local.md",
+    "docs/reference/measurement-statistics.md",
+    "docs/reference/validation.md",
+    "docs/development/architecture.md",
+    "docs/development/development-and-testing.md",
+    "docs/development/change-guide.md",
 )
 RETIRED = (
     "PROMETHEUS_INTEGRATION.md",
@@ -59,6 +67,61 @@ class DocumentationTest(unittest.TestCase):
                     )
         self.assertEqual(broken, [])
         self.assertEqual(escaped, [])
+
+    def test_reader_documents_have_mirrors_and_language_switches(self):
+        docs = ROOT / "docs"
+        for source in sorted(docs.rglob("*.md")):
+            relative = source.relative_to(docs)
+            if relative.parts[0] in ("ru", "agents", "adr"):
+                continue
+            mirror = docs / "ru" / relative
+            with self.subTest(document=str(relative)):
+                self.assertTrue(mirror.is_file(), f"Missing mirror: {mirror}")
+                source_links = re.findall(r"\[[^]]*\]\(([^)]+)\)", source.read_text())
+                self.assertIn(mirror.resolve(), [
+                    (source.parent / link).resolve()
+                    for link in source_links if "://" not in link
+                ])
+                if mirror.is_file():
+                    mirror_links = re.findall(r"\[[^]]*\]\(([^)]+)\)", mirror.read_text())
+                    self.assertIn(source.resolve(), [
+                        (mirror.parent / link).resolve()
+                        for link in mirror_links if "://" not in link
+                    ])
+
+    def test_bilingual_executable_examples_match(self):
+        docs = ROOT / "docs"
+
+        def executable_blocks(text):
+            blocks = re.findall(r"```(bash|python|sql|ini|json|yaml|promql)\n(.*?)```", text, re.S)
+            return [(language, "\n".join(
+                line for line in code.strip().splitlines()
+                if not line.lstrip().startswith("#")
+            )) for language, code in blocks]
+
+        for source in sorted(docs.rglob("*.md")):
+            relative = source.relative_to(docs)
+            if relative.parts[0] in ("ru", "agents", "adr"):
+                continue
+            mirror = docs / "ru" / relative
+            with self.subTest(document=str(relative)):
+                self.assertTrue(mirror.is_file())
+                if mirror.is_file():
+                    self.assertEqual(executable_blocks(source.read_text()),
+                                     executable_blocks(mirror.read_text()))
+
+    def test_arduino_json_example_is_valid_and_accounts_for_tail(self):
+        text = (ROOT / "docs/hardware/arduino.md").read_text()
+        samples = re.findall(r"```json\n(.*?)```", text, re.S)
+        self.assertTrue(samples)
+        for sample in samples:
+            data = json.loads(sample)
+            self.assertEqual(data["requests_sent"],
+                             data["responses_received"] + data["timeouts"])
+            self.assertEqual(len(data["worst_latencies_us"]), data["worst_count"])
+            self.assertGreaterEqual(data["avg_latency_us"], data["mean_latency_us"])
+            self.assertAlmostEqual(data["avg_latency_us"],
+                sum(data["worst_latencies_us"]) / data["worst_count"], places=2)
 
 
 if __name__ == "__main__":

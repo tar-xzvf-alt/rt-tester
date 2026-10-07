@@ -1,57 +1,73 @@
-# GPIO Measurement Methodology
+# GPIO measurement methodology
 
-Standalone и supervised GPIO modes используют одинаковую Arduino measurement
-model, но разные target paths. Не запускайте supervisor вручную через CMake,
-если эксперимент описан packaged stand profile: lifecycle должен принадлежать
-одному runner.
+[Русский](../ru/methodology/gpio-measurements.md)
 
-## Общие Условия
+Standalone and supervised modes share the Arduino timing model but measure
+different target paths. Use one runner to own lifecycle; do not manually start
+supervisor through CMake during a profile-driven experiment.
 
-1. Зафиксируйте board, kernel, packages, firmware и wiring.
-2. Используйте одинаковые `measurements-per-group`, interval и group count.
-3. Задайте независимый `response-timeout-us` для одного Arduino response.
-4. Используйте одинаковый `worst-count` или автоматические 5% группы.
-5. Для stress создавайте workload только через runner и проверяйте cleanup.
-6. Не смешивайте userspace/kernelspace или kernels в одной неподписанной серии.
-7. Сохраняйте SQLite DB как primary artifact.
+## Record and control conditions
 
-## Standalone
+1. Record board, kernel/configuration, target packages/revisions, firmware,
+   electrical level adaptation, and physical wiring.
+2. Keep group size, request interval, response deadline, group count, and retained
+   tail size identical across compared runs. Normally `worst-count` is 5% of the
+   requested group size, with a minimum of one.
+3. Record CPU frequency/governor, cooling, CPU/IRQ affinity, FIFO priorities,
+   housekeeping placement, and `node_exporter` scheduling.
+4. Create workload through the runner; record warm-up, workload command, memory
+   availability, and cleanup. Keep background services controlled.
+5. Label userspace/kernelspace and RT/non-RT explicitly. Do not combine different
+   conditions into an unlabeled series.
+6. Preserve SQLite, profile, logs, raw supervised traces, and provenance.
 
-Используйте `rt-tester-run-gpio` и один из execution modes:
+For the first standalone userspace experiment use the
+[walkthrough](../usage/standalone-gpio-walkthrough.md). The optional monitoring
+profile is part of the conditions: scrape/exporter overhead can affect a run.
+Even basic standalone runs check/pin target `node_exporter`.
 
-- userspace package `rt-handler`;
-- userspace source deploy/build;
-- kernelspace `rt_gpio_responder`.
+## Mode-specific checks
 
-Перед comparison выполните короткий smoke каждого mode. Для paired experiment
-используйте одинаковую последовательность idle/stress и не меняйте IRQ affinity,
-node_exporter priority или CPU placement между runs.
+Standalone supports installed userspace, configured userspace source deploy/build,
+and kernelspace responder. Smoke each variant before comparison. For paired runs,
+keep the idle/stress ordering and placement policy consistent.
 
-## Supervised
+Supervised runs must let `rt-tester-run-stand` control runtime, supervisor,
+controller, Arduino readiness, stress, and trace collection. Import trace
+aggregates and check session/group alignment before interpreting stage breakdown.
 
-Используйте `rt-tester-run-stand`. Runner должен единолично управлять runtime,
-supervisor, controller, Arduino readiness barrier, workload и trace collection.
-После session импортируйте trace aggregates и проверьте integrity counters.
+## Integrity before statistics
 
-## Проверки Целостности
-
-Для каждой группы должны согласовываться:
+Check continuous group indexes, consistent session IDs, and for every current
+group:
 
 ```text
 requests_sent = responses_received + timeout_count
-histogram/tail sample count соответствует profile
-session ID совпадает между Arduino, SQLite и trace data
+retained samples = available worst-tail samples
 ```
 
-Network drops, softnet drops, sequence anomalies и missing responses должны
-быть объяснены до статистического сравнения.
+The tail may shrink when too few responses arrive; no-response groups have no
+latency samples. Inspect timeouts separately: they are not included in latency
+mean/jitter. Explain missing responses, sequence anomalies, network drops, and
+fall/recovery events before comparing. Historical absent/defaulted counters and
+unrecorded versions are unknown, not evidence of a clean run.
 
-## Анализ
+## Interpretation
 
-Для unloaded sessions историческая методика использует latency threshold
-`--limit 75`, для stressed sessions `--limit 250`. Число анализируемых stored
-tail rows задается через `--top`; ни один из этих параметров не является Arduino
-response deadline.
+Arduino `mean_latency_us` covers all received responses, `avg_latency_us` is the
+worst-tail average, `min_latency_us` is the worst-tail minimum, and `jitter_us`
+is whole-received-group population standard deviation. SQLite retains the tail
+and jitter but not the whole-group mean. Plot tail averages, tail p95/p99,
+maximum, group jitter summaries, and integrity counts; do not label tail
+percentiles as whole-population percentiles. See
+[measurement statistics](../reference/measurement-statistics.md).
 
-Сравнивайте mean, p95/p99 stored tail, maximum, RMS jitter и integrity metrics.
-Один maximum не является достаточным основанием для вывода.
+The historical plotting thresholds are `--limit 75` for unloaded and
+`--limit 250` for stressed data, in microseconds. `--top` controls selected tail
+rows; neither option sets the Arduino deadline. Keep selection/threshold settings
+consistent and disclose them. An observed maximum depends on run duration and
+conditions and is not a guaranteed worst-case bound. Use repeated controlled
+runs rather than a conclusion from one maximum.
+
+See [analysis and reports](../usage/analysis-and-reports.md) and
+[validation](../reference/validation.md).

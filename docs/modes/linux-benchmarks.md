@@ -1,141 +1,90 @@
-# Linux Responsiveness Benchmarks
+# Linux responsiveness benchmarks
 
-Linux benchmark mode запускает уже установленный `cyclictest` на target по SSH.
-Он не использует Arduino, GPIO, receiver DB или Prometheus remote write.
+[Русский](../ru/modes/linux-benchmarks.md)
 
-## Когда Использовать
+This mode runs an already installed `cyclictest` on a target over SSH. It measures
+scheduler wake-up latency, without Arduino, GPIO, receiver SQLite, or Prometheus
+remote write. Use it to compare kernels, workloads, governors, and power policy;
+it does not measure the complete physical GPIO response path.
 
-- измерить scheduler wake-up latency PREEMPT_RT kernel;
-- сравнить idle и controlled stress;
-- отделить scheduler behavior от GPIO hardware path;
-- сравнить kernels, governors и power-management settings.
+## Preparation
 
-## Data Flow
-
-```text
-rt-tester-run-linux-benchmark on PC
-  -> SSH target
-  -> /usr/bin/cyclictest
-  -> native JSON, histogram and logs in target /tmp
-  -> SCP to local .<run_uid>.partial
-  -> validation and manifest.json
-  -> atomic rename to finalized <run_uid> bundle
-  -> optional publication to rt-results
-```
-
-Finalized bundle предназначен оставаться неизменным. Manifest перечисляет все
-файлы, размеры и SHA256. Publisher отклоняет undeclared или измененные файлы.
-
-## Target Prerequisites
+On an ALT target whose repositories provide these packages:
 
 ```bash
-apt-get install linux-rt-tests stress-ng openssh-server
+apt-get install linux-rt-tests openssh-server
+# For stressed runs:
+apt-get install stress-ng
 ```
 
-`stress-ng` нужен только stressed profile. Начиная с `rt-handler-0.1.8-alt1`,
-оба benchmark-пакета являются его runtime dependencies.
+The external `rt-handler-0.1.8-alt1` package also declares benchmark/stress
+dependencies; benchmark execution itself does not require using a GPIO handler.
+Runner preflight checks SSH, executable cyclictest, expected kernel, package
+version, and workload requirements. Failed preflight does not produce a complete
+bundle.
 
-Runner проверяет SSH, executable cyclictest, expected kernel, package version и
-наличие stress-ng. Ошибка preflight не создает complete bundle.
-
-## Packaged Profiles
+Copy and edit the installed laboratory profiles:
 
 ```text
 /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-idle.conf
 /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-stressed.conf
 ```
 
-Эти профили описывают текущий лабораторный VisionFive 2 и содержат конкретные
-адреса, kernel version и server settings. Для другого стенда скопируйте профиль
-и отредактируйте его.
-
-## Запуск
-
-Idle:
+Replace private addresses, expected kernel, output root, and publication settings.
 
 ```bash
-rt-tester-run-linux-benchmark \
-  --config /path/to/cyclictest-idle.conf \
-  --duration 10m
-```
-
-Stress:
-
-```bash
-rt-tester-run-linux-benchmark \
-  --config /path/to/cyclictest-stressed.conf \
-  --duration 10m
-```
-
-Показать generated cyclictest command без запуска:
-
-```bash
-rt-tester-run-linux-benchmark \
-  --config /path/to/cyclictest.conf \
-  --print-command
-```
-
-Изменить каталог bundles:
-
-```bash
-rt-tester-run-linux-benchmark \
-  --config /path/to/cyclictest.conf \
+rt-tester-run-linux-benchmark --config ./cyclictest-idle.conf --duration 10m
+rt-tester-run-linux-benchmark --config ./cyclictest-stressed.conf --duration 10m
+rt-tester-run-linux-benchmark --config ./cyclictest-idle.conf --print-command
+rt-tester-run-linux-benchmark --config ./cyclictest-idle.conf \
   --output-root ~/.local/state/rt-tester/my-series
 ```
 
-## Параметры Cyclictest
+`--print-command` prints the generated benchmark command. Use `--help` for CLI
+syntax. A ten-second smoke tests the pipeline, not worst-case behavior.
 
-Текущие VisionFive 2 profiles используют один FIFO thread на online CPU:
+## Parameters and lifecycle
+
+The laboratory VisionFive 2 profiles use one FIFO thread per online CPU:
 
 ```text
 --default-system --smp --policy=fifo --priority=95
 --interval=1000 --distance=0 --mlockall
 ```
 
-Stressed profile запускает отдельную process group:
+Their stressed workload is:
 
 ```text
-stress-ng --cpu 4 --cpu-method int64 \
-  --vm 1 --vm-bytes 70% --vm-keep --timeout 0
+stress-ng --cpu 4 --cpu-method int64 --vm 1 --vm-bytes 70% --vm-keep --timeout 0
 ```
 
-Runner останавливает только созданную process group и сохраняет stress log.
+The runner records the command and target state, collects native JSON, histogram,
+and logs in target `/tmp`, copies them into a local `.<run_uid>.partial`, validates
+the artifacts, writes `manifest.json`, and atomically renames the directory to
+the finalized `<run_uid>`. It stops the stress process group it created and keeps
+its log.
 
-## Результат
+## Primary artifact and publication
 
-Complete bundle содержит как минимум:
+A complete bundle includes `manifest.json`, `cyclictest.json`, `histogram.txt`,
+`stdout.log`, `stderr.log`, and stressed-run `stress.log`/`stress.pid`. The manifest
+records kernel, architecture, governors, tool packages, command, workload, cycles,
+histogram overflow, sizes, and SHA256 checksums. Keep finalized bundles unchanged;
+publication rejects changed or undeclared files.
 
-- `manifest.json`;
-- `cyclictest.json`;
-- `histogram.txt`;
-- `stdout.log` и `stderr.log`;
-- `stress.log` и `stress.pid` для stressed run.
-
-Manifest фиксирует target kernel, architecture, governors, tool packages,
-command, workload, cycles, histogram overflow и checksums.
-
-Для автоматической отправки используйте [Publishing Cyclictest](../usage/publish-cyclictest.md).
-Для controlled idle/stress comparison используйте [Cyclictest Comparisons](../methodology/cyclictest-comparisons.md).
-
-## Просмотр Результатов
-
-Локально summary и target metadata находятся в `manifest.json`, а per-thread
-statistics и histogram — в native `cyclictest.json`. После публикации central
-dashboard называется `Cyclictest Scheduler Latency Prototype`.
-
-SSH tunnel к текущему project server:
+Read local metadata/summary in the manifest and per-thread statistics/histogram
+in native JSON. [Publishing cyclictest](../usage/publish-cyclictest.md) explains
+`--publish`, existing bundles, and retries. Publication targets the external
+`rt-results` catalog, not Prometheus. Its dashboard is
+`Cyclictest Scheduler Latency Prototype` (`rt-cyclictest-prototype`); when your
+server provisions it and you forward Grafana:
 
 ```bash
-ssh -N -L 13000:127.0.0.1:3000 -p 228 root@wetgrape.su
+ssh -N -L 3002:127.0.0.1:3000 RESULTS_USER@RESULTS_HOST
 ```
 
-Dashboard:
-
-```text
-http://127.0.0.1:13000/d/rt-cyclictest-prototype/cyclictest-scheduler-latency-prototype
-```
-
-Catalog показывает все runs и позволяет фильтровать workload. Текущая dashboard
-variable `run` выбирает один `run_uid`: per-CPU summary и histogram относятся к
-этому run. Для сопоставления нескольких runs переключайте selection или
-сравнивайте строки catalog. Raw bundle остается первичным артефактом.
+Open `http://127.0.0.1:3002/d/rt-cyclictest-prototype/cyclictest-scheduler-latency-prototype`.
+The `run` variable selects one `run_uid`; switch it to compare per-CPU summaries
+or compare catalog rows. The raw bundle remains primary evidence. Use
+[cyclictest comparison methodology](../methodology/cyclictest-comparisons.md)
+for controlled repeated experiments.

@@ -1,52 +1,39 @@
-# Standalone GPIO Режим
+# Standalone GPIO
 
-Standalone GPIO режим измеряет базовую задержку платы без `rt-supervisor`,
-raw Ethernet и Beremiz/runtime слоя.
+[Русский](../ru/modes/standalone-gpio.md)
 
-```text
-PC receiver.py -> Arduino Mega -> GPIO input target board
-                              <- GPIO output target board <- handler
-```
-
-Default package workflow использует userspace `rt-handler`. Экспериментальные
-profiles также поддерживают kernelspace `rt_gpio_responder`. Source of truth
-находится в соответствующих target repositories; в `rt-tester` target C-код не
-дублируется.
-
-## Когда Использовать
-
-- Для baseline измерения `Arduino -> target GPIO -> Arduino`.
-- Для проверки wiring и GPIO latency перед supervised raw-Ethernet стендом.
-- Для сравнения standalone GPIO latency с цепочкой `controller-emu -> supervisor -> runtime`.
-
-## Что Не Используется
-
-- `alt-rt-supervisor`.
-- `controller-emu`.
-- Beremiz или stub runtime.
-- Legacy импорт `/var/log/soc_metrics.log`.
-- Секция `[soc]` в receiver config.
-
-CPU/memory метрики собираются через `node_exporter` и Prometheus. Runner не
-читает и не импортирует текстовый metrics log, который исторически мог писать
-`rt-handler`; в config он направляется в `/dev/null`.
-
-## Конфиг Стенда
-
-Пример для VisionFive 2:
+This mode measures the Arduino → target GPIO → handler → Arduino round trip.
+It excludes supervisor, raw Ethernet, and Beremiz/runtime layers. For a complete
+first experiment, use the [VisionFive 2 walkthrough](../usage/standalone-gpio-walkthrough.md).
 
 ```text
-/usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf
+PC receiver ──serial── Arduino D7 → level adaptation → target input
+                      Arduino D20 ← level adaptation ← target output ← handler
 ```
 
-Путь выше относится к установленному `rt-tester-tools`. В checkout тот же файл
-доступен как `configs/stands/visionfive2-standalone-gpio.conf`.
+The normal execution path uses installed userspace `rt-handler`. Kernelspace
+profiles use `rt_gpio_responder`. Their implementations belong to the external
+target repositories, not to `rt-tester`.
 
-Ключевые поля:
+## Profiles and execution
+
+Use a reader-owned copy of one of the neutral installed examples:
+
+```text
+/usr/share/rt-tester-tools/configs/stands/examples/visionfive2-gpio-basic.conf
+/usr/share/rt-tester-tools/configs/stands/examples/visionfive2-gpio-local.conf
+/usr/share/rt-tester-tools/configs/stands/examples/visionfive2-gpio-central.conf
+```
+
+Edit `host = root@TARGET_HOST`, metadata, and output paths; check Arduino serial
+discovery and access separately.
+`board = starfive` selects the VisionFive 2 runtime board profile in `rt-handler`;
+the reader-facing board label remains `visionfive2`. Typical installed target
+fields are:
 
 ```ini
 [target]
-host = root@10.42.0.211
+host = root@TARGET_HOST
 label = visionfive2
 board = starfive
 binary = /usr/sbin/rt-handler
@@ -56,35 +43,56 @@ metrics-log = /dev/null
 housekeeping-cpus = 0
 ```
 
-`board = starfive` здесь означает runtime profile в `rt-handler` для
-VisionFive 2. User-facing имя стенда и target-board остаются `visionfive2`.
-
-## Запуск
-
-### Userspace Package
-
-Запустить measurement с установленным RPM-пакетом `rt-handler` на target:
+From the saved experiment directory, after preparing the stand and converting
+the template's PC paths to absolute paths as shown in the
+[walkthrough](../usage/standalone-gpio-walkthrough.md):
 
 ```bash
-rt-tester-run-gpio \
-    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf
+rt-tester-run-gpio --config ./visionfive2-gpio-basic.conf \
+  --groups 3 --no-prometheus --no-grafana
 ```
 
-Штатный пакетный config запускает `/usr/sbin/rt-handler` и не требует сборки.
-Standalone runner поддерживает оба source-сценария:
+Both disabling flags are required for basic collection. An unadapted relative
+database path resolves in the receiver directory, not the experiment directory.
+Use [local](../observability/local.md) or
+[central observability](../observability/central.md) for live monitoring.
+The neutral local ports are receiver `9101`, Prometheus `9092`, and Grafana `3002`.
+Older stand profiles describe specific laboratory deployments; inspect them
+before use rather than assuming their addresses and paths are portable.
 
-- `--deploy` копирует локальный tree из `rt-handler-local` в target `repo`;
-- `--build` выполняет `make` в `<repo>/src` без копирования исходников;
-- `--deploy --build` сначала копирует, затем собирает.
+## Runner lifecycle
 
-Для source-запуска нужно работать с собственной копией config и задать
-`rt-handler-local`/`repo`, `binary = /root/rt-handler/src/rt-handler` и
-`workdir = /root/rt-handler/src`. Один `--build` требует, чтобы source tree уже
-был размещен на target вручную или предыдущим `--deploy`.
+The runner checks SSH, target tools, and Arduino serial access; optionally sets
+the target clock; cleans up old handler/stress processes; prepares observability;
+starts the selected handler; applies scheduling and affinity; starts receiver
+collection; then prints diagnostics and a SQLite summary. Stress is controlled
+by the profile. Handler/stress cleanup runs afterward unless `--keep-target` is
+set. `--prepare-only` prepares the target without Arduino collection
+and still changes target state.
 
-### Kernelspace Module
+`--dry-run` prints many planned commands but can write generated configuration
+and probe local state. It is not a side-effect-free check. Use `--help` for CLI
+inspection.
 
-Kernelspace profile задает:
+The target **must have a running `node_exporter` even with both observability
+flags disabled**. The runner checks for it and unconditionally pins its threads
+to `SCHED_OTHER` on `housekeeping-cpus`, so it does not compete with the real-time
+GPIO handler. The legacy handler text metrics log is not imported; profiles
+normally direct it to `/dev/null`. CPU/memory collection uses Prometheus instead.
+The disabling flags suppress managed monitoring startup; they do not disable the
+receiver's query client. Check for an unrelated Prometheus already listening at
+the configured URL before treating the run as a clean no-monitoring condition.
+
+## Source and kernel variants
+
+For userspace development, `--deploy` copies the configured `rt-handler-local`
+tree to target `repo`; `--build` runs `make` in `<repo>/src` without copying.
+Combining them deploys then builds. A build-only run requires an existing remote
+source tree. Set `binary` and `workdir` to that tree in your own profile; installed
+package profiles do not require compilation. See the
+[developer route](../development/development-and-testing.md).
+
+Kernel profiles specify:
 
 ```ini
 [target]
@@ -92,121 +100,31 @@ execution-mode = kernelspace
 module = rt_gpio_responder
 ```
 
-В этом режиме runner проверяет module, выполняет `modprobe`, проверяет IRQ и не
-разрешает `--deploy` или `--build`. Пакетные VisionFive 2 comparison profiles
-покрывают userspace/kernelspace, RT/non-RT и idle/stressed combinations.
+The runner checks/loads the module and checks IRQ state. It rejects `--deploy`
+and `--build` in this mode. The module must match the running kernel, and only
+one handler may own the GPIO lines. See [target GPIO](../hardware/target-gpio.md).
 
-Короткий smoke:
+## Wiring and artifacts
 
-```bash
-rt-tester-run-gpio \
-    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
-    --groups 3
-```
+Arduino Mega D7 sends the request; D20 receives the response. A common ground
+and suitable electrical level adaptation are required. GPIO chip/line mappings
+come from `/etc/rt-handler/boards.d/*.conf` and the external handler's built-in
+profiles; line numbers are not physical header pin numbers.
 
-Проверить команды без выполнения:
+SQLite stores groups, retained worst-tail latencies, events, and optional
+`soc_metrics`. Prometheus does not replace or upload the database. Receiver logs
+and `metrics_all_groups.log` use XDG state or `RT_TESTER_STATE_DIR`; profile paths
+control database and observability artifacts independently. See
+[runtime paths](../reference/runtime-paths.md), [statistics](../reference/measurement-statistics.md),
+and [analysis](../usage/analysis-and-reports.md).
 
-```bash
-rt-tester-run-gpio \
-    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
-    --dry-run
-```
-
-Только подготовить target без запуска Arduino measurement:
-
-```bash
-rt-tester-run-gpio \
-    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
-    --prepare-only
-```
-
-После запуска runner:
-
-1. проверяет SSH до target;
-2. проверяет, что Arduino serial port доступен;
-3. опционально синхронизирует время target;
-4. для userspace при `--deploy` копирует внешний `rt-handler` на target;
-5. для userspace при `--build` запускает `make` в source tree на target;
-6. останавливает старые userspace handler/stress процессы или подготавливает
-   выбранный kernel module;
-7. стартует Prometheus на `127.0.0.1:9092`, если он не запущен;
-8. подготавливает Grafana согласно profile: current profile использует central
-   tunnel на `13000`, а local managed profile может использовать `3002`;
-9. стартует выбранный userspace handler или загружает kernel module;
-10. печатает userspace log или kernel module/IRQ diagnostics;
-11. переводит `node_exporter` в `SCHED_OTHER` и пинит его на housekeeping CPU;
-12. запускает `receiver.py --start --exit-on-stop`;
-13. печатает handler, `node_exporter` и Prometheus diagnostics;
-14. проверяет SQLite summary.
-
-## Grafana
-
-Текущий packaged profile использует central Prometheus/Grafana через SSH tunnel
-и печатает ссылку вида:
-
-```text
-Grafana: http://127.0.0.1:13000/d/rt-standalone-gpio?var-session_id=<session_id>
-```
-
-Для этого нужны доступ к `wetgrape.su` и configured central SSH identity. Без
-central infrastructure используйте `--no-prometheus --no-grafana` или создайте
-profile с local observability. Если `grafana-managed = true`, standalone runner
-может управлять отдельной локальной Grafana на configured port, обычно `3002`.
-
-Dashboard называется `RT Standalone GPIO` и находится в папке `RT GPIO`. Он
-показывает:
-
-- Arduino latency: avg/max/min;
-- Arduino jitter;
-- CPU/memory target-платы из `node_exporter`.
-
-Все три панели расположены друг под другом и используют общий time range
-dashboard, поэтому ось X синхронизирована. В dashboard есть переменные `board`
-и `session_id`; latency/jitter панели используют thresholds для быстрого поиска
-выбросов.
-
-Остановить observability processes/tunnel, которыми управляет runner:
+Managed observability can remain available after collection. Stop it using the
+same profile and launch directory:
 
 ```bash
-rt-tester-run-gpio \
-    --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
-    --stop-observability
+rt-tester-run-gpio --config ./visionfive2-gpio-local.conf --stop-observability
 ```
 
-## node_exporter Priority
-
-`node_exporter` не должен конкурировать с real-time GPIO path. Runner не повышает
-его приоритет; наоборот, он переводит все TID `node_exporter` в `SCHED_OTHER` и
-закрепляет их на `housekeeping-cpus` из config.
-
-## Wiring
-
-Arduino Mega использует тот же физический протокол, что и остальные измерения:
-
-- Arduino pin 7 -> GPIO input target board;
-- GPIO output target board -> Arduino pin 20;
-- общий GND обязателен.
-
-GPIO line numbers задаются в `/etc/rt-handler/boards.d/*.conf` и во встроенных
-profiles `rt-handler`.
-
-## Результаты
-
-Основные данные сохраняются в SQLite через обычный receiver pipeline:
-
-- `groups`;
-- `latencies`;
-- `events`;
-- `soc_metrics`, если Prometheus/node_exporter доступны.
-
-Result paths задаются конкретным profile: smoke configs могут использовать
-`/tmp`, а comparison configs используют persistent state directory. Receiver
-пишет внутренние logs и `metrics_all_groups.log` в XDG state directory; этот
-путь можно заменить через `RT_TESTER_STATE_DIR`. Общая карта находится в
-[Runtime Paths](../reference/runtime-paths.md).
-
-Для анализа из checkout используется `src/pc-receiver/plot_statistics.py`. Эта
-source-only утилита не входит в RPM `rt-tester-tools`.
-
-Сводка baseline и reference supervised-сессий хранится в
-[Standalone GPIO Baseline](../results/standalone-gpio-baseline.md).
+The standalone dashboard UID is `rt-standalone-gpio`; it shows tail latency,
+whole-group jitter, and target load for the selected board/session. A dated
+[baseline report](../results/standalone-gpio-baseline.md) illustrates earlier runs.

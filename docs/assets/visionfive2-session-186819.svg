@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="370" viewBox="0 0 900 370" role="img" aria-labelledby="title desc">
+  <title id="title">Historical VisionFive 2 session 186819 retained-tail means</title>
+  <desc id="desc">Twenty-five bins of 100 consecutive groups. Each point is the mean of 7500 retained worst-five-percent latency samples. Overall retained-tail mean is 164.679701 microseconds. This is not the mean of all responses or a current reference-run result.</desc>
+  <rect width="900" height="370" fill="#f8fafc"/>
+  <g font-family="sans-serif" fill="#102d29">
+    <text x="60" y="32" font-size="21" font-weight="bold">Historical standalone GPIO · session 186819 · stress off</text>
+    <text x="60" y="56" font-size="14">Retained worst 5% mean per 100-group bin (7,500 stored samples/bin)</text>
+    <g stroke="#cbd5e1" stroke-width="1"><path d="M70 90H830M70 150H830M70 210H830M70 270H830"/></g>
+    <g font-size="13" text-anchor="end"><text x="61" y="94">170</text><text x="61" y="154">167</text><text x="61" y="214">164</text><text x="61" y="274">161</text></g>
+    <path d="M70 80V282H835" stroke="#64748b" fill="none"/>
+    <path d="M70 196.406H830" stroke="#b45309" stroke-dasharray="6 5"/>
+    <polyline points="70,159.024 101.667,188.091 133.333,168.240 165,171.995 196.667,161.435 228.333,153.061 260,208.923 291.667,239.067 323.333,244.016 355,218.149 386.667,211.739 418.333,215.195 450,185.765 481.667,193.829 513.333,180.613 545,165.243 576.667,198.885 608.333,168.016 640,223.867 671.667,203.312 703.333,168.720 735,242.181 766.667,227.781 798.333,231.579 830,181.424" stroke="#25635b" stroke-width="3" fill="none"/>
+    <g font-size="13" text-anchor="middle"><text x="70" y="303">0–99</text><text x="386.667" y="303">1000–1099</text><text x="703.333" y="303">2000–2099</text><text x="830" y="303">2400–2499</text></g>
+    <text x="450" y="326" text-anchor="middle" font-size="14">Group-index bins (not wall-clock time)</text>
+    <text x="18" y="180" transform="rotate(-90 18 180)" font-size="14">Latency, µs</text>
+    <text x="60" y="353" font-size="13">Dashed: pooled tail mean 164.680 µs · observed stored maximum 348 µs · no loss counters in this legacy DB</text>
+  </g>
+</svg>

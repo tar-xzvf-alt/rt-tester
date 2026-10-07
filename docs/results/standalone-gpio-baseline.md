@@ -1,10 +1,15 @@
 # Standalone GPIO Baseline Comparison
 
-Дата прогона: 2026-07-10.
+[Русский](../ru/results/standalone-gpio-baseline.md)
+
+Recorded run date: **2026-07-10**. This is historical evidence, not a new run of
+the current reference profile. The artifact paths and dashboard diagnostics below
+refer to that laboratory environment; full kernel/handler/firmware revisions are
+not recorded here.
 
 ## Fresh Standalone GPIO Run
 
-Команда:
+Recorded command:
 
 ```bash
 rt-tester-run-gpio \
@@ -12,7 +17,7 @@ rt-tester-run-gpio \
     --groups 100
 ```
 
-Результат:
+Recorded result (min/average/max over retained worst-tail latency rows):
 
 | Mode | Session | Groups | Latency rows | Min us | Avg us | Max us | SoC metrics | Events |
 |------|---------|--------|--------------|--------|--------|--------|-------------|--------|
@@ -47,3 +52,9 @@ Arduino parameters. The supervised raw-Ethernet reference sessions are around
 
 The live supervised comparison should be repeated after restoring carrier on the
 `visionfive2 end0 <-> runtime/controller peer` link.
+
+The report does not establish a controlled simultaneous comparison: the
+supervised sessions are earlier reference data. The 500 stored rows across 100
+groups describe a selected tail, not the complete response population. Preserve
+the numerical values as dated evidence and consult
+[current methodology](../methodology/gpio-measurements.md) for a new comparison.

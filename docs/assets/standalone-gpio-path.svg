@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="280" viewBox="0 0 960 280" role="img" aria-labelledby="title desc">
+  <title id="title">Standalone GPIO measurement path</title>
+  <desc id="desc">PC controls Arduino over USB serial. Arduino D7 requests pass through voltage adaptation to the VisionFive 2 handler. Its output returns through adaptation to Arduino D20. A common ground is required.</desc>
+  <defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" fill="#25635b"/></marker></defs>
+  <rect width="960" height="280" fill="#f8fafc"/>
+  <g font-family="sans-serif" fill="#102d29" text-anchor="middle">
+    <text x="480" y="29" font-size="21" font-weight="bold">Standalone GPIO: request / response round trip</text>
+    <g stroke="#25635b" stroke-width="2" fill="white"><rect x="20" y="83" width="180" height="105" rx="8"/><rect x="265" y="83" width="170" height="105" rx="8"/><rect x="500" y="83" width="160" height="105" rx="8"/><rect x="725" y="83" width="215" height="105" rx="8"/></g>
+    <text x="110" y="114" font-size="17">PC / receiver</text><text x="110" y="142" font-size="14">START, JSON groups</text><text x="110" y="166" font-size="14">SQLite + logs</text>
+    <text x="350" y="113" font-size="17">Arduino Mega</text><text x="350" y="142" font-size="14">D7 request →</text><text x="350" y="166" font-size="14">D20 response ←</text>
+    <text x="580" y="115" font-size="17">Level adaptation</text><text x="580" y="143" font-size="14">5 V ↔ 3.3 V</text><text x="580" y="166" font-size="14">both directions</text>
+    <text x="832" y="112" font-size="17">VisionFive 2</text><text x="832" y="140" font-size="14">GPIO → IRQ → rt-handler</text><text x="832" y="166" font-size="14">response GPIO</text>
+    <g stroke="#25635b" stroke-width="2" marker-end="url(#arrow)"><path d="M202 117H261"/><path d="M263 157H204"/><path d="M437 117H497"/><path d="M498 157H439"/><path d="M662 117H722"/><path d="M723 157H664"/></g>
+    <text x="232" y="72" font-size="12">USB serial</text><text x="470" y="72" font-size="12">request</text><text x="691" y="72" font-size="12">request</text>
+    <path d="M350 208H832" stroke="#64748b" stroke-width="2"/><text x="590" y="234" font-size="15">Common GND · chip/line offsets ≠ physical header pins</text>
+    <text x="480" y="261" font-size="13">Timing starts at Arduino request and ends at its detected response.</text>
+  </g>
+</svg>

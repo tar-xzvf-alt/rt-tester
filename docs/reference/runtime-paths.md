@@ -1,43 +1,64 @@
-# Runtime Paths
+# Runtime paths
 
-| Режим | Primary result | Local state | Remote state |
+[Русский](../ru/reference/runtime-paths.md)
+
+| Mode | Primary artifact | PC state | Target/server state |
 |---|---|---|---|
-| Standalone GPIO | SQLite session DB | receiver logs, temporary observability | target handler logs |
-| Supervised | SQLite DB и trace aggregates | receiver, Prometheus/Grafana state | runtime/controller logs and traces |
-| Cyclictest | finalized UUID bundle | publication sidecars | `rt-results` cyclictest catalog |
+| Standalone GPIO | Configured SQLite database | Receiver logs, generated configs, monitoring state | Handler/stress logs |
+| Supervised | SQLite including imported trace aggregates | Receiver and monitoring state | Runtime/controller logs and raw traces |
+| Cyclictest | Finalized UUID bundle | Publication sidecars | Temporary staging, `rt-results` catalog |
 
-## Cyclictest
+## Reader-owned GPIO experiments
 
-Текущие лабораторные VisionFive 2 profiles задают конкретный output root:
+The neutral templates use `.rt-tester-example` placeholders. Convert these to
+absolute paths using the [walkthrough preparation](../usage/standalone-gpio-walkthrough.md)
+before running. Keep the edited profiles in a persistent experiment directory.
+
+Relative paths do not share a single base: runner-managed paths generally use
+its launch directory, while the receiver resolves a relative `[measurement] db`
+from `src/pc-receiver/` in the source/installed tree. The runner's summary then
+looks for that path from its own directory. A relative database can therefore
+land in the wrong location or fail. Use an absolute profile `db` or an absolute
+`--db` override, and absolute observability paths. Keep profiles, versions,
+wiring notes, and logs with the database; use the same adapted profile for cleanup.
+
+Older smoke profiles may use `/tmp`; laboratory comparison profiles may use
+specific home/state directories. Copy and replace those paths before use.
+Do not infer result location from the mode name.
+
+Receiver logs and `metrics_all_groups.log` normally use:
 
 ```text
-/home/taranev/.local/state/rt-tester/cyclictest-prototype/<run_uid>/
+${XDG_STATE_HOME:-$HOME/.local/state}/rt-tester
 ```
 
-Перед использованием на другой машине скопируйте profile и замените его на
-пользовательский путь, например:
+`RT_TESTER_STATE_DIR` overrides only this receiver state directory. It does not
+move the SQLite database, target logs, Prometheus storage, Grafana files, or SSH
+tunnel files set in the profile. Relative target paths resolve remotely; choose
+them independently from PC paths.
+
+SQLite is the primary artifact. Before copying a live WAL-mode database, use a
+SQLite backup or stop writers and ensure a consistent copy; copying only `.db`
+while WAL contains recent writes can omit data. Keep original supervised
+databases: the merge tool does not copy `trace_group_metrics`.
+
+## Cyclictest bundles and publication
+
+Choose your own output root, for example:
 
 ```text
 ~/.local/state/rt-tester/cyclictest-results/<run_uid>/
 ~/.local/state/rt-tester/cyclictest-publish/<run_uid>.json
 ```
 
-Во время collection создается hidden `.<run_uid>.partial`. Complete bundle
-атомарно переименовывается в `<run_uid>`. Publication staging создается на
-сервере временно и удаляется после import attempt.
+Collection first uses hidden `.<run_uid>.partial`; successful validation writes
+a manifest and atomically renames to `<run_uid>`. Failed/incomplete directories
+are not finalized evidence. Publication sidecars remain outside the finalized
+bundle. Server staging is temporary; the default catalog location is
+`/var/lib/rt-results-prototype/cyclictest.db`, configurable in `[publish] database`.
 
-Central catalog:
-
-```text
-/var/lib/rt-results-prototype/cyclictest.db
-```
-
-## Arduino/GPIO
-
-Конкретный SQLite path задается stand/measurement config. Часть smoke profiles
-использует `/tmp`, а лабораторные comparison profiles используют persistent
-каталоги под `~/.local/state/rt-tester`. Всегда проверяйте config вместо
-предположения, что результат находится в `/tmp`.
-
-SQLite DB является primary artifact. Prometheus предназначен для live
-observability и не заменяет session DB.
+Live Prometheus remote write does not transfer GPIO SQLite or raw trace files.
+Cyclictest bundle publication is a separate
+[publisher workflow](../usage/publish-cyclictest.md). See
+[analysis](../usage/analysis-and-reports.md) for derived reports and
+[observability](../observability/central.md) for monitoring storage.

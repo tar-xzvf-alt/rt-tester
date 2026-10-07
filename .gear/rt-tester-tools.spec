@@ -1,5 +1,5 @@
 Name: rt-tester-tools
-Version: 0.4.1
+Version: 0.4.2
 Release: alt1
 Summary: PC-side measurement tools for RT latency stands
 License: GPLv3
@@ -91,6 +91,13 @@ test -z "$(find %buildroot%_datadir/%name -type f \( -name '*.db' -o -name '*.py
 %doc README.md LICENSE.md docs/
 
 %changelog
+* Wed Oct 07 2026 Taran Evgeniy <taranev@basealt.ru> 0.4.2-alt1
+- Add experiment-first English documentation and a complete Russian mirror
+- Document a reproducible VisionFive 2 userspace GPIO workflow and statistics
+- Add portable basic, local and central observability example profiles
+- Include offline diagrams, historical evidence and developer guides
+- Check bilingual examples and reference profile generation in the test suite
+
 * Thu Aug 20 2026 Taran Evgeniy <taranev@basealt.ru> 0.4.1-alt1
 - Restructure documentation by measurement mode and usage scenario
 - Add complete cyclictest publication and fixed-frequency workflows

@@ -1,65 +1,92 @@
-# Getting Started
+# Getting started
 
-## 1. Выберите Режим
+[Русский](ru/getting-started.md)
 
-| Режим | Что измеряется | Arduino | Основная команда |
+## 1. Choose the measured path
+
+| Mode | Measurement | Arduino | Installed command |
 |---|---|---:|---|
-| Standalone GPIO | GPIO request/response handler | Да | `rt-tester-run-gpio` |
-| Supervised raw Ethernet | Полный runtime/supervisor/controller путь | Да | `rt-tester-run-stand` |
-| Linux benchmark | Scheduler wake-up latency | Нет | `rt-tester-run-linux-benchmark` |
+| Standalone GPIO | GPIO request/handler/response round trip | Yes | `rt-tester-run-gpio` |
+| Supervised raw Ethernet | Controller, transport, supervisor, runtime round trip | Yes | `rt-tester-run-stand` |
+| Linux benchmark | Scheduler wake-up latency | No | `rt-tester-run-linux-benchmark` |
 
-## 2. Подготовьте Роли
+GPIO means general-purpose input/output. The Arduino measures elapsed time
+between a request transition and a response transition. PREEMPT_RT is a Linux
+real-time preemption configuration; it does not make every measured path or
+observed maximum a guaranteed deadline.
 
-Управляющий ПК выполняет runners и хранит первичные результаты. Target должен
-иметь SSH-доступ и компоненты выбранного режима. Arduino требуется только для
-GPIO-режимов. Центральный сервер нужен только для observability или публикации,
-но текущие packaged GPIO profiles настроены на project server `wetgrape.su`.
-Без доступа к нему добавьте `--no-prometheus --no-grafana` или используйте
-собственный local-only profile.
+## 2. Prepare the roles
 
-Подробная матрица пакетов находится в [Dependencies](reference/dependencies.md).
+The controlling PC runs the tools and stores primary artifacts. Targets need
+SSH access, permissions to change scheduling/affinity, and mode-specific
+software. GPIO modes also need flashed Arduino firmware, correct wiring, level
+adaptation, and a common ground. A central server is optional.
 
-## 3. Проверьте Профиль
-
-Не запускайте пакетный профиль вслепую. Проверьте:
-
-- `[target] host`, kernel и board label;
-- GPIO или raw-Ethernet topology;
-- duration, group count и workload;
-- output/database path;
-- `[publish]` host, account, key и remote database.
-
-Для лабораторного варианта сохраните копию профиля вне `/usr/share` и передайте
-ее через `--config`.
-
-## 4. Выполните Smoke Test
-
-Standalone:
+On ALT Linux, when your configured repository provides the package:
 
 ```bash
-rt-tester-run-gpio --config /path/to/standalone.conf
+apt-get install rt-tester-tools
 ```
 
-Supervised:
+See [dependencies](reference/dependencies.md) for local RPM installation,
+target packages, and plotting dependencies. The standalone runner requires a
+running target `node_exporter` even with observability disabled.
+
+## 3. Own your configuration
+
+Follow the [standalone walkthrough](usage/standalone-gpio-walkthrough.md) for a
+complete setup. Copy one of these installed examples into your saved experiment
+directory and edit the copy:
+
+```text
+/usr/share/rt-tester-tools/configs/stands/examples/visionfive2-gpio-basic.conf
+/usr/share/rt-tester-tools/configs/stands/examples/visionfive2-gpio-local.conf
+/usr/share/rt-tester-tools/configs/stands/examples/visionfive2-gpio-central.conf
+```
+
+Replace `root@TARGET_HOST`, check board/kernel labels and GPIO configuration,
+Arduino serial access, group size, interval, response timeout, workload, and
+output paths. Central mode also needs your server/account/key. Neutral examples
+use PC ports `9101` (receiver), `9092` (Prometheus), and `3002` (Grafana or central
+Grafana forward). Convert the example `.rt-tester-example` paths to absolute paths
+using the walkthrough's preparation step: receiver runs in a different working
+directory, and an unadapted relative database path can resolve there instead.
+
+## 4. Check a short run before collecting a series
+
+After completing the hardware and target preparation:
 
 ```bash
-rt-tester-run-stand --config /path/to/supervised.conf
+rt-tester-run-gpio --config ./visionfive2-gpio-basic.conf \
+  --groups 3 --no-prometheus --no-grafana
 ```
 
-Cyclictest без публикации:
+Basic requires both disabling flags. Local/central profiles are separate
+scenarios, described in [local](observability/local.md) and
+[central observability](observability/central.md). Use several groups for live
+dashboard checks; a single group can finish before a scrape captures it.
+
+Other prepared stands use:
 
 ```bash
-rt-tester-run-linux-benchmark \
-  --config /path/to/cyclictest.conf \
-  --duration 10
+rt-tester-run-stand --config ./supervised.conf \
+  --groups 3 --no-prometheus --no-grafana
+rt-tester-run-linux-benchmark --config ./cyclictest.conf --duration 10
 ```
 
-Сначала подтвердите целостность короткого запуска, затем увеличивайте duration
-или число групп. Для cyclictest runner печатает finalized bundle path. Для
-Arduino/GPIO primary source of truth является SQLite session DB.
+GPIO runners' `--dry-run` is not a read-only validation mode: it can write
+generated configs and probe local state. For inspecting CLI syntax, use `--help`.
+`--prepare-only` changes target state and is not a substitute for validation.
 
-## 5. Выберите Следующий Сценарий
+## 5. Preserve and validate
 
-- GPIO: [Standalone GPIO](modes/standalone-gpio.md) или [Supervised Raw Ethernet](modes/supervised-raw-ethernet.md).
-- Cyclictest: [Linux Benchmarks](modes/linux-benchmarks.md), затем [Publishing](usage/publish-cyclictest.md).
-- Сравнение режимов: используйте соответствующий документ в `methodology/`.
+Check group continuity, request/response/timeout accounting, events, and labels
+before increasing the number of groups. GPIO data is in the configured SQLite
+database; cyclictest prints a finalized bundle path. Preserve configs, logs,
+versions, and wiring notes with the primary artifact. Continue with
+[analysis](usage/analysis-and-reports.md) and the appropriate
+[GPIO](methodology/gpio-measurements.md) or
+[cyclictest](methodology/cyclictest-comparisons.md) methodology.
+
+For source builds or extensions, use the secondary
+[developer route](development/development-and-testing.md).

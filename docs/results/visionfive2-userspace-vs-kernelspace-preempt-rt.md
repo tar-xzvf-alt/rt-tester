@@ -1,6 +1,12 @@
 # VisionFive 2 Userspace vs Kernelspace, PREEMPT_RT
 
-Non-RT baseline для cross-kernel части находится в
+[Русский](../ru/results/visionfive2-userspace-vs-kernelspace-preempt-rt.md)
+
+Historical report. Its original text does not state a calendar run date or full
+handler/firmware revisions; recorded session IDs and kernel below provide the
+known provenance. This is not output from the current reference walkthrough.
+
+The non-RT baseline for the cross-kernel comparison is in
 [VisionFive 2 Userspace vs Kernelspace, Non-RT](visionfive2-userspace-vs-kernelspace-non-rt.md).
 
 ## Methodology
@@ -71,6 +77,8 @@ less than 2% in tail average.
 
 ## Artifacts
 
+The original local paths identify provenance; they are not packaged artifacts:
+
 ```text
 ~/.local/state/rt-tester/visionfive2-handler-comparison-v2/comparison.db
 ~/.local/state/rt-tester/visionfive2-handler-comparison-rt/comparison.db
@@ -79,3 +87,12 @@ less than 2% in tail average.
 ~/.local/state/rt-tester/visionfive2-handler-comparison-rt/stressed-pair2.png
 ~/.local/state/rt-tester/visionfive2-handler-comparison-rt/stressed-pair3.png
 ```
+
+The tail-average values describe retained worst response samples. Avg jitter is
+the average of whole-received-group standard deviations, not the tail standard
+deviation. The original report does not fully define the separate group-stddev
+aggregation; its labels and numerical values are retained without assigning a
+new formula. The stated cross-kernel findings apply to these recorded conditions,
+not to a guaranteed real-time bound or all PREEMPT_RT workloads. See
+[statistics](../reference/measurement-statistics.md) and
+[GPIO methodology](../methodology/gpio-measurements.md).

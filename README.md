@@ -1,109 +1,76 @@
 # RT Tester
 
-`rt-tester` измеряет latency Linux/RT-систем в трех независимых режимах:
+[Русский](docs/ru/README.md)
 
-- standalone GPIO: Arduino измеряет ответ userspace или kernelspace handler;
-- supervised raw Ethernet: полный путь runtime, supervisor и controller;
-- Linux benchmarks: `cyclictest` запускается на target напрямую по SSH.
-
-Пакет `rt-tester-tools` устанавливается на управляющий ПК. Target-side
-компоненты, Arduino firmware, центральная Grafana и база результатов
-устанавливаются отдельно.
-
-## Быстрый Старт
-
-Установленный RPM предоставляет основные команды:
+`rt-tester` helps experiment engineers measure Linux response latency, preserve
+the measurement evidence, and compare results under recorded conditions.
+The reference experiment uses a VisionFive 2, Arduino Mega 2560, and ALT Linux.
 
 ```text
-rt-tester-run-gpio
-rt-tester-run-stand
-rt-tester-run-linux-benchmark
-rt-tester-publish-cyclictest
-rt-tester-receiver
-rt-tester-import-trace
-rt-tester-trace-summary
+Measurement PC ──USB/serial── Arduino Mega
+                              D7 │ request through level adaptation
+                                 ▼
+                          VisionFive 2 GPIO → handler
+                                 │ response through level adaptation
+                             D20 ◀
+Arduino times request → response; PC stores group data in SQLite.
+All boards share GND. GPIO wiring must respect the boards' voltage levels.
 ```
 
-Standalone GPIO smoke:
+This physical round trip includes GPIO and handler response time. A separate
+`cyclictest` mode measures scheduler wake-up latency without Arduino.
+
+## Start an experiment
+
+On the controlling ALT Linux PC, install the tools from a repository that
+provides the package:
 
 ```bash
-rt-tester-run-gpio \
-  --config /usr/share/rt-tester-tools/configs/stands/visionfive2-standalone-gpio.conf \
-  --groups 3 \
-  --no-prometheus \
-  --no-grafana
+apt-get install rt-tester-tools
 ```
 
-Supervised raw-Ethernet smoke:
+Package availability depends on your configured repositories or supplied local
+RPMs; this command does not imply that every ALT repository contains the project
+packages. See [installation and prerequisites](docs/reference/dependencies.md).
+Target software and Arduino firmware are installed separately.
 
-```bash
-rt-tester-run-stand \
-  --config /usr/share/rt-tester-tools/configs/stands/rockpi-plc-visionfive2-controller.conf \
-  --groups 3 \
-  --no-prometheus \
-  --no-grafana
-```
+Follow the [complete standalone GPIO walkthrough](docs/usage/standalone-gpio-walkthrough.md)
+to prepare hardware, copy and edit a profile in a saved experiment directory,
+run a short check, collect data, validate it, and analyze a historical example.
+The basic profile requires `--no-prometheus --no-grafana`; even this mode needs
+a running target `node_exporter` because the runner checks and pins it.
 
-Cyclictest с автоматической публикацией результата:
-
-```bash
-rt-tester-run-linux-benchmark \
-  --config /usr/share/rt-tester-tools/configs/stands/visionfive2-rt-cyclictest-idle.conf \
-  --duration 10m \
-  --publish
-```
-
-Эти smoke commands отключают central observability. Пакетные профили являются
-примерами конкретных стендов. Перед новым
-экспериментом скопируйте профиль и проверьте адреса, kernel version, GPIO,
-пути результатов, параметры нагрузки и настройки публикации.
-
-## Документация
-
-Начните с [индекса документации](docs/README.md) или выберите режим:
-
-| Задача | Документ |
+| Your task | Start here |
 |---|---|
-| Первый запуск и выбор режима | [Getting Started](docs/getting-started.md) |
-| Standalone userspace/kernelspace GPIO | [Standalone GPIO](docs/modes/standalone-gpio.md) |
-| Полный runtime/raw-Ethernet путь | [Supervised Raw Ethernet](docs/modes/supervised-raw-ethernet.md) |
-| Idle/stressed cyclictest | [Linux Benchmarks](docs/modes/linux-benchmarks.md) |
-| Автоматическая отправка cyclictest | [Publishing Cyclictest](docs/usage/publish-cyclictest.md) |
-| Сравнение при фиксированной частоте | [Cyclictest Methodology](docs/methodology/cyclictest-comparisons.md) |
-| Receiver и SQLite collection | [PC Receiver](docs/usage/receiver.md) |
-| Post-processing и reports | [Analysis and Reports](docs/usage/analysis-and-reports.md) |
-| Центральные Prometheus и Grafana | [Central Observability](docs/observability/central.md) |
-| Зависимости по ролям | [Dependencies](docs/reference/dependencies.md) |
-| Runtime-файлы и результаты | [Runtime Paths](docs/reference/runtime-paths.md) |
-| SQLite schema | [SQLite Schema](docs/reference/sqlite-schema.md) |
-| Исторические отчеты | [Results Index](docs/results/README.md) |
+| Prepare your first stand and choose a mode | [Getting started](docs/getting-started.md) |
+| Run the complete VisionFive 2 GPIO experiment | [Standalone walkthrough](docs/usage/standalone-gpio-walkthrough.md) |
+| Measure the runtime/supervisor/controller path | [Supervised raw Ethernet](docs/modes/supervised-raw-ethernet.md) |
+| Measure scheduler latency | [Linux benchmarks](docs/modes/linux-benchmarks.md) |
+| Validate and interpret SQLite data | [Analysis and reports](docs/usage/analysis-and-reports.md) |
+| See live data locally or on your server | [Local](docs/observability/local.md) / [central observability](docs/observability/central.md) |
+| Maintain or extend the tools | [Development and testing](docs/development/development-and-testing.md) |
 
-## Архитектура Репозиториев
+The [documentation index](docs/README.md) includes methodology, statistics,
+hardware references, and dated results. Live Prometheus delivery does **not**
+publish the primary SQLite database.
 
-`rt-tester` содержит PC-side orchestration, receiver, stand profiles,
-observability assets и документацию. Target-side source of truth находится в
-отдельных проектах:
+## Repository responsibilities
 
-- [rt-handler](https://altlinux.space/besogon1238/rt-handler): standalone userspace GPIO;
-- `rt-handler-kernel`: standalone kernel module;
-- `rt-supervisor`: supervisor и runtime;
-- `rt-controller`: controller-side bridge;
-- `rt-results`: validated import, SQLite catalogs и Grafana dashboards.
+This repository owns PC runners, receiver, stand profiles, and observability
+assets. Target components have their own source of truth:
 
-## Установка
+- [rt-handler](https://altlinux.space/besogon1238/rt-handler): userspace GPIO;
+- [rt-handler-kernel](https://altlinux.space/besogon1238/rt-handler-kernel): kernel GPIO responder;
+- [rt-supervisor](https://altlinux.space/besogon1238/rt-supervisor): supervisor/runtime integration;
+- [rt-controller](https://altlinux.space/besogon1238/rt-controller): GPIO/raw-Ethernet bridge;
+- [rt-results](https://altlinux.space/besogon1238/rt-results): validated imports, catalogs, and result dashboards.
 
-Собрать PC-side RPM:
+Developers should start with [architecture](docs/development/architecture.md),
+then [development and testing](docs/development/development-and-testing.md) and
+the [change guide](docs/development/change-guide.md). Source builds and RPM
+packaging belong to that route; installed packages are the normal measurement
+execution path. Plotting currently requires a source checkout.
 
-```bash
-gear-hsh --no-sisyphus-check=changelog,packager,gpg \
-  --apt-config=/home/taranev/hasher/aptbox/etc/apt/apt.conf \
-  --workdir=/home/taranev/hasher/rt-tester
-```
+## License
 
-Полный список зависимостей и target-пакетов приведен в
-[docs/reference/dependencies.md](docs/reference/dependencies.md).
-
-## Лицензия
-
-Проект распространяется по GNU GPL v3. Полный текст находится в
-[LICENSE.md](LICENSE.md).
+GNU GPL v3; see [LICENSE.md](LICENSE.md).
