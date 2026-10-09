@@ -68,6 +68,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_documen
 | `test_publish_cyclictest.py` | Удалённый импорт с mock, состояние повторной отправки и отклонение изменённых артефактов |
 | `test_documentation.py` | Структуру, локальные ссылки/ресурсы, переключатели языка, совпадение исполняемых примеров и семантику JSON |
 | `test_documentation_profiles.py` | Адаптированные профили через генераторы receiver/Prometheus/Grafana; базовые флаги подавляют запуск мониторинга |
+| `test_gpio_config_failures.py` | Диагностику ядра, разделение stdout/stderr, ограничение SSH, смену адреса exporter и согласованность пути базы |
 
 Тесты подменяют границы subprocess/сети либо используют временные данные. Они не
 доказывают правильность подключения GPIO, временных характеристик, serial-

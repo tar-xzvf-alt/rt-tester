@@ -73,7 +73,7 @@ def run(
         check=check,
         text=True,
         stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.STDOUT if capture else None,
+        stderr=None,
     )
 
 
@@ -81,7 +81,7 @@ def ssh(
     host: str, command: str, *, check: bool = True, capture: bool = False
 ) -> subprocess.CompletedProcess[str]:
     return run(
-        ["ssh", "-o", "BatchMode=yes", host, command],
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, command],
         check=check,
         capture=capture,
     )

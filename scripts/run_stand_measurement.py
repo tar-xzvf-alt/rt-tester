@@ -99,7 +99,7 @@ def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
         check=False,
         text=True,
         stdout=subprocess.PIPE if collect else None,
-        stderr=subprocess.STDOUT if collect else None,
+        stderr=subprocess.STDOUT if collect and not capture else None,
     )
     if VERBOSE and capture and result.stdout:
         print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
@@ -121,7 +121,7 @@ def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
 def ssh(host: str, command: str, *, dry_run: bool = False,
         capture: bool = False, check: bool = True) -> subprocess.CompletedProcess[str]:
     return run(
-        ["ssh", "-o", "BatchMode=yes", host, command],
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, command],
         dry_run=dry_run,
         capture=capture,
         check=check,

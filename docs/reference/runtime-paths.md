@@ -14,13 +14,16 @@ The neutral templates use `.rt-tester-example` placeholders. Convert these to
 absolute paths using the [walkthrough preparation](../usage/standalone-gpio-walkthrough.md)
 before running. Keep the edited profiles in a persistent experiment directory.
 
-Relative paths do not share a single base: runner-managed paths generally use
-its launch directory, while the receiver resolves a relative `[measurement] db`
-from `src/pc-receiver/` in the source/installed tree. The runner's summary then
-looks for that path from its own directory. A relative database can therefore
-land in the wrong location or fail. Use an absolute profile `db` or an absolute
-`--db` override, and absolute observability paths. Keep profiles, versions,
-wiring notes, and logs with the database; use the same adapted profile for cleanup.
+The updated source GPIO runner expands `~` and environment variables in
+`[measurement] db` / `--db`, then resolves the path against its launch directory
+before starting receiver. Receiver and the final summary therefore use the same
+absolute database path. Other observability paths still need explicit preparation.
+
+Installed `0.4.2` predates this fix: it passes a relative database path unchanged
+to receiver, which runs from `src/pc-receiver/` in the installed tree, while the
+summary looks from the launch directory. Use absolute database and observability
+paths for compatibility with that package. Keep profiles, versions, wiring notes,
+and logs with the database; use the same adapted profile for cleanup.
 
 Older smoke profiles may use `/tmp`; laboratory comparison profiles may use
 specific home/state directories. Copy and replace those paths before use.

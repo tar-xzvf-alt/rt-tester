@@ -88,14 +88,14 @@ def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
         check=check,
         text=True,
         stdout=subprocess.PIPE if capture else None,
-        stderr=subprocess.STDOUT if capture else None,
+        stderr=None,
     )
 
 
 def ssh(host: str, command: str, *, dry_run: bool = False,
         capture: bool = False, check: bool = True) -> subprocess.CompletedProcess[str]:
     return run(
-        ["ssh", "-o", "BatchMode=yes", host, command],
+        ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, command],
         dry_run=dry_run,
         capture=capture,
         check=check,
@@ -157,7 +157,7 @@ def write_prometheus_config(path: Path, cfg: configparser.ConfigParser) -> None:
     receiver_port = int(optional(cfg, "observability", "receiver-port", "9101"))
     target_host = require(cfg, "target", "host").split("@")[-1]
     node_target = optional(
-        cfg, "observability", "node-exporter-target", f"{target_host}:9100")
+        cfg, "observability", "node-exporter-target", "") or f"{target_host}:9100"
     board = optional(cfg, "target", "label", require(cfg, "target", "board"))
     labels = central_observability.external_labels(cfg, "rt-gpio-stand")
     remote_write = central_observability.remote_write_block(cfg)
@@ -434,8 +434,10 @@ def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
 
     expected_kernel = optional(cfg, "target", "expected-kernel", "")
     if expected_kernel:
-        ssh(host, f"test \"$(uname -r)\" = {q(expected_kernel)}",
-            dry_run=dry_run)
+        result = ssh(host, "uname -r", dry_run=dry_run, capture=True)
+        if not dry_run and result.stdout.strip() != expected_kernel:
+            die(f"target kernel {result.stdout.strip()} does not match "
+                f"expected {expected_kernel}")
 
     remote_commands = ["chrt", "taskset", "node_exporter"]
     if config_bool(optional(cfg, "measurement", "target-stress", "off")):
@@ -833,7 +835,8 @@ def run_measurement(args: argparse.Namespace) -> None:
     stand_name = require(cfg, "stand", "name")
     session_id = args.session_id or int(time.time())
     groups = args.groups or int(require(cfg, "measurement", "groups"))
-    db_path = args.db or require(cfg, "measurement", "db")
+    db_path = str(Path(os.path.expandvars(
+        args.db or require(cfg, "measurement", "db"))).expanduser().resolve())
     warmup_seconds = args.warmup_seconds
     if warmup_seconds is None:
         warmup_seconds = int(optional(cfg, "stress", "warmup-seconds", "0"))

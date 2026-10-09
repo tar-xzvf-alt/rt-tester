@@ -2,6 +2,13 @@
 
 [Русский](../ru/usage/receiver.md)
 
+A receiver parameter file is not a stand profile: it does not start a GPIO handler,
+load a kernel responder, or generate workload. `target-stress` and `target-payload`
+are recorded labels here, not commands to create those conditions. Use the mode
+runner for target lifecycle. A local `measurement.conf` may also contain an old
+absolute DB path or a long group count; inspect it rather than treating it as a
+portable quick start.
+
 The receiver controls Arduino sessions, receives group JSON, queries optional
 SoC metrics through Prometheus, and stores SQLite data. Mode runners normally
 generate its config and own its lifecycle; do not start another receiver on the

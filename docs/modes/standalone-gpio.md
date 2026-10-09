@@ -2,6 +2,25 @@
 
 [Русский](../ru/modes/standalone-gpio.md)
 
+## Adapting a project profile
+
+Historical comparison profiles describe a particular laboratory environment,
+not automatic hardware discovery. Check the SSH host, exact expected kernel,
+selected handler binary, output paths and monitoring mode before running.
+`expected-kernel` intentionally rejects a different boot kernel; update the
+kernel label as well when explicitly preparing a new experiment.
+
+Userspace comparison profiles select `/root/rt-handler-userspace/src/rt-handler`.
+That source-build binary must exist on the target. To use the installed package,
+select `/usr/sbin/rt-handler` instead. Building a source tree does not automatically
+change the configured `binary`.
+
+Standalone profiles now derive node_exporter's endpoint from the SSH host on port
+9100. Set `node-exporter-target` explicitly only for a different exporter address.
+Central profiles also require their server/key/forwarding settings. For plain
+collection use both disabling flags; for local monitoring use the local template.
+See [local](../observability/local.md) and [central](../observability/central.md).
+
 This mode measures the Arduino → target GPIO → handler → Arduino round trip.
 It excludes supervisor, raw Ethernet, and Beremiz/runtime layers. For a complete
 first experiment, use the [VisionFive 2 walkthrough](../usage/standalone-gpio-walkthrough.md).
@@ -52,8 +71,9 @@ rt-tester-run-gpio --config ./visionfive2-gpio-basic.conf \
   --groups 3 --no-prometheus --no-grafana
 ```
 
-Both disabling flags are required for basic collection. An unadapted relative
-database path resolves in the receiver directory, not the experiment directory.
+Both disabling flags are required for basic collection. Installed `0.4.2` resolves
+an unadapted relative database path in the receiver directory; the updated source
+runner normalizes it against the launch directory. Absolute paths work with both.
 Use [local](../observability/local.md) or
 [central observability](../observability/central.md) for live monitoring.
 The neutral local ports are receiver `9101`, Prometheus `9092`, and Grafana `3002`.

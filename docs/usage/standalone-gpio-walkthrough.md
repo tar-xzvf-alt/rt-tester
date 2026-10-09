@@ -167,7 +167,7 @@ The example assumes CPU 1 for handler/IRQ and CPUs 0,3 for housekeeping.
 Changing these choices changes the experiment. Central transport is adapted
 separately in [central observability](../observability/central.md).
 
-Absolute paths are important: the runner launches receiver from its own source
+For installed `0.4.2`, absolute paths are important: the runner launches receiver from its own source
 directory, so a relative database path is **not** reliably relative to your
 experiment directory. INI files do not perform general shell interpolation;
 do not write literal `$PWD` or `$HOME` in runner paths.
