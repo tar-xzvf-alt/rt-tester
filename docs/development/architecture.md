@@ -56,6 +56,7 @@ PC Python tools.
 | `scripts/run_gpio_measurement.py` | Standalone preflight, backend selection, target lifecycle, tuning, receiver launch, integrity checks |
 | `scripts/run_stand_measurement.py` | Multi-board startup/arming, receiver gate, network diagnostics, trace import and consistency checks |
 | `scripts/central_observability.py` | Shared central observability configuration and SSH tunnel lifecycle; runners also prepare local services |
+| `scripts/run_cleanup.py` | Ordered final actions, primary-error preservation and bounded PID/process-group stop commands |
 | `scripts/run_linux_benchmark.py`, `publish_cyclictest.py` | Native cyclictest JSON validation, bundle finalization, validated publication and retry state |
 | `src/arduino-meter/arduino-meter.ino`, `measurement.cpp` | Serial command handling, pending-request/timeout accounting, interrupt timing, group statistics and retained tail |
 | `src/pc-receiver/receiver.py` | Collector state and threads; coordinates serial, storage, metrics and session logging |
@@ -75,6 +76,41 @@ support, trace tools, profiles and observability assets. Wrappers use
 `/usr/share/rt-tester-tools` (overridable via `RT_TESTER_ROOT`). Plotting, merging,
 historical helpers, tests, Arduino firmware and target software are outside that
 installed executable scope. Documentation is packaged separately as `%doc`.
+
+## Runner finalization
+
+The updated source runners attempt every registered final action even when a
+diagnostic or another stop action raises. The measurement's original exception,
+including `KeyboardInterrupt` or `SystemExit`, is preserved; secondary errors are
+reported to stderr. If measurement succeeded, a final-action error is raised rather
+than reporting successful completion. A finalized cyclictest bundle is retained
+even if subsequent remote cleanup fails.
+
+Pre-run recovery still clears stale processes by name on a dedicated stand.
+Normal GPIO stop uses the configured handler PID or kernel module and the stress
+process group. The supervised runner starts supervisor/runtime and stress under
+`setsid`, then stops their process groups and the configured controller PID.
+It attempts supervisor, controller and stress stops independently. PID files and
+shared-memory names still assume exclusive use of the stand; they do not support
+concurrent runs. A runtime that deliberately detaches from its process group needs
+its own lifecycle handling.
+
+PID/group stops use `ps` and `awk` to confirm that no live members remain, including
+workers whose group leader has already exited. Zombies are not treated as running
+workload. Invalid PID files or an unconfirmed stop fail cleanup and retain the PID
+file for recovery; preflight checks the process-probing tools.
+The cyclictest runner retains its remote directory while `stress.pid` remains,
+so directory cleanup cannot discard an unconfirmed stress-stop handle.
+
+Finalization SSH commands and network snapshots have a 30-second command timeout,
+separate from the 5-second SSH connection timeout. The piped supervised receiver is
+terminated on callback/read/write failure or interrupt, waited for up to 5 seconds,
+then killed and waited for up to another 5 seconds; its pipes are closed. Waiting
+for exit after stdout EOF is also bounded to 5 seconds. Readiness waiting itself
+still has no deadline. Remote unavailability is reported, not proof of remote
+termination. `--keep-target` / `--keep-targets` retain target processes; observability
+and target tuning intentionally persist unless explicitly stopped or reconfigured.
+These changes are in source, not the installed `0.4.2` package.
 
 ## Collector lifecycle and serial boundary
 

@@ -91,7 +91,7 @@ class StressLifecycleTest(unittest.TestCase):
         stop_command = ssh.call_args_list[1].args[1]
         self.assertIn("setsid", start_command)
         self.assertIn("/tmp/run/stress.pid", start_command)
-        self.assertIn("kill -TERM -$p", stop_command)
+        self.assertIn("kill -TERM -$pid", stop_command)
         self.assertNotIn("pkill", stop_command)
 
 

@@ -32,7 +32,7 @@ install -d "$root/configs/stands" "$root/configs/server" \
 
 install -m755 scripts/run_stand_measurement.py scripts/run_gpio_measurement.py \
     scripts/run_linux_benchmark.py scripts/publish_cyclictest.py "$root/scripts/"
-install -m644 scripts/central_observability.py "$root/scripts/"
+install -m644 scripts/central_observability.py scripts/run_cleanup.py "$root/scripts/"
 install -m755 src/pc-receiver/receiver.py \
     src/pc-receiver/import_trace_metrics.py src/pc-receiver/trace_summary.py \
     "$root/src/pc-receiver/"

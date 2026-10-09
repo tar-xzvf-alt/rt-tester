@@ -63,6 +63,11 @@ Availability and installation are controlled by
 [rt-handler-kernel](https://altlinux.space/besogon1238/rt-handler-kernel), not this
 repository. See [target GPIO](../hardware/target-gpio.md).
 
+The updated source runners also require target `setsid` for stressed GPIO runs
+and for supervisor/runtime process-group ownership. PID/group stops use `ps` and
+`awk`; preflight checks these tools before measurement startup. Stressed cyclictest
+also requires `setsid`, `ps` and `awk`.
+
 ## Supervised targets
 
 Runtime/supervisor and controller boards need their corresponding external

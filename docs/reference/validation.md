@@ -26,6 +26,21 @@ stand, not a claim that a new reference run has already been performed.
 | Central metric delivery | Not executed | Requires server/account and verified matching-session receipt |
 | Release RPM build/install | Recorded separately | Finished documentation approved; see the build's artifact/log report for packaging results |
 
+## Runner finalization checks — 2026-10-09
+
+- Full automated suite: **69 tests passed**, including 19 runner-cleanup tests.
+- GPIO/stand startup failures, independent final actions, preserved interrupts,
+  broken warning output and retained cyclictest bundles were checked through
+  runner entry points with mocked SSH and temporary files.
+- Local shell simulations checked failed signals, retained PID files,
+  process-group workers after leader exit, zombie handling and the cyclictest
+  directory-retention guard. No real target processes were signalled.
+- Real short local child processes checked supervised gate success, broken stdin,
+  TERM-ignoring receiver cleanup and interruption during teardown.
+- Source GPIO/stand/cyclictest CLI help and `git diff --check` passed.
+- Remote SSH cleanup, actual supervisor/runtime process-group behavior, GPIO
+  hardware and an RPM build/install were not executed for this change.
+
 ## Stand acceptance checklist
 
 Record date, package/revisions, board revision, kernel configuration, firmware

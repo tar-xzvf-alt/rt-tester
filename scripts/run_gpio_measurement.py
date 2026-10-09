@@ -22,6 +22,7 @@ import urllib.request
 from pathlib import Path
 
 import central_observability
+from run_cleanup import REMOTE_CLEANUP_TIMEOUT, final_actions, stop_pidfile_command
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -74,7 +75,8 @@ def execution_mode(cfg: configparser.ConfigParser) -> str:
 
 
 def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
-        check: bool = True, capture: bool = False) -> subprocess.CompletedProcess[str]:
+        check: bool = True, capture: bool = False,
+        timeout: float | None = None) -> subprocess.CompletedProcess[str]:
     printable = " ".join(q(part) for part in cmd)
     if cwd:
         printable = f"(cd {q(cwd)} && {printable})"
@@ -89,16 +91,19 @@ def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
         text=True,
         stdout=subprocess.PIPE if capture else None,
         stderr=None,
+        timeout=timeout,
     )
 
 
 def ssh(host: str, command: str, *, dry_run: bool = False,
-        capture: bool = False, check: bool = True) -> subprocess.CompletedProcess[str]:
+        capture: bool = False, check: bool = True,
+        timeout: float | None = None) -> subprocess.CompletedProcess[str]:
     return run(
         ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, command],
         dry_run=dry_run,
         capture=capture,
         check=check,
+        timeout=timeout,
     )
 
 
@@ -439,9 +444,9 @@ def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
             die(f"target kernel {result.stdout.strip()} does not match "
                 f"expected {expected_kernel}")
 
-    remote_commands = ["chrt", "taskset", "node_exporter"]
+    remote_commands = ["chrt", "taskset", "node_exporter", "ps", "awk"]
     if config_bool(optional(cfg, "measurement", "target-stress", "off")):
-        remote_commands.append("stress-ng")
+        remote_commands.extend(["stress-ng", "setsid"])
     command = " && ".join(
         f"command -v {q(command)} >/dev/null" for command in remote_commands
     )
@@ -517,6 +522,7 @@ def build_handler(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
 
 
 def cleanup_target(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    """Recover the dedicated target before a run, including stale processes."""
     host = require(cfg, "target", "host")
     stress_pid = optional(cfg, "stress", "pid", "/tmp/rt-gpio-stress.pid")
     commands = [
@@ -543,6 +549,28 @@ def cleanup_target(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
         "pkill -KILL -f '^stress-ng' 2>/dev/null || true",
     ])
     ssh(host, "; ".join(commands), dry_run=dry_run, check=False)
+
+
+def stop_target(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
+    """Stop the configured measurement resources, not all processes by name."""
+    host = require(cfg, "target", "host")
+
+    def stop_handler() -> None:
+        if execution_mode(cfg) == "kernelspace":
+            module = optional(cfg, "target", "module", "rt_gpio_responder")
+            command = f"if [ -d /sys/module/{q(module)} ]; then modprobe -r {q(module)}; fi"
+        else:
+            command = stop_pidfile_command(require(cfg, "target", "pid-path"))
+        ssh(host, command, dry_run=dry_run, timeout=REMOTE_CLEANUP_TIMEOUT)
+
+    def stop_stress() -> None:
+        if config_bool(optional(cfg, "measurement", "target-stress", "off")):
+            pid_path = optional(cfg, "stress", "pid", "/tmp/rt-gpio-stress.pid")
+            ssh(host, stop_pidfile_command(pid_path, process_group=True), dry_run=dry_run,
+                timeout=REMOTE_CLEANUP_TIMEOUT)
+
+    with final_actions(("GPIO handler stop", stop_handler), ("GPIO stress stop", stop_stress)):
+        pass
 
 
 def start_userspace_handler(cfg: configparser.ConfigParser,
@@ -604,10 +632,8 @@ def start_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
     pid_path = optional(cfg, "stress", "pid", "/tmp/rt-gpio-stress.pid")
     log_path = optional(cfg, "stress", "log", "/tmp/rt-gpio-stress.log")
     command = (
-        f"pkill -TERM -f '^stress-ng' 2>/dev/null || true; sleep 0.2; "
-        f"pkill -KILL -f '^stress-ng' 2>/dev/null || true; "
         f": > {q(log_path)}; "
-        f"{stress_cmd} >{q(log_path)} 2>&1 & "
+        f"setsid sh -c {q('exec ' + stress_cmd)} >{q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}"
     )
     print(f"Target stress: on ({stress_cmd})")
@@ -751,7 +777,7 @@ def print_target_diagnostics(cfg: configparser.ConfigParser,
         f"ps -eLo pid,tid,cls,rtprio,psr,comm,args | "
         f"awk '$6 == \"node_exporter\" {{ print }}'"
     )
-    result = ssh(host, command, capture=True, check=False)
+    result = ssh(host, command, capture=True, check=False, timeout=REMOTE_CLEANUP_TIMEOUT)
     if result.stdout:
         print("Target diagnostics:")
         print(result.stdout.rstrip())
@@ -891,7 +917,15 @@ def run_measurement(args: argparse.Namespace) -> None:
     write_receiver_config(receiver_config, cfg, db_path, groups)
     print(f"Receiver config: {receiver_config}")
 
-    try:
+    actions = [
+        ("target diagnostics", lambda: print_target_diagnostics(cfg, dry_run=args.dry_run)),
+    ]
+    if not args.dry_run:
+        actions.append(("Prometheus diagnostics",
+                        lambda: print_prometheus_diagnostics(prometheus_url, session_id)))
+    if not args.keep_target:
+        actions.append(("target cleanup", lambda: stop_target(cfg, dry_run=args.dry_run)))
+    with final_actions(*actions):
         start_stress(cfg, dry_run=args.dry_run)
         pin_node_exporter(cfg, dry_run=args.dry_run)
         warm_up_stress(cfg, warmup_seconds, dry_run=args.dry_run)
@@ -899,12 +933,6 @@ def run_measurement(args: argparse.Namespace) -> None:
         pin_handler(cfg, dry_run=args.dry_run)
         run_receiver(cfg, session_id, receiver_config, groups,
                      dry_run=args.dry_run)
-    finally:
-        print_target_diagnostics(cfg, dry_run=args.dry_run)
-        if not args.dry_run:
-            print_prometheus_diagnostics(prometheus_url, session_id)
-        if not args.keep_target:
-            cleanup_target(cfg, dry_run=args.dry_run)
 
     db_ok = True if args.dry_run else print_db_summary(db_path, session_id, groups)
     if db_ok:

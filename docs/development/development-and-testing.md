@@ -69,6 +69,7 @@ PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tests -p 'test_documen
 | `test_documentation.py` | Document structure, local links/assets, language switches, executable example parity and JSON semantics |
 | `test_documentation_profiles.py` | Adapted reference profiles through receiver/Prometheus/Grafana generators; basic flags skip monitoring startup |
 | `test_gpio_config_failures.py` | Kernel diagnostics, stdout/stderr isolation, bounded SSH, edited exporter hosts and DB path consistency |
+| `test_runner_cleanup.py` | Startup/diagnostic/cleanup failures, preserved interrupts, scoped stops, finalized bundle retention and real local child-process cleanup |
 
 Tests mock subprocess/network boundaries or use temporary data. They do not prove
 GPIO wiring, timing, firmware serial interoperability, kernel-module compatibility,

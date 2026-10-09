@@ -82,7 +82,7 @@ class ReferenceProfileTest(unittest.TestCase):
             no_prometheus=True, no_grafana=True, keep_target=False,
         )
         mocked = (
-            "check_prerequisites", "check_arduino", "cleanup_target",
+            "check_prerequisites", "check_arduino", "cleanup_target", "stop_target",
             "stop_local_receivers", "start_stress", "pin_node_exporter",
             "warm_up_stress", "start_handler", "pin_handler", "run_receiver",
             "print_target_diagnostics", "print_db_summary", "write_receiver_config",

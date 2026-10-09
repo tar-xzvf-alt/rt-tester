@@ -18,6 +18,7 @@ import uuid
 from pathlib import Path
 
 from publish_cyclictest import publish_bundle
+from run_cleanup import REMOTE_CLEANUP_TIMEOUT, final_actions, stop_pidfile_command
 
 
 BUNDLE_SCHEMA_VERSION = 1
@@ -64,7 +65,8 @@ def config_bool(value: str) -> bool:
 
 
 def run(
-    cmd: list[str], *, check: bool = True, capture: bool = False
+    cmd: list[str], *, check: bool = True, capture: bool = False,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     print("$ " + " ".join(q(part) for part in cmd))
     sys.stdout.flush()
@@ -74,16 +76,19 @@ def run(
         text=True,
         stdout=subprocess.PIPE if capture else None,
         stderr=None,
+        timeout=timeout,
     )
 
 
 def ssh(
-    host: str, command: str, *, check: bool = True, capture: bool = False
+    host: str, command: str, *, check: bool = True, capture: bool = False,
+    timeout: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     return run(
         ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, command],
         check=check,
         capture=capture,
+        timeout=timeout,
     )
 
 
@@ -210,7 +215,8 @@ def preflight(cfg: configparser.ConfigParser) -> dict[str, object]:
     if workload not in ("idle", "stress-ng"):
         die(f"unsupported [workload] engine: {workload}")
     if workload == "stress-ng":
-        ssh(host, "command -v stress-ng >/dev/null")
+        ssh(host, "command -v stress-ng >/dev/null && command -v setsid >/dev/null && "
+            "command -v ps >/dev/null && command -v awk >/dev/null")
         metadata["stress_package"] = remote_value(host, "rpm -q stress-ng")
     return metadata
 
@@ -237,15 +243,10 @@ def stop_stress(cfg: configparser.ConfigParser, remote_dir: str) -> None:
     if optional(cfg, "workload", "engine", "idle") != "stress-ng":
         return
     host = require(cfg, "target", "host")
-    pid = q(remote_dir + "/stress.pid")
     ssh(
         host,
-        f"if [ -s {pid} ]; then p=$(cat {pid}); "
-        f"kill -TERM -$p 2>/dev/null || kill -TERM $p 2>/dev/null ||:; "
-        f"i=0; while kill -0 $p 2>/dev/null && [ $i -lt 25 ]; do "
-        f"sleep .2; i=$((i+1)); done; "
-        f"kill -KILL -$p 2>/dev/null ||:; fi",
-        check=False,
+        stop_pidfile_command(remote_dir + "/stress.pid", process_group=True),
+        timeout=REMOTE_CLEANUP_TIMEOUT,
     )
 
 
@@ -274,7 +275,19 @@ def execute(cfg: configparser.ConfigParser, output_root: Path) -> Path:
     exit_code = 1
 
     partial.mkdir(parents=True)
-    try:
+
+    def cleanup_remote_directory() -> None:
+        # A failed/unconfirmed stress stop leaves its scoped recovery handle.
+        ssh(host,
+            f"if [ -e {q(remote_dir + '/stress.pid')} ]; then "
+            f"echo {q('retaining remote directory with stress PID: ' + remote_dir)} >&2; "
+            f"exit 1; fi; rm -rf {q(remote_dir)}",
+            timeout=REMOTE_CLEANUP_TIMEOUT)
+
+    with final_actions(
+        ("cyclictest stress stop", lambda: stop_stress(cfg, remote_dir)),
+        ("cyclictest remote directory cleanup", cleanup_remote_directory),
+    ):
         ssh(host, f"rm -rf {q(remote_dir)} && mkdir -m700 {q(remote_dir)}")
         start_stress(cfg, remote_dir)
         result = ssh(
@@ -329,9 +342,6 @@ def execute(cfg: configparser.ConfigParser, output_root: Path) -> Path:
         )
         partial.rename(bundle)
         return bundle
-    finally:
-        stop_stress(cfg, remote_dir)
-        ssh(host, f"rm -rf {q(remote_dir)}", check=False)
 
 
 def main() -> None:

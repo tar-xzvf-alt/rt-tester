@@ -98,7 +98,7 @@ class ConfigurationFailureTest(unittest.TestCase):
                 with contextlib.ExitStack() as stack:
                     stack.enter_context(mock.patch.dict(os.environ, {"HOME": tmp, "CONFIG_AUDIT_HOME": tmp}))
                     stack.enter_context(mock.patch.object(runner.tempfile, "gettempdir", return_value=tmp))
-                    for name in ("check_prerequisites", "check_arduino", "cleanup_target",
+                    for name in ("check_prerequisites", "check_arduino", "cleanup_target", "stop_target",
                                  "stop_local_receivers", "start_stress", "pin_node_exporter",
                                  "warm_up_stress", "start_handler", "pin_handler",
                                  "print_target_diagnostics", "print_prometheus_diagnostics"):

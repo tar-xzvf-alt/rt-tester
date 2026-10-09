@@ -67,6 +67,11 @@ apt-get install rt-handler prometheus-node_exporter openssh-server
 [rt-handler-kernel](https://altlinux.space/besogon1238/rt-handler-kernel), а не
 этим репозиторием. См. [GPIO целевой системы](../hardware/target-gpio.md).
 
+Обновлённые сценарии из исходников также требуют `setsid` на целевой системе
+для GPIO-запусков с нагрузкой и владения группой процессов supervisor/runtime.
+Остановка PID/групп использует `ps` и `awk`; эти инструменты проверяются до запуска
+измерений. Cyclictest с нагрузкой также требует `setsid`, `ps` и `awk`.
+
 ## Целевые системы режима с супервизором
 
 Платам среды исполнения/супервизора и контроллера нужны соответствующие внешние

@@ -23,6 +23,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 import central_observability
+from run_cleanup import REMOTE_CLEANUP_TIMEOUT, final_actions, stop_pidfile_command
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -85,7 +86,8 @@ def config_bool(value: str) -> bool:
 
 
 def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
-        check: bool = True, capture: bool = False) -> subprocess.CompletedProcess[str]:
+        check: bool = True, capture: bool = False,
+        timeout: float | None = None) -> subprocess.CompletedProcess[str]:
     printable = format_command(cmd, cwd)
     if VERBOSE or dry_run:
         print(f"$ {printable}")
@@ -100,6 +102,7 @@ def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
         text=True,
         stdout=subprocess.PIPE if collect else None,
         stderr=subprocess.STDOUT if collect and not capture else None,
+        timeout=timeout,
     )
     if VERBOSE and capture and result.stdout:
         print(result.stdout, end="" if result.stdout.endswith("\n") else "\n")
@@ -119,12 +122,14 @@ def run(cmd: list[str], *, cwd: Path | None = None, dry_run: bool = False,
 
 
 def ssh(host: str, command: str, *, dry_run: bool = False,
-        capture: bool = False, check: bool = True) -> subprocess.CompletedProcess[str]:
+        capture: bool = False, check: bool = True,
+        timeout: float | None = None) -> subprocess.CompletedProcess[str]:
     return run(
         ["ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, command],
         dry_run=dry_run,
         capture=capture,
         check=check,
+        timeout=timeout,
     )
 
 
@@ -402,9 +407,13 @@ def check_prerequisites(cfg: configparser.ConfigParser, *, dry_run: bool,
         host = require(cfg, section, "host")
         repo = require(cfg, section, "repo")
         stand_config = require(cfg, section, "stand-config")
-        ssh(host, "hostname >/dev/null", dry_run=dry_run)
+        ssh(host, "hostname >/dev/null && command -v ps >/dev/null && command -v awk >/dev/null",
+            dry_run=dry_run)
         ssh(host, f"cd {q(repo)} && scripts/preflight_stand.sh {q(stand_config)}",
             dry_run=dry_run)
+
+    ssh(require(cfg, "supervisor", "host"), "command -v setsid >/dev/null",
+        dry_run=dry_run)
 
     if runtime_stress_enabled(cfg):
         supervisor_host = require(cfg, "supervisor", "host")
@@ -470,21 +479,6 @@ def stop_local_receivers(*, dry_run: bool) -> None:
             os.kill(pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
-
-
-def stop_pidfile_command(pid_path: str) -> str:
-    path = q(pid_path)
-    return (
-        f"if [ -f {path} ]; then "
-        f"pid=$(cat {path} 2>/dev/null || true); "
-        f"case $pid in ''|*[!0-9]*) pid=;; esac; "
-        f"if [ -n \"$pid\" ] && kill -0 $pid 2>/dev/null; then "
-        f"kill $pid 2>/dev/null || true; i=0; "
-        f"while kill -0 $pid 2>/dev/null && [ $i -lt 30 ]; do "
-        f"sleep 0.1; i=$((i + 1)); done; "
-        f"if kill -0 $pid 2>/dev/null; then kill -KILL $pid 2>/dev/null || true; "
-        f"sleep 0.1; fi; fi; rm -f {path}; fi; "
-    )
 
 
 def cleanup_before_run(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
@@ -585,7 +579,7 @@ def start_supervisor(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
         f"rm -f /dev/shm/shmem_input /dev/shm/shmem_output; "
         f": > {q(trace_path)}; : > {q(log_path)}; "
         f"cd {q(repo)} || exit 1; "
-        f"{env}RT_TRACE_PATH={q(trace_path)} {q(binary)} -i {q(iface)} "
+        f"{env}RT_TRACE_PATH={q(trace_path)} setsid {q(binary)} -i {q(iface)} "
         f"-t {q(timeout_us)} -r {q(runtime)} > {q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}; "
         f"sleep 2; scripts/pin_stand.sh {q(stand_config)} >/tmp/pin-supervisor.log 2>&1 || true"
@@ -609,7 +603,6 @@ def start_controller(cfg: configparser.ConfigParser, session_id: int, groups: in
     if env:
         env += " "
     command = (
-        f"pkill -x controller-emu 2>/dev/null || true; "
         f": > {q(trace_path)}; : > {q(log_path)}; "
         f"cd {q(repo)} || exit 1; "
         f"{env}RT_TRACE_PATH={q(trace_path)} "
@@ -643,13 +636,8 @@ def start_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> No
     pid_path = optional(cfg, "stress", "runtime-pid", "/tmp/rt-runtime-stress.pid")
     log_path = optional(cfg, "stress", "runtime-log", "/tmp/rt-runtime-stress.log")
     command = (
-        f"if [ -f {q(pid_path)} ]; then "
-        f"old=$(cat {q(pid_path)} 2>/dev/null || true); "
-        f"if [ -n \"$old\" ]; then kill $old 2>/dev/null || true; fi; "
-        f"rm -f {q(pid_path)}; fi; "
-        f"pkill -x stress-ng 2>/dev/null || true; "
         f": > {q(log_path)}; "
-        f"{stress_cmd} > {q(log_path)} 2>&1 & "
+        f"setsid sh -c {q('exec ' + stress_cmd)} > {q(log_path)} 2>&1 & "
         f"echo $! > {q(pid_path)}"
     )
     print("Runtime stress: on")
@@ -663,14 +651,8 @@ def stop_runtime_stress(cfg: configparser.ConfigParser, *, dry_run: bool) -> Non
 
     host = require(cfg, "supervisor", "host")
     pid_path = optional(cfg, "stress", "runtime-pid", "/tmp/rt-runtime-stress.pid")
-    command = (
-        f"if [ -f {q(pid_path)} ]; then "
-        f"pid=$(cat {q(pid_path)} 2>/dev/null || true); "
-        f"if [ -n \"$pid\" ]; then kill $pid 2>/dev/null || true; fi; "
-        f"rm -f {q(pid_path)}; fi; "
-        f"pkill -x stress-ng 2>/dev/null || true"
-    )
-    ssh(host, command, dry_run=dry_run, check=False)
+    ssh(host, stop_pidfile_command(pid_path, process_group=True), dry_run=dry_run,
+        timeout=REMOTE_CLEANUP_TIMEOUT)
 
 
 def collect_network_snapshot(cfg: configparser.ConfigParser, section: str,
@@ -749,7 +731,7 @@ except (OSError, ValueError):
 print(json.dumps(snapshot, sort_keys=True))
 """
     result = ssh(host, "python3 - <<'PY'\n" + script + "PY",
-                 capture=True, check=False)
+                 capture=True, check=False, timeout=REMOTE_CLEANUP_TIMEOUT)
     if result.returncode != 0 or not result.stdout.strip():
         print(f"warning: failed to collect network counters from {section}")
         if result.stdout:
@@ -868,21 +850,53 @@ def print_network_delta(before: dict[str, dict[str, object]] | None,
 
 
 def stop_targets(cfg: configparser.ConfigParser, *, dry_run: bool) -> None:
-    supervisor_host = require(cfg, "supervisor", "host")
-    supervisor_pid = require(cfg, "supervisor", "pid-path")
-    controller_host = require(cfg, "controller", "host")
-    controller_pid = require(cfg, "controller", "pid-path")
-    ssh(supervisor_host,
-        stop_pidfile_command(supervisor_pid) +
-        f"pkill -KILL -x runtime 2>/dev/null || true; "
-        f"pkill -f '[B]eremiz_service.py' 2>/dev/null || true; "
-        f"rm -f /dev/shm/shmem_input /dev/shm/shmem_output",
-        dry_run=dry_run, check=False)
-    ssh(controller_host,
-        stop_pidfile_command(controller_pid) +
-        f"pkill -KILL -x controller-emu 2>/dev/null || true",
-        dry_run=dry_run, check=False)
-    stop_runtime_stress(cfg, dry_run=dry_run)
+    def stop_supervisor() -> None:
+        ssh(require(cfg, "supervisor", "host"),
+            stop_pidfile_command(require(cfg, "supervisor", "pid-path"), process_group=True) +
+            "rm -f /dev/shm/shmem_input /dev/shm/shmem_output",
+            dry_run=dry_run, timeout=REMOTE_CLEANUP_TIMEOUT)
+
+    def stop_controller() -> None:
+        ssh(require(cfg, "controller", "host"),
+            stop_pidfile_command(require(cfg, "controller", "pid-path")),
+            dry_run=dry_run, timeout=REMOTE_CLEANUP_TIMEOUT)
+
+    with final_actions(
+        ("supervisor stop", stop_supervisor),
+        ("controller stop", stop_controller),
+        ("runtime stress stop", lambda: stop_runtime_stress(cfg, dry_run=dry_run)),
+    ):
+        pass
+
+
+RECEIVER_STOP_TIMEOUT = 5
+
+
+def close_receiver(proc: subprocess.Popen) -> None:
+    def stop() -> None:
+        try:
+            if proc.poll() is None:
+                proc.terminate()
+            try:
+                proc.wait(timeout=RECEIVER_STOP_TIMEOUT)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=RECEIVER_STOP_TIMEOUT)
+        except BaseException:
+            # Complete teardown even if TERM/wait itself is interrupted.
+            with final_actions(
+                ("receiver force kill", proc.kill),
+                ("receiver reap", lambda: proc.wait(timeout=RECEIVER_STOP_TIMEOUT)),
+            ):
+                raise
+
+    actions = [("receiver stop", stop)]
+    for name in ("stdin", "stdout"):
+        stream = getattr(proc, name)
+        if stream is not None:
+            actions.append((f"receiver {name} close", stream.close))
+    with final_actions(*actions):
+        pass
 
 
 def run_receiver(cfg: configparser.ConfigParser, session_id: int,
@@ -915,39 +929,40 @@ def run_receiver(cfg: configparser.ConfigParser, session_id: int,
         stderr=subprocess.STDOUT,
         bufsize=1,
     )
-    output: deque[str] = deque(maxlen=40)
-    ready = False
-    assert proc.stdout is not None
-    for raw_line in proc.stdout:
-        line = raw_line.rstrip("\n")
-        output.append(line)
-        if line == RECEIVER_READY and on_ready is not None:
-            on_ready()
-            assert proc.stdin is not None
-            proc.stdin.write("start\n")
-            proc.stdin.flush()
-            ready = True
+    with final_actions(("receiver cleanup", lambda: close_receiver(proc))):
+        output: deque[str] = deque(maxlen=40)
+        ready = False
+        assert proc.stdout is not None
+        for raw_line in proc.stdout:
+            line = raw_line.rstrip("\n")
+            output.append(line)
+            if line == RECEIVER_READY and on_ready is not None:
+                on_ready()
+                assert proc.stdin is not None
+                proc.stdin.write("start\n")
+                proc.stdin.flush()
+                ready = True
+                if VERBOSE:
+                    print(line)
+                continue
+            match = RECEIVER_PROGRESS_RE.match(line)
             if VERBOSE:
                 print(line)
-            continue
-        match = RECEIVER_PROGRESS_RE.match(line)
-        if VERBOSE:
-            print(line)
-        elif match:
-            print(f"Progress: {match.group('current')}/{match.group('total')} groups")
-        elif any(token in line.lower() for token in (
-            "warning", "error", "failed", "fall detected", "recovered",
-        )):
-            print(line)
-    returncode = proc.wait()
-    if on_ready is not None and not ready and returncode == 0:
-        returncode = 1
-    if returncode != 0:
-        error = subprocess.CalledProcessError(
-            returncode, cmd, output="\n".join(output)
-        )
-        error.cwd = PC_RECEIVER_DIR
-        raise error
+            elif match:
+                print(f"Progress: {match.group('current')}/{match.group('total')} groups")
+            elif any(token in line.lower() for token in (
+                "warning", "error", "failed", "fall detected", "recovered",
+            )):
+                print(line)
+        returncode = proc.wait(timeout=RECEIVER_STOP_TIMEOUT)
+        if on_ready is not None and not ready and returncode == 0:
+            returncode = 1
+        if returncode != 0:
+            error = subprocess.CalledProcessError(
+                returncode, cmd, output="\n".join(output)
+            )
+            error.cwd = PC_RECEIVER_DIR
+            raise error
 
 
 def import_trace_metrics(db_path: str, session_id: int, prometheus_url: str | None,
@@ -1234,7 +1249,16 @@ def run_measurement(args: argparse.Namespace) -> None:
 
     network_before = None
     network_after = None
-    try:
+
+    def final_network_snapshot() -> None:
+        nonlocal network_after
+        if network_before is not None:
+            network_after = collect_network_snapshots(cfg, dry_run=args.dry_run)
+
+    actions = [("final network snapshot", final_network_snapshot)]
+    if not args.keep_targets:
+        actions.append(("target stop", lambda: stop_targets(cfg, dry_run=args.dry_run)))
+    with final_actions(*actions):
         print("Starting targets...")
         start_runtime_stress(cfg, dry_run=args.dry_run)
         start_supervisor(cfg, dry_run=args.dry_run)
@@ -1255,11 +1279,6 @@ def run_measurement(args: argparse.Namespace) -> None:
                 cfg, session_id, receiver_config, groups, dry_run=False,
                 on_ready=start_measurement_targets,
             )
-    finally:
-        if network_before is not None:
-            network_after = collect_network_snapshots(cfg, dry_run=args.dry_run)
-        if not args.keep_targets:
-            stop_targets(cfg, dry_run=args.dry_run)
 
     print("Collecting and validating results...")
     trace_import_ok = import_trace_metrics(

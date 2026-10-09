@@ -75,7 +75,7 @@ class OutputTest(unittest.TestCase):
 
     def test_receiver_gates_start_until_targets_are_ready(self):
         process = mock.Mock()
-        process.stdin = io.StringIO()
+        process.stdin = mock.Mock()
         process.stdout = io.StringIO(
             "Arduino ready for target start\n"
             "Group 1/1 stored (index 0, 100.0%)\n"
@@ -93,7 +93,7 @@ class OutputTest(unittest.TestCase):
             )
 
         ready.assert_called_once_with()
-        self.assertEqual(process.stdin.getvalue(), "start\n")
+        process.stdin.write.assert_called_once_with("start\n")
         self.assertIn("Progress: 1/1 groups", output.getvalue())
 
     def test_command_failure_is_actionable_without_traceback(self):
@@ -256,10 +256,10 @@ class LifecycleCommandTest(unittest.TestCase):
     def test_pidfile_stop_waits_before_kill_and_removal(self):
         command = runner.stop_pidfile_command("/tmp/supervisor.pid")
 
-        self.assertLess(command.index("kill $pid"), command.index("while kill -0"))
-        self.assertLess(command.index("while kill -0"), command.index("kill -KILL"))
+        self.assertLess(command.index("kill $pid"), command.index("if ! rt_tester_wait"))
+        self.assertLess(command.index("if ! rt_tester_wait"), command.index("kill -KILL"))
         self.assertLess(command.index("kill -KILL"), command.index("rm -f"))
-        self.assertIn("[ $i -lt 30 ]", command)
+        self.assertIn("[ $i -ge 30 ]", command)
 
 if __name__ == "__main__":
     unittest.main()
