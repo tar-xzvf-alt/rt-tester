@@ -12,6 +12,10 @@ arduino.db
 /merged.db
 /merged.db-*
 
+# SQLite runtime sidecars; keep primary measurement databases trackable.
+*.db-wal
+*.db-shm
+
 # Generated local plots and board dumps from ad-hoc experiments.
 /*.png
 /brcmfmac*.txt
