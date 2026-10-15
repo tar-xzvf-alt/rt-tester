@@ -84,6 +84,7 @@ def load_config(config_path=None):
         'target-stress': config.DEFAULT_TARGET_STRESS,
         'target-payload': config.DEFAULT_TARGET_PAYLOAD,
         'prometheus-url': 'http://localhost:9090',
+        'node-exporter-board': None,
         'soc': {
             'enabled': False,
             'host': None,
@@ -102,7 +103,7 @@ def load_config(config_path=None):
                         'measurements-per-group', 'measurement-interval-us',
                         'response-timeout-us',
                         'target-board', 'target-kernel', 'target-stress',
-                        'target-payload', 'prometheus-url']:
+                        'target-payload', 'prometheus-url', 'node-exporter-board']:
                 if key in file_config:
                     config_dict[key] = file_config[key]
             

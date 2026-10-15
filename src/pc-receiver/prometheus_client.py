@@ -6,6 +6,7 @@ Queries metrics from Prometheus server instead of SQLite database.
 """
 
 import requests
+import json
 from typing import Optional, List, Dict, Any
 import time
 from datetime import datetime
@@ -267,22 +268,31 @@ def get_prometheus_client(config: Optional[Dict] = None) -> PrometheusClient:
     return PrometheusClient(prometheus_url=url)
 
 
-def get_node_exporter_metrics(prometheus_url: str = "http://localhost:9090") -> Dict[str, float]:
+def get_node_exporter_metrics(
+    prometheus_url: str = "http://localhost:9090",
+    board: Optional[str] = None,
+) -> Dict[str, float]:
     """
     Get current CPU and memory metrics from node_exporter.
     
     Args:
         prometheus_url: Prometheus server URL
+        board: Optional node_exporter board label; avoids mixing multiple boards
         
     Returns:
         Dictionary with 'cpu_percent' and 'memory_percent'
     """
     client = PrometheusClient(prometheus_url=prometheus_url)
     metrics = {"cpu_percent": None, "memory_percent": None}
+    board_label = f"board={json.dumps(board)}," if board else ""
+    memory_selector = f"{{{board_label.rstrip(',')}}}" if board else ""
     
     try:
         # CPU usage (100% - idle)
-        cpu_query = '100 - (avg(irate(node_cpu_seconds_total{mode="idle"}[30s])) * 100)'
+        cpu_query = (
+            '100 - (avg(irate(node_cpu_seconds_total{'
+            + board_label + 'mode="idle"}[30s])) * 100)'
+        )
         result = client.query(cpu_query)
         if result:
             metrics["cpu_percent"] = float(result[0].get("value", [0, 0])[1])
@@ -291,7 +301,9 @@ def get_node_exporter_metrics(prometheus_url: str = "http://localhost:9090") -> 
     
     try:
         # Memory usage
-        mem_query = '(node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100'
+        total = f"node_memory_MemTotal_bytes{memory_selector}"
+        available = f"node_memory_MemAvailable_bytes{memory_selector}"
+        mem_query = f"({total} - {available}) / {total} * 100"
         result = client.query(mem_query)
         if result:
             metrics["memory_percent"] = float(result[0].get("value", [0, 0])[1])

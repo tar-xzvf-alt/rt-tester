@@ -27,15 +27,30 @@ class MetricsStorage:
         self._latest_group: Optional[Dict] = None
         self._groups_history: List[Dict] = []
         self._max_history = 10000  # Keep last 10000 groups
+        self._seen_groups = set()
+        self._session_totals = {'requests_sent': 0, 'responses_received': 0, 'timeouts': 0}
     
     def update_session(self, session_id: str):
         with self._lock:
             self._current_session_id = session_id
             self._latest_group = None
+            self._seen_groups.clear()
+            self._session_totals = dict.fromkeys(self._session_totals, 0)
     
     def add_group(self, group_data: Dict):
         with self._lock:
             if self._current_session_id:
+                group_data = dict(group_data)
+                index = group_data.get('group_index')
+                if index is not None and index in self._seen_groups:
+                    return
+                if index is not None:
+                    self._seen_groups.add(index)
+                if all(field in group_data for field in self._session_totals):
+                    for field in self._session_totals:
+                        self._session_totals[field] += int(group_data[field])
+                    group_data['session_totals'] = dict(self._session_totals)
+                group_data.setdefault('received_timestamp_seconds', time.time())
                 group_data['session_id'] = self._current_session_id
                 self._groups_history.append(group_data)
                 
@@ -127,6 +142,27 @@ class PrometheusMetricsHandler(http.server.BaseHTTPRequestHandler):
         
         lines.append(f"# TYPE arduino_session_info gauge")
         lines.append(f'arduino_session_info{{board="{board}",kernel="{kernel}",session_id="{session_id}",stress="{stress}"}} 1')
+
+        # Latest-group gauges, not cumulative counters. Receipt time lets a
+        # dashboard distinguish a retained last result from active collection.
+        for field in ('group_index', 'requests_sent', 'responses_received', 'timeouts'):
+            if field in latest:
+                name = 'arduino_group_index' if field == 'group_index' else f'arduino_group_{field}'
+                lines.append(f'# TYPE {name} gauge')
+                lines.append(f'{name}{{{labels}}} {int(latest[field])}')
+        lines.append('# TYPE arduino_last_group_timestamp_seconds gauge')
+        lines.append(
+            f'arduino_last_group_timestamp_seconds{{{labels}}} '
+            f'{latest["received_timestamp_seconds"]}'
+        )
+        for field, value in latest.get('session_totals', {}).items():
+            name = {
+                'requests_sent': 'arduino_requests_total',
+                'responses_received': 'arduino_responses_total',
+                'timeouts': 'arduino_timeouts_total',
+            }[field]
+            lines.append(f'# TYPE {name} counter')
+            lines.append(f'{name}{{{labels}}} {value}')
         
         # Add CPU/memory metrics from node_exporter (if available)
         soc_cpu = latest.get('soc_cpu_percent')

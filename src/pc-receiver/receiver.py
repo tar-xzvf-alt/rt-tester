@@ -74,6 +74,7 @@ class ArduinoCollector:
         self.target_stress = config_dict.get('target-stress', config.DEFAULT_TARGET_STRESS)
         self.target_payload = config_dict.get('target-payload', config.DEFAULT_TARGET_PAYLOAD)
         self.prometheus_url = config_dict.get('prometheus-url', 'http://localhost:9090')
+        self.node_exporter_board = config_dict.get('node-exporter-board')
 
 
         # Auto-stop configuration
@@ -220,14 +221,16 @@ class ArduinoCollector:
             msg['kernel'] = self.target_kernel
             msg['stress'] = self.target_stress
             
-            # Send to metrics server for Prometheus
-            self.metrics_server.add_group(msg)
-            
             # Get CPU/memory from node_exporter via Prometheus
-            node_metrics = get_node_exporter_metrics(self.prometheus_url)
+            node_metrics = get_node_exporter_metrics(
+                self.prometheus_url, board=self.node_exporter_board)
             if node_metrics['cpu_percent'] is not None:
                 msg['soc_cpu_percent'] = node_metrics['cpu_percent']
                 msg['soc_memory_percent'] = node_metrics['memory_percent'] if node_metrics['memory_percent'] else 0
+
+            # Publish a complete snapshot and the real receive time, not scrape time.
+            msg['received_timestamp_seconds'] = current_time_us / 1_000_000
+            self.metrics_server.add_group(msg)
             
             os.makedirs(config.STATE_DIR, exist_ok=True)
             with open(config.METRICS_LOG, 'a') as f:
@@ -744,7 +747,9 @@ def main():
     parser.add_argument('--start-gate-stdin', action='store_true',
                        help='Wait for a line on stdin before starting measurement')
     parser.add_argument('--exit-on-stop', action='store_true',
-                       help='Exit when Arduino reports stopped/auto_stopped')
+                        help='Exit when Arduino reports stopped/auto_stopped')
+    parser.add_argument('--keep-metrics', action='store_true',
+                        help='Keep /metrics serving the last group after a finite session')
     parser.add_argument('--groups', type=int,
                        help='Override auto-stop group count from config')
     parser.add_argument('--session-id', type=int,
@@ -757,6 +762,9 @@ def main():
 
     if args.start_gate_stdin and not args.start:
         parser.error('--start-gate-stdin requires --start')
+
+    if args.keep_metrics and not args.exit_on_stop:
+        parser.error('--keep-metrics requires --exit-on-stop')
 
     if args.groups is not None and args.groups < 1:
         parser.error('--groups must be >= 1')
@@ -787,6 +795,14 @@ def main():
             sys.exit("error: start gate closed before target startup")
     
     collector.run(auto_start=args.start, exit_on_stop=args.exit_on_stop)
+
+    if args.keep_metrics:
+        print('Collection ended; Arduino closed. Keeping /metrics available.', flush=True)
+        try:
+            while True:
+                time.sleep(10)
+        except KeyboardInterrupt:
+            collector.metrics_server.stop()
 
 
 if __name__ == "__main__":
