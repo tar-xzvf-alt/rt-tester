@@ -1,0 +1,200 @@
+{
+  "uid": "rt-repka5-k3",
+  "title": "Repka Pi 5 → Sipeed K3 ITX",
+  "id": null,
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "tags": ["rt-tester", "repka5-k3", "latency", "trace"],
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {"from": "now-30m", "to": "now"},
+  "templating": {"list": [
+    {"name": "datasource", "label": "Prometheus", "type": "datasource", "query": "prometheus", "refresh": 1},
+    {"name": "session_id", "label": "Сессия этапов", "type": "query", "datasource": {"type": "prometheus", "uid": "${datasource}"}, "query": "label_values(arduino_session_info{stand=\"repka5-k3\"}, session_id)", "refresh": 2, "sort": 4, "includeAll": true, "allValue": ".*", "current": {"text": "All", "value": "$__all"}},
+    {"name": "stage_stat", "label": "Статистика этапов", "type": "custom", "query": "min,avg,max", "includeAll": true, "allValue": "min|avg|max", "current": {"text": "avg", "value": "avg"}}
+  ]},
+  "panels": [
+    {
+      "id": 6, "title": "Общая задержка GPIO → GPIO", "type": "timeseries",
+      "description": "Overview of sessions in the selected time range. Whole-group mean uses every received response; tail mean uses the worst subset. No responses is not zero latency. Live lines expire 15 seconds after the last group.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 0, "w": 24, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "options": {"legend": {"displayMode": "table", "placement": "bottom", "calcs": ["mean", "max"]}},
+      "targets": [
+        {"expr": "arduino_latency_mean{stand=\"repka5-k3\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=\"repka5-k3\"} < 15) and on(stand,session_id) (arduino_group_responses_received{stand=\"repka5-k3\"} > 0)", "legendFormat": "{{session_id}} среднее всех ответов", "refId": "A"},
+        {"expr": "arduino_latency_avg{stand=\"repka5-k3\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=\"repka5-k3\"} < 15) and on(stand,session_id) (arduino_group_responses_received{stand=\"repka5-k3\"} > 0)", "legendFormat": "{{session_id}} среднее худшего хвоста", "refId": "B"},
+        {"expr": "arduino_latency_max{stand=\"repka5-k3\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=\"repka5-k3\"} < 15) and on(stand,session_id) (arduino_group_responses_received{stand=\"repka5-k3\"} > 0)", "legendFormat": "{{session_id}} максимум", "refId": "C"}
+      ]
+    },
+    {
+      "id": 12, "title": "RMS джиттер всей группы", "type": "timeseries",
+      "description": "Arduino RMS jitter over all received responses, not just the worst tail. Overview of sessions in the selected time range.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 8, "w": 24, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "arduino_jitter{stand=\"repka5-k3\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=\"repka5-k3\"} < 15) and on(stand,session_id) (arduino_group_responses_received{stand=\"repka5-k3\"} > 0)", "legendFormat": "{{session_id}} RMS", "refId": "A"}]
+    },
+    {
+      "id": 21, "title": "Repka: GPIO → начало отправки", "type": "timeseries",
+      "description": "Local processing after reading the GPIO event; does not measure the entire IRQ dispatch latency.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 16, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"gpio_to_send\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"gpio_to_send\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 22, "title": "Repka: отправка запроса", "type": "timeseries",
+      "description": "Local fragmentation, CRC and send work for a logical message; not pure wire latency.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 12, "y": 16, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"request_send\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"request_send\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 23, "title": "K3: приём запроса", "type": "timeseries",
+      "description": "Local request reassembly from first to last frame of the logical message.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 23, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"ethernet_recv\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"ethernet_recv\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 24, "title": "K3: публикация входа в shared memory", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 12, "y": 23, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"shmem_input\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"shmem_input\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 25, "title": "K3: логика ПЛК — ожидание результата", "type": "timeseries",
+      "description": "runtime_wait includes waiting for the 1 ms PLC cycle, scheduling and response publication. It is not pure PLC CPU execution time. Statistics are per group of the selected session.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 30, "w": 24, "h": 8},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"runtime_wait\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"runtime_wait\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 26, "title": "K3: чтение выхода из shared memory", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 38, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"shmem_output\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"shmem_output\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 27, "title": "K3: отправка ответа", "type": "timeseries",
+      "description": "Local response fragmentation and sending; not propagation time across the network.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 12, "y": 38, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"ethernet_send\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"spacemit-k3\",session_id=~\"$session_id\",stage=\"ethernet_send\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 28, "title": "Repka: приём ответа", "type": "timeseries",
+      "description": "Local response reassembly from the first to last frame.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 45, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"response_recv\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"response_recv\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 29, "title": "Repka: применение результата к GPIO", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 12, "y": 45, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"response_to_gpio\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"response_to_gpio\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 30, "title": "Repka: ожидание ответа — перекрывает работу K3", "type": "timeseries",
+      "description": "Wall-clock waiting bucket includes K3 work and network delays. Do not add it to runtime_wait or interpret it as controller CPU time.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 52, "w": 24, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "µs"}, "overrides": []},
+      "targets": [{"expr": "rt_trace_stage_latest_us{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"response_wait\",stat=~\"$stage_stat\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=\"repka5-k3\",board=\"repkapi5\",session_id=~\"$session_id\",stage=\"response_wait\"} < 15)", "legendFormat": "{{session_id}} {{stat}}", "refId": "A"}]
+    },
+    {
+      "id": 1, "title": "Endpoint health (1 = UP)", "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 59, "w": 24, "h": 4},
+      "fieldConfig": {"defaults": {"min": 0, "max": 1, "displayName": "${__field.labels.job}", "thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "green", "value": 1}]}}, "overrides": []},
+      "options": {"reduceOptions": {"calcs": ["lastNotNull"], "values": false}, "textMode": "value_and_name", "colorMode": "background"},
+      "targets": [{"expr": "up{stand=\"repka5-k3\"}", "refId": "A", "instant": true}]
+    },
+    {
+      "id": 2, "title": "CPU usage — each board separately", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 63, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "targets": [{"expr": "100 * (1 - avg by (board) (rate(node_cpu_seconds_total{stand=\"repka5-k3\",mode=\"idle\"}[$__rate_interval])))", "legendFormat": "{{board}}", "refId": "A"}]
+    },
+    {
+      "id": 3, "title": "Memory usage — each board separately", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 12, "y": 63, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "percent", "min": 0, "max": 100}, "overrides": []},
+      "targets": [{"expr": "100 * (1 - node_memory_MemAvailable_bytes{stand=\"repka5-k3\"} / node_memory_MemTotal_bytes{stand=\"repka5-k3\"})", "legendFormat": "{{board}}", "refId": "A"}]
+    },
+    {
+      "id": 4, "title": "Load average (not CPU %)", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 70, "w": 12, "h": 7},
+      "targets": [{"expr": "node_load1{stand=\"repka5-k3\"}", "legendFormat": "{{board}} load1", "refId": "A"}]
+    },
+    {
+      "id": 5, "title": "end0 network throughput", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 12, "y": 70, "w": 12, "h": 7},
+      "fieldConfig": {"defaults": {"unit": "Bps"}, "overrides": []},
+      "targets": [
+        {"expr": "rate(node_network_receive_bytes_total{stand=\"repka5-k3\",device=\"end0\"}[$__rate_interval])", "legendFormat": "{{board}} RX", "refId": "A"},
+        {"expr": "rate(node_network_transmit_bytes_total{stand=\"repka5-k3\",device=\"end0\"}[$__rate_interval])", "legendFormat": "{{board}} TX", "refId": "B"}
+      ]
+    },
+    {
+      "id": 7, "title": "Age of last Arduino group", "type": "stat",
+      "description": "Endpoint UP does not imply active GPIO pulses. Age increases after the finite session stops.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 89, "w": 24, "h": 4},
+      "fieldConfig": {"defaults": {"unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "orange", "value": 15}]}}, "overrides": []},
+      "targets": [{"expr": "time() - arduino_last_group_timestamp_seconds{stand=\"repka5-k3\",session_id=~\"$session_id\"}", "legendFormat": "{{session_id}}", "refId": "A", "instant": true}]
+    },
+    {
+      "id": 8, "title": "Last-group requests / responses / timeouts", "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 12, "y": 77, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "arduino_group_requests_sent{stand=\"repka5-k3\",session_id=~\"$session_id\"}", "legendFormat": "requests", "refId": "A", "instant": true},
+        {"expr": "arduino_group_responses_received{stand=\"repka5-k3\",session_id=~\"$session_id\"}", "legendFormat": "responses", "refId": "B", "instant": true},
+        {"expr": "arduino_group_timeouts{stand=\"repka5-k3\",session_id=~\"$session_id\"}", "legendFormat": "timeouts", "refId": "C", "instant": true}
+      ]
+    },
+    {
+      "id": 11, "title": "Group alignment", "type": "timeseries",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 77, "w": 12, "h": 7},
+      "targets": [
+        {"expr": "arduino_group_index{stand=\"repka5-k3\",session_id=~\"$session_id\"}", "legendFormat": "Arduino", "refId": "A"},
+        {"expr": "rt_trace_stage_latest_group_index{stand=\"repka5-k3\",session_id=~\"$session_id\",stage=~\"gpio_to_send|runtime_wait\"}", "legendFormat": "{{board}}", "refId": "B"}
+      ]
+    },
+    {
+      "id": 13, "title": "Session totals — including earlier group timeouts", "type": "stat",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 0, "y": 84, "w": 16, "h": 5},
+      "targets": [
+        {"expr": "max_over_time(arduino_requests_total{stand=\"repka5-k3\",session_id=~\"$session_id\"}[$__range])", "legendFormat": "{{session_id}} requests", "refId": "A", "instant": true},
+        {"expr": "max_over_time(arduino_responses_total{stand=\"repka5-k3\",session_id=~\"$session_id\"}[$__range])", "legendFormat": "{{session_id}} responses", "refId": "B", "instant": true},
+        {"expr": "max_over_time(arduino_timeouts_total{stand=\"repka5-k3\",session_id=~\"$session_id\"}[$__range])", "legendFormat": "{{session_id}} timeouts", "refId": "C", "instant": true}
+      ]
+    },
+    {
+      "id": 14, "title": "Board clock difference (includes scrape age)", "type": "stat",
+      "description": "Gross clock sanity check, not an NTP precision measurement. Up to one scrape interval of age is normal.",
+      "datasource": {"type": "prometheus", "uid": "${datasource}"},
+      "gridPos": {"x": 16, "y": 84, "w": 8, "h": 5},
+      "fieldConfig": {"defaults": {"unit": "s", "displayName": "${__field.labels.board}", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 10}]}}, "overrides": []},
+      "targets": [{"expr": "abs(time() - node_time_seconds{stand=\"repka5-k3\"})", "legendFormat": "{{board}}", "refId": "A", "instant": true}]
+    }
+  ]
+}

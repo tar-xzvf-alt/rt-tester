@@ -1,0 +1,12 @@
+apiVersion: 1
+providers:
+  - name: repka5-k3
+    orgId: 1
+    folder: RT Stand
+    folderUid: rt-stand
+    type: file
+    disableDeletion: true
+    allowUiUpdates: true
+    updateIntervalSeconds: 10
+    options:
+      path: /var/lib/grafana/rt-stand-dashboards

@@ -1,0 +1,873 @@
+{
+  "uid": "rt-supervised-overview",
+  "title": "Supervised PLC — latency and stages",
+  "id": null,
+  "schemaVersion": 39,
+  "version": 2,
+  "editable": true,
+  "tags": [
+    "rt-tester",
+    "supervised",
+    "latency",
+    "trace"
+  ],
+  "timezone": "browser",
+  "refresh": "5s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "datasource",
+        "label": "Prometheus",
+        "type": "datasource",
+        "query": "prometheus",
+        "refresh": 1,
+        "hide": 2
+      },
+      {
+        "name": "stand",
+        "label": "Stand",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(rt_trace_stage_latest_us{role=\"supervisor\"}, stand)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 2
+      },
+      {
+        "name": "runtime_board",
+        "label": "PLC runtime board",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "label_values(rt_trace_stage_latest_us{stand=~\"${stand:regex}\",role=\"supervisor\",stage=\"runtime_wait\"}, board)",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": false,
+        "multi": false
+      },
+      {
+        "name": "kernel",
+        "label": "Kernel",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "query_result(max by (kernel) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\"}[$__range]) and on(stand,session_id) max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\"}[$__range]))))",
+        "regex": "/kernel=\"([^\"]+)\"/",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0
+      },
+      {
+        "name": "stress",
+        "label": "Stress",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "query_result(max by (stress) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",kernel=~\"${kernel:regex}\"}[$__range]) and on(stand,session_id) max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\"}[$__range]))))",
+        "regex": "/stress=\"([^\"]+)\"/",
+        "refresh": 2,
+        "sort": 1,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0
+      },
+      {
+        "name": "session_id",
+        "label": "Session",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": "query_result(max by (session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range]) and on(stand,session_id) max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\"}[$__range]))))",
+        "regex": "/session_id=\"([^\"]+)\"/",
+        "refresh": 2,
+        "sort": 4,
+        "includeAll": true,
+        "multi": false,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "hide": 0
+      },
+      {
+        "name": "stage_stat",
+        "label": "Stage statistic",
+        "type": "custom",
+        "query": "min,avg,max",
+        "includeAll": true,
+        "allValue": "min|avg|max",
+        "multi": false,
+        "current": {
+          "text": "avg",
+          "value": "avg"
+        }
+      },
+      {
+        "name": "freshness_seconds",
+        "label": "Freshness limit (s)",
+        "type": "constant",
+        "query": "60",
+        "hide": 2,
+        "current": {
+          "text": "60",
+          "value": "60"
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 6,
+      "title": "GPIO → GPIO latency",
+      "type": "timeseries",
+      "description": "Selected runtime-board sessions. Whole-group mean and worst-tail mean are distinct. No responses is not zero latency; freshness is based on group receipt time. Board, kernel and stress select recorded sessions. Kernel/stress are receiver metadata, not independently verified host state.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom",
+          "calcs": [
+            "mean",
+            "max"
+          ]
+        }
+      },
+      "targets": [
+        {
+          "expr": "arduino_latency_mean{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} < $freshness_seconds) and on(stand,session_id) (arduino_group_responses_received{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} > 0) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} whole-group mean",
+          "refId": "A"
+        },
+        {
+          "expr": "arduino_latency_avg{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} < $freshness_seconds) and on(stand,session_id) (arduino_group_responses_received{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} > 0) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} worst-tail mean",
+          "refId": "B"
+        },
+        {
+          "expr": "arduino_latency_max{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} < $freshness_seconds) and on(stand,session_id) (arduino_group_responses_received{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} > 0) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} maximum",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "title": "Whole-group RMS jitter",
+      "type": "timeseries",
+      "description": "RMS jitter of all received responses in each group of the selected runtime-board sessions. Board, kernel and stress select recorded sessions. Kernel/stress are receiver metadata, not independently verified host state.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 8,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "arduino_jitter{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (time() - arduino_last_group_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} < $freshness_seconds) and on(stand,session_id) (arduino_group_responses_received{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} > 0) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} RMS",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 21,
+      "title": "Controller: GPIO → start of sending",
+      "type": "timeseries",
+      "description": "Local processing after reading the GPIO event; does not measure the entire IRQ dispatch latency.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 16,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"gpio_to_send\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"gpio_to_send\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 22,
+      "title": "Controller: request send",
+      "type": "timeseries",
+      "description": "Local fragmentation, CRC and send work for a logical message; not pure wire latency.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 16,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"request_send\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"request_send\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 23,
+      "title": "PLC: request receive",
+      "type": "timeseries",
+      "description": "Local request reassembly from first to last frame of the logical message.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 23,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"ethernet_recv\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"ethernet_recv\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 24,
+      "title": "PLC: shared-memory input publication",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 23,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"shmem_input\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"shmem_input\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 25,
+      "title": "PLC: wait for runtime result",
+      "type": "timeseries",
+      "description": "runtime_wait includes scheduling, the configured PLC cycle and response publication; it is not pure PLC CPU execution time. Statistics are per-group stage samples, not worst-tail averages.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 30,
+        "w": 24,
+        "h": 8
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"runtime_wait\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"runtime_wait\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 26,
+      "title": "PLC: shared-memory output read",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 38,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"shmem_output\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"shmem_output\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 27,
+      "title": "PLC: response send",
+      "type": "timeseries",
+      "description": "Local response fragmentation and sending; not propagation time across the network.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 38,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"ethernet_send\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",session_id=~\"${session_id:regex}\",role=\"supervisor\",stage=\"ethernet_send\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 28,
+      "title": "Controller: response receive",
+      "type": "timeseries",
+      "description": "Local response reassembly from the first to last frame.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"response_recv\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"response_recv\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 29,
+      "title": "Controller: response → GPIO",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 45,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"response_to_gpio\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"response_to_gpio\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 30,
+      "title": "Controller: response wait — overlaps PLC work",
+      "type": "timeseries",
+      "description": "Waiting includes PLC-side work and network delays. Do not sum it with PLC stages.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 52,
+        "w": 24,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "µs"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rt_trace_stage_latest_us{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"response_wait\",stat=~\"${stage_stat:regex}\"} and on(stand,board,session_id,stage) (time() - rt_trace_stage_latest_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"response_wait\"} < $freshness_seconds) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{board}} · {{session_id}} · {{stat}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "title": "Endpoint health (1 = UP)",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 59,
+        "w": 24,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "min": 0,
+          "max": 1,
+          "displayName": "${__field.labels.job} · ${__field.labels.instance}",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "textMode": "value_and_name",
+        "colorMode": "background"
+      },
+      "targets": [
+        {
+          "expr": "up{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\"} or (up{stand=~\"${stand:regex}\",role=\"controller\"} and on(stand,board) max by (stand,board) (rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\"} and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range]))))) or (up{stand=~\"${stand:regex}\",job=\"arduino_latency\"} and on(stand) max by (stand) ((max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))))",
+          "legendFormat": "{{job}} · {{instance}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "title": "PLC runtime CPU usage",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 63,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (1 - avg by (stand,board,instance) (rate(node_cpu_seconds_total{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\",mode=\"idle\"}[$__rate_interval])))",
+          "legendFormat": "{{board}} · {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Host metrics for the selected runtime board and time range, not session-labelled kernel/stress results. For an old experiment, select its time range. Interfaces are shown separately, excluding loopback."
+    },
+    {
+      "id": 3,
+      "title": "PLC runtime memory usage",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 63,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (1 - node_memory_MemAvailable_bytes{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\"} / node_memory_MemTotal_bytes{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\"})",
+          "legendFormat": "{{board}} · {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Host metrics for the selected runtime board and time range, not session-labelled kernel/stress results. For an old experiment, select its time range. Interfaces are shown separately, excluding loopback."
+    },
+    {
+      "id": 4,
+      "title": "PLC runtime load average (not CPU %)",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 70,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "node_load1{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\"}",
+          "legendFormat": "{{board}} · {{instance}}",
+          "refId": "A"
+        }
+      ],
+      "description": "Host metrics for the selected runtime board and time range, not session-labelled kernel/stress results. For an old experiment, select its time range. Interfaces are shown separately, excluding loopback."
+    },
+    {
+      "id": 5,
+      "title": "PLC runtime network throughput",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 70,
+        "w": 12,
+        "h": 7
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "rate(node_network_receive_bytes_total{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\",device!=\"lo\"}[$__rate_interval])",
+          "legendFormat": "{{board}} · {{instance}} · {{device}} RX",
+          "refId": "A"
+        },
+        {
+          "expr": "rate(node_network_transmit_bytes_total{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\",device!=\"lo\"}[$__rate_interval])",
+          "legendFormat": "{{board}} · {{instance}} · {{device}} TX",
+          "refId": "B"
+        }
+      ],
+      "description": "Host metrics for the selected runtime board and time range, not session-labelled kernel/stress results. For an old experiment, select its time range. Interfaces are shown separately, excluding loopback."
+    },
+    {
+      "id": 7,
+      "title": "Age of last Arduino group",
+      "type": "stat",
+      "description": "Endpoint UP does not mean active measurement. The hidden freshness_seconds installation setting controls latency/stage expiry.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 89,
+        "w": 24,
+        "h": 4
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "(time() - arduino_last_group_timestamp_seconds{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"}) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Last-group requests / responses / timeouts",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 77,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "arduino_group_requests_sent{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} requests_sent",
+          "refId": "A",
+          "instant": true
+        },
+        {
+          "expr": "arduino_group_responses_received{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} responses_received",
+          "refId": "B",
+          "instant": true
+        },
+        {
+          "expr": "arduino_group_timeouts{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} timeouts",
+          "refId": "C",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "title": "Group alignment",
+      "type": "timeseries",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 77,
+        "w": 12,
+        "h": 7
+      },
+      "targets": [
+        {
+          "expr": "arduino_group_index{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"} and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} Arduino",
+          "refId": "A"
+        },
+        {
+          "expr": "rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=\"runtime_wait\"} and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} runtime",
+          "refId": "B"
+        },
+        {
+          "expr": "rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",role=\"controller\",stage=\"gpio_to_send\"} and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} controller",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "id": 13,
+      "title": "Session totals — including earlier timeouts",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 84,
+        "w": 16,
+        "h": 5
+      },
+      "targets": [
+        {
+          "expr": "max_over_time(arduino_requests_total{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"}[$__range]) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} requests",
+          "refId": "A",
+          "instant": true
+        },
+        {
+          "expr": "max_over_time(arduino_responses_total{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"}[$__range]) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} responses",
+          "refId": "B",
+          "instant": true
+        },
+        {
+          "expr": "max_over_time(arduino_timeouts_total{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\"}[$__range]) and on(stand,session_id) (max by (stand,session_id) (max_over_time(rt_trace_stage_latest_group_index{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=\"supervisor\",stage=~\"runtime_wait\",session_id=~\"${session_id:regex}\"}[$__range])) and on(stand,session_id) max by (stand,session_id) (max_over_time(arduino_session_info{stand=~\"${stand:regex}\",session_id=~\"${session_id:regex}\",kernel=~\"${kernel:regex}\",stress=~\"${stress:regex}\"}[$__range])))",
+          "legendFormat": "{{session_id}} timeouts",
+          "refId": "C",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 14,
+      "title": "Runtime clock difference (includes scrape age)",
+      "type": "stat",
+      "description": "Host metrics for the selected runtime board and time range, not session-labelled kernel/stress results. For an old experiment, select its time range. Interfaces are shown separately, excluding loopback.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "x": 16,
+        "y": 84,
+        "w": 8,
+        "h": 5
+      },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "displayName": "${__field.labels.board}",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 10
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "abs(time() - node_time_seconds{stand=~\"${stand:regex}\",board=~\"${runtime_board:regex}\",role=~\"runtime|supervisor\"})",
+          "legendFormat": "{{board}} · {{instance}}",
+          "refId": "A",
+          "instant": true
+        }
+      ]
+    }
+  ]
+}

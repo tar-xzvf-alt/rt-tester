@@ -1,0 +1,53 @@
+# Lab collector: system Prometheus on :9090, direct IP access to both boards.
+global:
+  scrape_interval: 2s
+  evaluation_interval: 15s
+
+scrape_configs:
+  - job_name: repka5_node_exporter
+    static_configs:
+      - targets: ['10.64.128.104:9100']
+        labels:
+          stand: repka5-k3
+          board: repkapi5
+          role: controller
+          source: node_exporter
+
+  - job_name: k3_node_exporter
+    static_configs:
+      - targets: ['10.64.128.175:9100']
+        labels:
+          stand: repka5-k3
+          board: spacemit-k3
+          role: supervisor
+          source: node_exporter
+
+  - job_name: arduino_latency
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['127.0.0.1:9101']
+        labels:
+          stand: repka5-k3
+          controller_board: repkapi5
+          role: end_to_end
+          source: pc-receiver
+
+  - job_name: rt_trace_controller
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['10.64.128.104:9201']
+        labels:
+          stand: repka5-k3
+          board: repkapi5
+          role: controller
+          source: rt-trace-exporter
+
+  - job_name: rt_trace_supervisor
+    scrape_interval: 500ms
+    static_configs:
+      - targets: ['10.64.128.175:9201']
+        labels:
+          stand: repka5-k3
+          board: spacemit-k3
+          role: supervisor
+          source: rt-trace-exporter
