@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" role="img" aria-labelledby="title desc">
+<title id="title">Standalone GPIO measurement</title><desc id="desc">The PC controls an MCU over USB serial. The MCU issues a GPIO edge and detects the response from a target handler. The handler runs in userspace or kernelspace. There is no Ethernet message, supervisor, or PLC runtime in the measured path.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L7 4 L0 8 Z" fill="#ff8000" /></marker>
+<style>text { font-family:'DejaVu Sans',Arial,sans-serif; fill:#000; } .title {font-size:40px;font-weight:700} .heading {font-size:29px;font-weight:700} .body {font-size:23px;fill:#333} .label {font-size:22px} .card {fill:white;stroke:#ff8000;stroke-width:3} .link {fill:none;stroke:#ff8000;stroke-width:4;stroke-linejoin:round}</style></defs>
+<rect width="1400" height="760" fill="white" />
+<text x="70" y="78" class="title">Standalone GPIO measurement</text>
+<text x="70" y="125" class="body">Measure the target response without Ethernet or a PLC runtime.</text>
+<rect x="490" y="175" width="420" height="140" rx="22" class="card" />
+<text x="520" y="220" class="heading">PC / receiver</text>
+<text x="520" y="262" class="body">Control and collection</text>
+<text x="520" y="295" class="body">SQLite and logs</text>
+<path d="M490 245 H285 V430" class="link" />
+<text x="305" y="280" class="label">USB / serial</text>
+<path d="M910 245 H1090 V430" class="link" stroke-dasharray="9 9" />
+<text x="960" y="280" class="label">Management</text>
+<rect x="90" y="430" width="390" height="230" rx="22" class="card" />
+<text x="120" y="480" class="heading">MCU</text>
+<text x="120" y="530" class="body">Issue the GPIO edge</text>
+<text x="120" y="567" class="body">Detect the response</text>
+<text x="120" y="617" class="body">Measure the full round trip</text>
+<rect x="870" y="430" width="440" height="230" rx="22" class="card" />
+<text x="900" y="480" class="heading">Target device</text>
+<text x="900" y="530" class="body" style="font-size:20px">GPIO IN → handler → GPIO OUT</text>
+<text x="900" y="580" class="body">userspace / kernelspace</text>
+<text x="900" y="617" class="body">No supervisor or PLC runtime</text>
+<path d="M492 505 H858" class="link" marker-end="url(#arrow)" />
+<text x="675" y="478" text-anchor="middle" class="label">GPIO edge</text>
+<path d="M858 605 H492" class="link" marker-end="url(#arrow)" />
+<text x="675" y="643" text-anchor="middle" class="label">GPIO response edge</text>
+<text x="70" y="716" class="body">Solid links: measurement and collection. Dashed link: target management.</text>
+</svg>

@@ -2,6 +2,23 @@
 
 [Русский](../ru/modes/standalone-gpio.md)
 
+## Measurement principle
+
+![Generic standalone GPIO stand](../assets/standalone-gpio-stand-en.svg)
+
+The microcontroller (MCU) issues a GPIO edge and measures the time until it
+detects the target's response edge. The target handler reads the input and sets
+the output; it may run in userspace or kernelspace. There is no Ethernet message,
+supervisor, or PLC runtime in this measurement path.
+
+The PC controls collection over USB serial and stores group results in SQLite.
+Its management connection to the target is separate from the timed GPIO path.
+The drawing is hardware-neutral; the supplied firmware uses an Arduino MCU.
+Electrical level adaptation and a suitable ground connection are not drawn:
+follow the [wiring requirements](../hardware/target-gpio.md) for the actual hardware.
+This is a physical round-trip measurement, not an isolated IRQ or handler CPU-time
+measurement. See [measurement statistics](../reference/measurement-statistics.md).
+
 ## Adapting a project profile
 
 Historical comparison profiles describe a particular laboratory environment,

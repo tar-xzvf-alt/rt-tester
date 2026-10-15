@@ -1,0 +1,32 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="760" viewBox="0 0 1400 760" role="img" aria-labelledby="title desc">
+<title id="title">Автономное измерение GPIO</title><desc id="desc">ПК управляет MCU по USB serial. MCU выдаёт фронт GPIO и фиксирует ответ обработчика целевого устройства. Обработчик работает в userspace или kernelspace. В измерительном контуре нет Ethernet-посылки, supervisor и PLC runtime.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L7 4 L0 8 Z" fill="#ff8000" /></marker>
+<style>text { font-family:'DejaVu Sans',Arial,sans-serif; fill:#000; } .title {font-size:40px;font-weight:700} .heading {font-size:29px;font-weight:700} .body {font-size:23px;fill:#333} .label {font-size:22px} .card {fill:white;stroke:#ff8000;stroke-width:3} .link {fill:none;stroke:#ff8000;stroke-width:4;stroke-linejoin:round}</style></defs>
+<rect width="1400" height="760" fill="white" />
+<text x="70" y="78" class="title">Автономное измерение GPIO</text>
+<text x="70" y="125" class="body">Измерение отклика устройства без Ethernet-обмена и PLC runtime.</text>
+<rect x="490" y="175" width="420" height="140" rx="22" class="card" />
+<text x="520" y="220" class="heading">ПК / приёмник</text>
+<text x="520" y="262" class="body">Управление и сбор</text>
+<text x="520" y="295" class="body">SQLite и журналы</text>
+<path d="M490 245 H285 V430" class="link" />
+<text x="305" y="280" class="label">USB / serial</text>
+<path d="M910 245 H1090 V430" class="link" stroke-dasharray="9 9" />
+<text x="960" y="280" class="label">Управление</text>
+<rect x="90" y="430" width="390" height="230" rx="22" class="card" />
+<text x="120" y="480" class="heading">MCU</text>
+<text x="120" y="530" class="body">Выдача фронта GPIO</text>
+<text x="120" y="567" class="body">Фиксация ответного фронта</text>
+<text x="120" y="617" class="body">Замер времени отклика</text>
+<rect x="870" y="430" width="440" height="230" rx="22" class="card" />
+<text x="900" y="480" class="heading">Целевое устройство</text>
+<text x="900" y="530" class="body" style="font-size:20px">GPIO IN → обработчик → GPIO OUT</text>
+<text x="900" y="580" class="body">userspace / kernelspace</text>
+<text x="900" y="617" class="body">Без supervisor и PLC runtime</text>
+<path d="M492 505 H858" class="link" marker-end="url(#arrow)" />
+<text x="675" y="478" text-anchor="middle" class="label">Фронт GPIO</text>
+<path d="M858 605 H492" class="link" marker-end="url(#arrow)" />
+<text x="675" y="643" text-anchor="middle" class="label">Ответный фронт GPIO</text>
+<text x="70" y="716" class="body">Сплошные линии — измерение и сбор. Пунктир — управление целевым устройством.</text>
+</svg>

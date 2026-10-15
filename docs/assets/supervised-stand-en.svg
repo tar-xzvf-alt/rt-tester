@@ -1,0 +1,52 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Supervised measurement stand</title>
+  <desc id="desc">PC controls an MCU over USB and manages the target devices over a network. The MCU times a GPIO round trip through an external controller and a PLC connected by Ethernet. No particular hardware model is required.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto-start-reverse"><path d="M0 0 L7 4 L0 8 Z" fill="#ff8000" /></marker>
+    <style>
+      text { font-family: 'DejaVu Sans', Arial, sans-serif; fill: #000; }
+      .title { font-size: 48px; font-weight: 700; }
+      .heading { font-size: 32px; font-weight: 700; }
+      .body { font-size: 25px; fill: #333; }
+      .label { font-size: 24px; fill: #000; }
+      .card { fill: #fff; stroke: #ff8000; stroke-width: 3; }
+      .link { fill: none; stroke: #ff8000; stroke-width: 4; stroke-linejoin: round; }
+      .icon { fill: none; stroke: #ff8000; stroke-width: 4; stroke-linecap: round; stroke-linejoin: round; }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#fff" />
+  <text x="100" y="105" class="title">Supervised measurement stand</text>
+  <text x="100" y="155" class="body">External timing · controller · PLC · collection</text>
+  <rect x="540" y="220" width="520" height="160" rx="24" class="card" />
+  <rect x="578" y="262" width="74" height="49" rx="5" class="icon" />
+  <path d="M567 323 H663" class="icon" />
+  <text x="695" y="283" class="heading">PC</text>
+  <text x="695" y="328" class="body">Control and collection</text>
+  <path d="M540 300 H265 V550" class="link" />
+  <text x="285" y="343" class="label">USB</text>
+  <path d="M1060 300 H1320 V550" class="link" stroke-dasharray="9 9" />
+  <text x="1150" y="271" class="label">Management network</text>
+  <path d="M920 550 V455 H1320" class="link" stroke-dasharray="9 9" />
+  <rect x="100" y="550" width="330" height="230" rx="24" class="card" />
+  <rect x="130" y="592" width="50" height="50" rx="8" class="icon" />
+  <path d="M140 581 V592 M155 581 V592 M170 581 V592 M140 642 V653 M155 642 V653 M170 642 V653" class="icon" />
+  <text x="203" y="626" class="heading">MCU</text>
+  <text x="130" y="708" class="body" style="font-size:22px">Round-trip timing</text>
+  <text x="130" y="736" class="body" style="font-size:22px">between devices</text>
+  <rect x="635" y="550" width="330" height="230" rx="24" class="card" />
+  <rect x="665" y="592" width="50" height="50" rx="8" class="icon" />
+  <path d="M675 581 V592 M690 581 V592 M705 581 V592 M675 642 V653 M690 642 V653 M705 642 V653" class="icon" />
+  <text x="739" y="626" class="heading">Controller</text>
+  <text x="665" y="708" class="body">GPIO ↔ Ethernet</text>
+  <rect x="1170" y="550" width="330" height="230" rx="24" class="card" />
+  <rect x="1200" y="592" width="50" height="50" rx="8" class="icon" />
+  <path d="M1210 581 V592 M1225 581 V592 M1240 581 V592 M1210 642 V653 M1225 642 V653 M1240 642 V653" class="icon" />
+  <text x="1273" y="626" class="heading">PLC</text>
+  <text x="1200" y="708" class="body" style="font-size:20px">Supervisor + Runtime</text>
+  <path d="M442 645 H623" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+  <text x="502" y="616" class="label">GPIO</text>
+  <path d="M977 645 H1158" class="link" marker-start="url(#arrow)" marker-end="url(#arrow)" />
+  <text x="1017" y="616" class="label">Ethernet</text>
+  <text x="100" y="831" class="body">Solid links: measurement path. Dashed links: management and monitoring.</text>
+</svg>

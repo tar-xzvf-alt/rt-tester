@@ -1,0 +1,65 @@
+<?xml version='1.0' encoding='utf-8'?>
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="900" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Измерение времени обмена и этапы обработки</title>
+  <desc id="desc">MCU измеряет полный цикл GPIO. Внешний контроллер отправляет и принимает Ethernet-посылки. На устройстве ПЛК супервизор обменивается данными с runtime через shared memory. Названия этапов описывают операции, а не точные границы измеряемых интервалов.</desc>
+  <defs>
+    <marker id="blue" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L7 4 L0 8 Z" fill="#ff8000" /></marker>
+    <marker id="green" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0 L7 4 L0 8 Z" fill="#ff8000" /></marker>
+    <style>
+      text { font-family: 'DejaVu Sans', Arial, sans-serif; fill: #000; }
+      .title { font-size: 46px; font-weight: 700; }
+      .heading { font-size: 29px; font-weight: 700; }
+      .body { font-size: 24px; fill: #333; }
+      .label { font-size: 24px; fill: #000; }
+      .stage { font-size: 22px; fill: #333; }
+      .note { font-size: 20px; fill: #333; }
+      .card { fill: white; stroke: #ff8000; stroke-width: 2; }
+      .request { fill: none; stroke: #ff8000; stroke-width: 4; marker-end: url(#blue); }
+      .response { fill: none; stroke: #ff8000; stroke-width: 4; marker-end: url(#green); }
+    </style>
+  </defs>
+  <rect width="1600" height="900" fill="#fff" />
+  <text x="70" y="85" class="title">Измерение времени обмена и этапы обработки</text>
+  <text x="70" y="132" class="body">MCU измеряет полный цикл. Локальная трассировка описывает этапы обработки.</text>
+
+  <rect x="70" y="265" width="360" height="155" rx="24" class="card" />
+  <text x="100" y="321" class="heading">Микроконтроллер</text>
+  <text x="100" y="365" class="body">Начало и конец отсчёта</text>
+  <text x="100" y="400" class="note" style="font-size:20px">Полный цикл GPIO → GPIO</text>
+
+  <rect x="605" y="265" width="400" height="155" rx="24" class="card" />
+  <text x="650" y="321" class="heading" font-size="27px" style="font-size:27px">Внешний контроллер</text>
+  <text x="650" y="365" class="body">Обработка сигналов</text>
+  <text x="650" y="400" class="note">GPIO ↔ Ethernet</text>
+
+  <rect x="1170" y="265" width="360" height="155" rx="24" class="card" />
+  <text x="1200" y="321" class="heading">Устройство ПЛК</text>
+  <text x="1200" y="365" class="body" style="font-size:20px">Supervisor + Runtime</text>
+  <text x="1200" y="400" class="note">Обработка данных</text>
+
+  <path d="M250 265 V220 H800 V253" class="request" />
+  <text x="485" y="199" text-anchor="middle" class="label">Фронт GPIO</text>
+  <path d="M950 265 V220 H1350 V253" class="request" />
+  <text x="1135" y="199" text-anchor="middle" class="label">Ethernet-посылка</text>
+  <path d="M1350 420 V465 H950 V432" class="response" />
+  <text x="1135" y="503" text-anchor="middle" class="label">Ethernet-посылка</text>
+  <path d="M800 420 V465 H250 V432" class="response" />
+  <text x="485" y="503" text-anchor="middle" class="label">Фронт GPIO</text>
+
+  <rect x="70" y="550" width="710" height="256" rx="22" class="card" />
+  <text x="100" y="590" class="heading">Этапы на внешнем контроллере</text>
+  <text x="100" y="630" class="stage">Обработка входного фронта GPIO</text>
+  <text x="100" y="665" class="stage">Отправка Ethernet-посылки</text>
+  <text x="100" y="700" class="stage">Ожидание результата</text>
+  <text x="100" y="735" class="stage">Приём Ethernet-посылки</text>
+  <text x="100" y="770" class="stage">Установка выходного сигнала GPIO</text>
+
+  <rect x="810" y="550" width="720" height="256" rx="22" class="card" />
+  <text x="840" y="590" class="heading">Этапы на стороне ПЛК</text>
+  <text x="840" y="630" class="stage">Приём Ethernet-посылки</text>
+  <text x="840" y="665" class="stage">Запись в shared memory</text>
+  <text x="840" y="700" class="stage">Работа runtime / логики ПЛК</text>
+  <text x="840" y="735" class="stage">Чтение результата из shared memory</text>
+  <text x="840" y="770" class="stage">Отправка Ethernet-посылки</text>
+
+</svg>

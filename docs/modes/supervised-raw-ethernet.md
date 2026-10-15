@@ -6,10 +6,31 @@ This mode measures the complete Arduino/controller/raw-Ethernet/supervisor/runti
 round trip. `rt-tester-run-stand` owns the readiness barrier, workload, receiver,
 and trace collection.
 
-```text
-Arduino → controller GPIO → raw Ethernet → supervisor → shared memory → runtime
-Arduino ← controller GPIO ← raw Ethernet ← supervisor ← runtime response
-```
+## Stand and exchange principle
+
+![Generic supervised measurement stand](../assets/supervised-stand-en.svg)
+
+The microcontroller (MCU) measures the complete GPIO round trip. An external
+controller translates GPIO events into raw Ethernet messages. On the PLC device,
+the supervisor exchanges data with the runtime through shared memory; the result
+returns through Ethernet and the controller's output GPIO. The PC controls
+collection and stores results; it is not a relay for the measured Ethernet exchange.
+The device names describe roles, not required hardware models or a particular
+runtime implementation. The supplied MCU firmware uses Arduino.
+
+![Processing stages of the supervised exchange](../assets/supervised-exchange-en.svg)
+
+The stage lists describe operations, not exact timing boundaries. Local traces
+provide stage statistics separately from the MCU's physical round-trip measurement.
+Runtime waiting includes scheduling and, for a cyclic PLC, waiting for its next
+cycle; it is not pure logic execution time. The controller's response wait overlaps
+the PLC-side work, so those intervals must not be added as independent stages.
+Trace averages are not automatically averages of the worst 5% of measurements.
+
+Message size is experiment-dependent; see [network health and transport](#network-health-and-transport).
+Level adaptation and grounding are omitted from the drawings, not from the wiring
+requirements; see [target GPIO](../hardware/target-gpio.md). Management connections
+are separate from the timed path and do not prescribe a Wi-Fi or tunnel topology.
 
 For the handler baseline use [standalone GPIO](standalone-gpio.md); for scheduler
 latency without GPIO use [Linux benchmarks](linux-benchmarks.md).
@@ -107,6 +128,11 @@ for the full payload. `requested retransmit` indicates frame recovery;
 `retry_*` stages indicate retry of the complete request/response cycle.
 
 ## Inspect the result
+
+For runtime-board selection, use **Supervised PLC — latency and stages**
+(UID `rt-supervised-overview`). Select **PLC runtime board**, **Kernel**, **Stress**,
+then a session and time range. See the [generic dashboard setup](../observability/local.md#generic-supervised-dashboard)
+for datasource selection, required scrape labels, and freshness settings.
 
 The `RT Trace Stage Breakdown` dashboard UID is `rt-trace-stages`. It shows
 runtime CPU/memory, RX/TX bytes/sec, Arduino round-trip latency, ordinary stages,
